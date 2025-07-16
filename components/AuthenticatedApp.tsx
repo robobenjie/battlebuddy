@@ -7,6 +7,7 @@ import HamburgerMenu from './HamburgerMenu';
 import Sidebar from './Sidebar';
 import UploadArmyPage from './UploadArmyPage';
 import ViewArmiesPage from './ViewArmiesPage';
+import ArmyDetailPage from './ArmyDetailPage';
 
 interface AuthenticatedAppProps {
   user: any;
@@ -17,6 +18,7 @@ export default function AuthenticatedApp({ user }: AuthenticatedAppProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [currentPage, setCurrentPage] = useState('home');
+  const [selectedArmyId, setSelectedArmyId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
 
@@ -41,6 +43,17 @@ export default function AuthenticatedApp({ user }: AuthenticatedAppProps) {
   // Navigation handlers
   const handleNavigation = (page: string) => {
     setCurrentPage(page);
+    setSelectedArmyId(null); // Clear selected army when navigating to other pages
+  };
+
+  const handleNavigateToArmy = (armyId: string) => {
+    setSelectedArmyId(armyId);
+    setCurrentPage('army-detail');
+  };
+
+  const handleBackToArmies = () => {
+    setSelectedArmyId(null);
+    setCurrentPage('view-armies');
   };
 
   const handleLogout = () => {
@@ -143,7 +156,17 @@ export default function AuthenticatedApp({ user }: AuthenticatedAppProps) {
       case 'upload-army':
         return <UploadArmyPage user={user} onSuccess={() => setCurrentPage('view-armies')} />;
       case 'view-armies':
-        return <ViewArmiesPage user={user} />;
+        return <ViewArmiesPage user={user} onNavigateToArmy={handleNavigateToArmy} />;
+      case 'army-detail':
+        return selectedArmyId ? (
+          <ArmyDetailPage 
+            armyId={selectedArmyId} 
+            user={user} 
+            onBack={handleBackToArmies} 
+          />
+        ) : (
+          <ViewArmiesPage user={user} onNavigateToArmy={handleNavigateToArmy} />
+        );
       case 'home':
       default:
         return (

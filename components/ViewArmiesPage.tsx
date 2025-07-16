@@ -6,9 +6,10 @@ import ConfirmationModal from './ConfirmationModal';
 
 interface ViewArmiesPageProps {
   user: any;
+  onNavigateToArmy?: (armyId: string) => void;
 }
 
-export default function ViewArmiesPage({ user }: ViewArmiesPageProps) {
+export default function ViewArmiesPage({ user, onNavigateToArmy }: ViewArmiesPageProps) {
   const [deletingArmyId, setDeletingArmyId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -56,9 +57,8 @@ export default function ViewArmiesPage({ user }: ViewArmiesPageProps) {
   };
 
   const handleArmyClick = (armyId: string) => {
-    // TODO: Navigate to army detail view (not implemented yet)
-    console.log('Navigate to army:', armyId);
-    alert('Army detail view not implemented yet');
+    // Navigate to army detail view
+    onNavigateToArmy?.(armyId);
   };
 
   const formatDate = (timestamp: number) => {
