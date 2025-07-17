@@ -954,7 +954,7 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
     console.log('📥 Building army transaction...');
     // Add army transaction with required fields that database expects
     transactions.push(
-      (db.tx.armies[armyMetadata.id] as any).update({
+      db.tx.armies[armyMetadata.id].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
         pointsValue: armyMetadata.totalPoints,
@@ -976,7 +976,7 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
     for (const unit of units) {
       const unitModels = allModels.filter(m => m.unitId === unit.id);
       transactions.push(
-        (db.tx.units[unit.id] as any).update({
+        db.tx.units[unit.id].update({
           name: unit.name,
           type: unit.type || 'Infantry',
           abilities: unit.rules || [],
@@ -1014,7 +1014,7 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
       }
       
       transactions.push(
-        (db.tx.models[model.id] as any).update({
+        db.tx.models[model.id].update({
           name: model.name,
           baseStats: baseStats,
           currentWounds: 0,
@@ -1040,7 +1040,7 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
     // Add weapon transactions with required fields that database expects
     for (const weapon of allWeapons) {
       transactions.push(
-        (db.tx.weapons[weapon.id] as any).update({
+        db.tx.weapons[weapon.id].update({
           name: weapon.name,
           type: weapon.type,
           profiles: weapon.profiles || [],

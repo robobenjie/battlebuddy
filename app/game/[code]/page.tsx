@@ -34,8 +34,11 @@ export default function GamePage() {
   const game = games.find((g: any) => g.code === gameCode);
   const players = allPlayers.filter((p: any) => p.gameId === game?.id);
 
-  // Get user's army templates (not game-specific)
-  const userArmies = allArmies.filter((a: any) => a.ownerId === user?.id && !a.gameId);
+  // Get all user army templates (not game-specific) - host needs to see all armies to copy them
+  const userArmies = allArmies.filter((a: any) => !a.gameId);
+  
+  // Get current user's armies for the army selection UI
+  const currentUserArmies = allArmies.filter((a: any) => a.ownerId === user?.id && !a.gameId);
 
   // Function to copy an army using the original JSON and import logic
   const copyArmyToGame = async (armyId: string, playerId: string) => {
@@ -250,11 +253,11 @@ export default function GamePage() {
         </div>
 
         {/* Army Selection for Current Player */}
-        {currentPlayer && !currentPlayer.armyId && userArmies.length > 0 && (
+        {currentPlayer && !currentPlayer.armyId && currentUserArmies.length > 0 && (
           <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-8">
             <h2 className="text-2xl font-semibold mb-4">Select Your Army</h2>
             <div className="space-y-3">
-              {userArmies.map((army) => (
+              {currentUserArmies.map((army) => (
                 <div
                   key={army.id}
                   className="flex items-center justify-between bg-gray-700 rounded-lg p-4"

@@ -3,12 +3,13 @@
  * Tests basic army metadata extraction and parsing from NewRecruit JSON
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { 
   extractArmyMetadata, 
   extractUnits,
   extractModels,
   extractWeapons,
+  importArmyForGame,
   type NewRecruitRoster, 
   type ArmyMetadata,
   type UnitData,
@@ -16,6 +17,208 @@ import {
   type WeaponData
 } from '../lib/army-import';
 import testData from '../test_data/assault_weapon_test.json';
+
+// Mock transactions storage
+const mockTransactions: any[] = [];
+
+// Mock the db import
+vi.mock('../lib/db', () => ({
+  db: {
+    transact: async (transactions: any[]) => {
+      mockTransactions.push(...transactions);
+      return Promise.resolve();
+    },
+    tx: {
+      armies: new Proxy({}, {
+        get: (target, prop) => ({
+          update: (data: any) => ({ type: 'army-update', id: prop, data })
+        })
+      }),
+      units: new Proxy({}, {
+        get: (target, prop) => ({
+          update: (data: any) => ({ type: 'unit-update', id: prop, data })
+        })
+      }),
+      models: new Proxy({}, {
+        get: (target, prop) => ({
+          update: (data: any) => ({ type: 'model-update', id: prop, data })
+        })
+      }),
+      weapons: new Proxy({}, {
+        get: (target, prop) => ({
+          update: (data: any) => ({ type: 'weapon-update', id: prop, data })
+        })
+      })
+    }
+  }
+}));
+
+describe('Army Import - Model Count Preservation', () => {
+  const userId1 = 'player1-user-id';
+  const userId2 = 'player2-user-id';
+  const gameId = 'test-game-id';
+
+  beforeEach(() => {
+    // Clear mock transactions before each test
+    mockTransactions.length = 0;
+  });
+
+  describe('Model Count Extraction Tests', () => {
+    it('should extract correct model counts from unit data', () => {
+      const jsonData = testData as NewRecruitRoster;
+      const armyMetadata = extractArmyMetadata(jsonData, userId1);
+      const units = extractUnits(jsonData, armyMetadata.id, userId1);
+      
+      console.log('🧪 Extracted units:', units.length);
+      
+      // Test model extraction for each unit
+      units.forEach((unit, index) => {
+        console.log(`🧪 Unit ${index + 1}: ${unit.name}, count: ${unit.count}`);
+        
+        const models = extractModels(unit);
+        console.log(`🧪 Models for unit ${unit.name}:`, models.map(m => ({ name: m.name, count: m.count })));
+        
+        // Verify no model has count of 1 unless that's actually correct
+        models.forEach(model => {
+          expect(model.count).toBeGreaterThan(0);
+          console.log(`🧪 Model: ${model.name}, count: ${model.count}`);
+        });
+      });
+    });
+
+    it('should preserve model counts through full import process', async () => {
+      const jsonData = testData as NewRecruitRoster;
+      
+      // Test import for player 1 (host)
+      console.log('🧪 Testing import for Player 1 (host)');
+      const result1 = await importArmyForGame(jsonData, userId1, gameId);
+      
+      // Extract model transactions for player 1
+      const player1ModelTransactions = mockTransactions.filter(t => t.type === 'model-update');
+      console.log('🧪 Player 1 model transactions:', player1ModelTransactions.length);
+      
+      player1ModelTransactions.forEach((transaction, index) => {
+        console.log(`🧪 Player 1 Model ${index + 1}: ${transaction.data.name}, count: ${transaction.data.count}`);
+        expect(transaction.data.count).toBeGreaterThan(0);
+        expect(transaction.data.count).toBeDefined();
+      });
+      
+      // Clear transactions and test player 2
+      mockTransactions.length = 0;
+      
+      console.log('🧪 Testing import for Player 2 (non-host)');
+      const result2 = await importArmyForGame(jsonData, userId2, gameId);
+      
+      // Extract model transactions for player 2
+      const player2ModelTransactions = mockTransactions.filter(t => t.type === 'model-update');
+      console.log('🧪 Player 2 model transactions:', player2ModelTransactions.length);
+      
+      player2ModelTransactions.forEach((transaction, index) => {
+        console.log(`🧪 Player 2 Model ${index + 1}: ${transaction.data.name}, count: ${transaction.data.count}`);
+        expect(transaction.data.count).toBeGreaterThan(0);
+        expect(transaction.data.count).toBeDefined();
+      });
+      
+      // Compare counts between players
+      expect(player1ModelTransactions.length).toBe(player2ModelTransactions.length);
+      
+      for (let i = 0; i < player1ModelTransactions.length; i++) {
+        const p1Model = player1ModelTransactions[i];
+        const p2Model = player2ModelTransactions[i];
+        
+        console.log(`🧪 Comparing model ${i + 1}: P1=${p1Model.data.count}, P2=${p2Model.data.count}`);
+        expect(p1Model.data.count).toBe(p2Model.data.count);
+      }
+    });
+  });
+
+  describe('Different Army Data Structures', () => {
+    it('should handle armies with different model configurations', async () => {
+      // Create test data with known model counts
+      const testArmy1: NewRecruitRoster = {
+        roster: {
+          name: "Test Army 1",
+          costs: [{ name: "pts", typeId: "points", value: 500 }],
+          costLimits: [{ name: "pts", typeId: "points", value: 1000 }],
+          forces: [{
+            selections: [{
+              name: "Test Unit",
+              type: "unit",
+              number: 1,
+              categories: [{ name: "Infantry", id: "cat1" }],
+              selections: [{
+                name: "Test Model",
+                type: "model",
+                number: 5, // 5 models
+                profiles: [{
+                  id: "prof1",
+                  name: "Test Model",
+                  typeName: "Unit",
+                  characteristics: [
+                    { name: "M", typeId: "M", $text: "6\"" },
+                    { name: "T", typeId: "T", $text: "4" }
+                  ]
+                }]
+              }]
+            }]
+          }]
+        }
+      };
+
+      const testArmy2: NewRecruitRoster = {
+        roster: {
+          name: "Test Army 2", 
+          costs: [{ name: "pts", typeId: "points", value: 500 }],
+          costLimits: [{ name: "pts", typeId: "points", value: 1000 }],
+          forces: [{
+            selections: [{
+              name: "Test Unit 2",
+              type: "unit", 
+              number: 1,
+              categories: [{ name: "Infantry", id: "cat1" }],
+              selections: [{
+                name: "Test Model 2",
+                type: "model",
+                number: 10, // 10 models
+                profiles: [{
+                  id: "prof2",
+                  name: "Test Model 2", 
+                  typeName: "Unit",
+                  characteristics: [
+                    { name: "M", typeId: "M", $text: "6\"" },
+                    { name: "T", typeId: "T", $text: "3" }
+                  ]
+                }]
+              }]
+            }]
+          }]
+        }
+      };
+
+      // Test both armies
+      console.log('🧪 Testing Army 1 (5 models)');
+      await importArmyForGame(testArmy1, userId1, gameId);
+      const army1Models = mockTransactions.filter(t => t.type === 'model-update');
+      
+      mockTransactions.length = 0;
+      
+      console.log('🧪 Testing Army 2 (10 models)');
+      await importArmyForGame(testArmy2, userId2, gameId);
+      const army2Models = mockTransactions.filter(t => t.type === 'model-update');
+      
+      // Verify counts are preserved
+      army1Models.forEach(transaction => {
+        console.log(`🧪 Army 1 Model: ${transaction.data.name}, count: ${transaction.data.count}`);
+        expect(transaction.data.count).toBe(5);
+      });
+      
+      army2Models.forEach(transaction => {
+        console.log(`🧪 Army 2 Model: ${transaction.data.name}, count: ${transaction.data.count}`);
+        expect(transaction.data.count).toBe(10);
+      });
+    });
+  });
+});
 
 describe('Army Import - Phase 1: Basic Army Metadata', () => {
   const userId = 'test-user-123';
@@ -436,7 +639,7 @@ describe('Army Import - Phase 3: Model Processing', () => {
       for (const unit of units) {
         const models = extractModels(unit);
         
-        for (const model of models) {
+                for (const model of models) {
           if (model.characteristics.length > 0) {
             const charNames = model.characteristics.map(c => c.name);
             
@@ -733,7 +936,7 @@ describe('Army Import - Phase 4: Weapon Processing', () => {
         }
       }
     });
-  });
+
 
   describe('Weapon data structure validation', () => {
     it('should return weapons with all required fields and correct types', () => {
@@ -862,6 +1065,7 @@ describe('Army Import - Phase 4: Weapon Processing', () => {
         
         expect(hasRecognizable40kWeapons).toBe(true);
       }
+    });
     });
   });
 }); 

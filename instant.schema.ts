@@ -38,6 +38,12 @@ const _schema = i.schema({
       ownerId: i.string().indexed(),
       sourceData: i.string().optional(), // JSON string of original import
       gameId: i.string().optional(), // null for user templates, gameId for game copies
+      // Additional army metadata
+      detachment: i.string().optional(),
+      battleSize: i.string().optional(),
+      totalPoints: i.number().optional(),
+      pointsLimit: i.number().optional(),
+      createdAt: i.number().optional(),
     }),
 
     units: i.entity({
@@ -61,6 +67,7 @@ const _schema = i.schema({
       lastActionTurn: i.number().optional(), // track which turn the last action was taken
       armyId: i.string().indexed(),
       gameId: i.string().optional(), // null for user templates, gameId for game copies
+      cost: i.number(), // cost in points for this unit
     }),
 
     models: i.entity({
@@ -77,6 +84,11 @@ const _schema = i.schema({
       lastActionTurn: i.number().optional(),
       unitId: i.string().indexed(),
       gameId: i.string().optional(), // null for user templates, gameId for game copies
+      // Model count and characteristics for game copies
+      count: i.number(),
+      characteristics: i.json(), // array of characteristics
+      armyId: i.string().indexed(),
+      ownerId: i.string().indexed(),
     }),
 
     weapons: i.entity({
@@ -88,6 +100,11 @@ const _schema = i.schema({
       modelId: i.string().indexed(),
       ownerId: i.string().indexed(), // Add missing ownerId field
       gameId: i.string().optional(), // null for user templates, gameId for game copies
+      // Weapon count and characteristics for game copies
+      count: i.number(),
+      characteristics: i.json(), // array of characteristics
+      armyId: i.string().indexed(),
+      unitId: i.string().indexed(),
     }),
 
     rules: i.entity({
