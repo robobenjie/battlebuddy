@@ -49,7 +49,7 @@ const _schema = i.schema({
     units: i.entity({
       name: i.string(),
       type: i.string(), // "Infantry", "Vehicle", "Monster"
-      abilities: i.json(), // array of unit abilities
+      abilities: i.json(), // array of structured ability objects (formerly 'profiles')
       modelIds: i.json(), // array of model IDs
       keywords: i.json(), // array of keywords
       startingModels: i.number(),
@@ -69,7 +69,6 @@ const _schema = i.schema({
       cost: i.number(), // cost in points for this unit
       count: i.number(), // number of this unit in the army
       categories: i.json(), // array of categories (e.g., ["Infantry", "Faction: Adeptus Astartes"])
-      profiles: i.json(), // array of unit profiles with characteristics
       rules: i.json(), // array of unit rules
       sourceData: i.json(), // original source data for re-parsing
       ownerId: i.string().indexed(), // user who owns this unit

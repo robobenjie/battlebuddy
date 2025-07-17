@@ -14,20 +14,25 @@ interface UnitCardProps {
     cost: number;
     count: number;
     categories: string[];
-    profiles?: Array<{
-      id: string;
-      name: string;
-      typeName?: string;
-      characteristics: Array<{
-        name: string;
-        typeId: string;
-        value: string;
-      }>;
-    }>;
     rules?: Array<{
       id: string;
       name: string;
       description: string;
+      characteristics?: Array<{
+        name: string;
+        typeId?: string;
+        value: string;
+      }>;
+      typeName?: string;
+    }>;
+    abilities?: Array<{
+      id: string;
+      name: string;
+      characteristics?: Array<{
+        name: string;
+        typeId?: string;
+        value: string;
+      }>;
     }>;
   };
   models?: Array<{
@@ -424,9 +429,32 @@ export default function UnitCard({
           )}
 
           {/* Abilities */}
-          {unit.rules && unit.rules.length > 0 && (
+          {unit.abilities && unit.abilities.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-gray-300 mb-2">Abilities</h4>
+              <div className="space-y-2">
+                {unit.abilities.map((ability) => (
+                  <div key={ability.id} className="bg-gray-700 rounded-lg p-2">
+                    <div className="text-xs font-medium text-white mb-1">{ability.name}</div>
+                    {ability.characteristics && ability.characteristics.length > 0 && (
+                      <div className="text-xs text-gray-300">
+                        {ability.characteristics.map((char, i) => (
+                          <div key={i}>
+                            {char.name === 'Description' ? char.value : `${char.name}: ${char.value}`}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Rules */}
+          {unit.rules && unit.rules.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-300 mb-2">Rules</h4>
               <div className="space-y-2">
                 {unit.rules.map((rule) => (
                   <div key={rule.id} className="bg-gray-700 rounded-lg p-2">

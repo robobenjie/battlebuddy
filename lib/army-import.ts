@@ -30,13 +30,14 @@ export interface UnitData {
   cost: number;
   count: number;
   categories: string[];
-  profiles: Array<{
+  abilities: Array<{
     id: string;
     name: string;
     typeName?: string;
-    characteristics: Array<{
+    description?: string;
+    characteristics?: Array<{
       name: string;
-      typeId: string;
+      typeId?: string;
       value: string;
     }>;
   }>;
@@ -248,31 +249,27 @@ function isUnit(selection: any): boolean {
 function parseUnit(selection: any, armyId: string, userId: string): UnitData {
   const categories = selection.categories?.map((cat: any) => cat.name) || [];
   let cost = selection.costs?.[0]?.value || 0;
-  
-  // If unit cost is 0, sum up costs from model selections
   if (cost === 0 && selection.selections) {
     cost = sumSelectionCosts(selection.selections);
   }
-  
-  // Parse rules
+  // Parse rules (simple rules only)
   const rules = selection.rules?.map((rule: any) => ({
     id: rule.id,
     name: rule.name,
     description: rule.description || ''
   })) || [];
-  
-  // Parse profiles
-  const profiles = selection.profiles?.map((profile: any) => ({
+  // Parse abilities (formerly profiles)
+  const abilities = selection.profiles?.map((profile: any) => ({
     id: profile.id,
     name: profile.name,
     typeName: profile.typeName,
+    description: profile.typeName || '',
     characteristics: profile.characteristics?.map((char: any) => ({
       name: char.name,
       typeId: char.typeId,
       value: char.$text || ''
     })) || []
   })) || [];
-
   return {
     id: id(),
     name: selection.name,
@@ -280,7 +277,7 @@ function parseUnit(selection: any, armyId: string, userId: string): UnitData {
     cost,
     count: selection.number || 1,
     categories,
-    profiles,
+    abilities,
     rules,
     sourceData: selection, // Store original selection for re-parsing
     armyId,
@@ -342,7 +339,7 @@ export async function importArmyWithUnits(jsonData: NewRecruitRoster, userId: st
           cost: unit.cost,
           count: unit.count,
           categories: unit.categories,
-          profiles: unit.profiles,
+          abilities: unit.abilities,
           rules: unit.rules,
           sourceData: unit.sourceData,
           armyId: unit.armyId,
@@ -410,30 +407,27 @@ function getUnitStatlines(unit: UnitData): Array<{
     extractStatlinesFromSelections(unit.sourceData.selections, statlineMap);
   }
 
-  // If no statlines found in selections, fallback to unit profiles
-  if (statlineMap.size === 0 && unit.profiles) {
-    for (const profile of unit.profiles) {
-      if (profile.typeName === 'Unit' && profile.characteristics && profile.characteristics.length > 0) {
-        statlineMap.set(unit.name, {
-          count: unit.count || 1,
-          characteristics: profile.characteristics.map(char => ({
-            name: char.name,
-            value: char.value
-          }))
-        });
-        break; // Use first valid unit profile
-      }
+  // If no statlines found in selections, fallback to unit abilities (not rules)
+  if (statlineMap.size === 0 && unit.abilities) {
+    // Look for an ability that might represent the unit's profile/statline
+    const unitProfileAbility = unit.abilities.find(ability => ability.typeName === 'Unit');
+    if (unitProfileAbility) {
+      statlineMap.set(unit.name, {
+        count: unit.count || 1,
+        characteristics: (unitProfileAbility.characteristics || []).map((char: { name: string; value: string }) => ({
+          name: char.name,
+          value: char.value
+        }))
+      });
     }
   } else if (statlineMap.size > 0) {
     // Check if any models have empty characteristics (meaning they need parent unit profile)
-    const parentUnitProfile = unit.profiles?.find(p => p.typeName === 'Unit' && p.characteristics && p.characteristics.length > 0);
-    
+    const parentUnitProfile = unit.abilities?.find(a => a.typeName === 'Unit' && a.characteristics && a.characteristics.length > 0);
     if (parentUnitProfile) {
-      const parentCharacteristics = parentUnitProfile.characteristics.map(char => ({
+      const parentCharacteristics = (parentUnitProfile.characteristics || []).map((char: { name: string; value: string }) => ({
         name: char.name,
         value: char.value
       }));
-      
       // Fill in empty characteristics with parent unit profile
       for (const [modelName, data] of statlineMap.entries()) {
         if (data.characteristics.length === 0) {
@@ -610,7 +604,7 @@ export async function importArmyWithUnitsAndModels(jsonData: NewRecruitRoster, u
           cost: unit.cost,
           count: unit.count,
           categories: unit.categories,
-          profiles: unit.profiles,
+          abilities: unit.abilities,
           rules: unit.rules,
           sourceData: unit.sourceData,
           armyId: unit.armyId,
@@ -852,7 +846,7 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
           cost: unit.cost,
           count: unit.count,
           categories: unit.categories,
-          profiles: unit.profiles,
+          abilities: unit.abilities,
           rules: unit.rules,
           sourceData: unit.sourceData,
           armyId: unit.armyId,
@@ -880,13 +874,16 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
         db.tx.weapons[weapon.id].update({
           name: weapon.name,
           type: weapon.type,
+          profiles: weapon.profiles || [],
+          abilities: [],
+          keywords: [],
+          modelId: weapon.modelId,
+          ownerId: weapon.ownerId,
+          // Add missing required fields that database expects
           count: weapon.count,
           characteristics: weapon.characteristics,
-          profiles: weapon.profiles,
-          modelId: weapon.modelId,
-          unitId: weapon.unitId,
           armyId: weapon.armyId,
-          ownerId: weapon.ownerId
+          unitId: weapon.unitId
         })
       );
     }
@@ -985,7 +982,7 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
           cost: unit.cost,
           count: unit.count,
           categories: unit.categories,
-          profiles: unit.profiles,
+          abilities: unit.abilities,
           rules: unit.rules,
           sourceData: unit.sourceData,
           armyId: unit.armyId,
@@ -1004,7 +1001,6 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
           lastActionTurn: 0,
           gameId: gameId,
           // Legacy fields for backward compatibility
-          abilities: unit.rules || [],
           modelIds: unitModels.map(m => m.id),
           keywords: unit.categories || []
         })

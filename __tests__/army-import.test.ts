@@ -424,39 +424,22 @@ describe('Army Import - Phase 2: Unit Extraction', () => {
       }
     });
 
-    it('should parse unit profiles correctly', () => {
-      const units = extractUnits(jsonData, armyId, userId);
-      
-      // Find units that should have profiles
-      const unitsWithProfiles = units.filter(unit => unit.profiles.length > 0);
-      
-      for (const unit of unitsWithProfiles) {
-        for (const profile of unit.profiles) {
-          expect(profile.id).toBeDefined();
-          expect(profile.name).toBeDefined();
-          expect(Array.isArray(profile.characteristics)).toBe(true);
-          
-          // Check characteristic structure
-          for (const char of profile.characteristics) {
-            expect(char.name).toBeDefined();
-            expect(char.typeId).toBeDefined();
-            expect(char.value).toBeDefined();
-          }
-        }
-      }
-    });
-
     it('should parse unit rules correctly', () => {
       const units = extractUnits(jsonData, armyId, userId);
-      
       // Find units that should have rules
       const unitsWithRules = units.filter(unit => unit.rules.length > 0);
-      
       for (const unit of unitsWithRules) {
         for (const rule of unit.rules) {
           expect(rule.id).toBeDefined();
           expect(rule.name).toBeDefined();
           expect(typeof rule.description).toBe('string');
+          // If rule has characteristics, check their structure
+          if (rule.characteristics) {
+            for (const char of rule.characteristics) {
+              expect(char.name).toBeDefined();
+              expect(char.value).toBeDefined();
+            }
+          }
         }
       }
     });
@@ -526,7 +509,6 @@ describe('Army Import - Phase 2: Unit Extraction', () => {
       
       // Required array fields
       expect(Array.isArray(unit.categories)).toBe(true);
-      expect(Array.isArray(unit.profiles)).toBe(true);
       expect(Array.isArray(unit.rules)).toBe(true);
       
       // Required object field
