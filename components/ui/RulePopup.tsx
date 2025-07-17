@@ -14,7 +14,7 @@ interface RulePopupProps {
 }
 
 // Common 40k rules database for quick lookup
-const COMMON_RULES: Record<string, string> = {
+export const COMMON_RULES: Record<string, string> = {
   'Assault': 'Weapons with this ability can be fired after the bearer\'s unit has Advanced.',
   'Heavy': 'Weapons with this ability can only be fired if the bearer\'s unit Remained Stationary this turn.',
   'Pistol': 'Weapons with this ability can be fired even if the bearer\'s unit is within Engagement Range of enemy units.',

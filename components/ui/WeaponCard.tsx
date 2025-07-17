@@ -38,10 +38,7 @@ export default function WeaponCard({
   );
   const keywords = keywordsChar ? parseWeaponKeywords(keywordsChar.value) : [];
   
-  // Get weapon icon
-  const getWeaponIcon = (type: string) => {
-    return type === 'ranged' ? '🔫' : '⚔️';
-  };
+  // Remove weapon icon functionality
 
   // Filter out keywords from characteristics for stat display
   const statCharacteristics = weapon.characteristics.filter(c => 
@@ -53,14 +50,11 @@ export default function WeaponCard({
       {/* Header */}
       <div className="bg-gray-750 px-3 py-2 border-b border-gray-700">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="text-lg">{getWeaponIcon(weapon.type)}</span>
-            <div>
-              <h4 className="font-semibold text-white text-sm">{weapon.name}</h4>
-              {weapon.count > 1 && (
-                <span className="text-xs text-gray-400">×{weapon.count}</span>
-              )}
-            </div>
+          <div className="flex-1">
+            <h4 className="font-semibold text-white text-sm">{weapon.name}</h4>
+            {weapon.count > 1 && (
+              <span className="text-xs text-gray-400">×{weapon.count}</span>
+            )}
           </div>
           <div className="text-xs text-gray-400 capitalize">
             {weapon.type}
@@ -162,8 +156,8 @@ export function WeaponList({
       <div className={`space-y-4 ${className}`}>
         {rangedWeapons.length > 0 && (
           <div>
-            <h5 className="text-sm font-semibold text-gray-300 mb-2 flex items-center">
-              🔫 Ranged Weapons ({rangedWeapons.length})
+            <h5 className="text-sm font-semibold text-gray-300 mb-2">
+              Ranged Weapons ({rangedWeapons.length})
             </h5>
             <div className="space-y-2">
               {rangedWeapons.map((weapon) => (
@@ -180,8 +174,8 @@ export function WeaponList({
 
         {meleeWeapons.length > 0 && (
           <div>
-            <h5 className="text-sm font-semibold text-gray-300 mb-2 flex items-center">
-              ⚔️ Melee Weapons ({meleeWeapons.length})
+            <h5 className="text-sm font-semibold text-gray-300 mb-2">
+              Melee Weapons ({meleeWeapons.length})
             </h5>
             <div className="space-y-2">
               {meleeWeapons.map((weapon) => (

@@ -96,7 +96,6 @@ export default function ViewArmiesPage({ user, onNavigateToArmy }: ViewArmiesPag
 
         {armies.length === 0 ? (
           <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
-            <div className="text-4xl mb-4">🏛️</div>
             <h3 className="text-lg font-medium text-gray-300 mb-2">
               No armies yet
             </h3>
@@ -121,18 +120,9 @@ export default function ViewArmiesPage({ user, onNavigateToArmy }: ViewArmiesPag
                         {army.name}
                       </h3>
                       <div className="flex items-center space-x-4 text-sm text-gray-400">
-                        <span className="flex items-center">
-                          <span className="mr-1">⚔️</span>
-                          {army.faction}
-                        </span>
-                        <span className="flex items-center">
-                          <span className="mr-1">📊</span>
-                          {formatPoints(army.totalPoints, army.pointsLimit)}
-                        </span>
-                        <span className="flex items-center">
-                          <span className="mr-1">🗓️</span>
-                          {formatDate(army.createdAt)}
-                        </span>
+                        <span>{army.faction}</span>
+                        <span>{formatPoints(army.totalPoints, army.pointsLimit)}</span>
+                        <span>{formatDate(army.createdAt)}</span>
                       </div>
                       {army.detachment && (
                         <div className="mt-1 text-sm text-gray-500">
@@ -147,7 +137,7 @@ export default function ViewArmiesPage({ user, onNavigateToArmy }: ViewArmiesPag
                     className="ml-4 p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
                     title="Delete army"
                   >
-                    🗑️
+                    ✕
                   </button>
                 </div>
               </div>

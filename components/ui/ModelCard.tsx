@@ -44,21 +44,7 @@ export default function ModelCard({
   compact = false,
   showWeapons = true
 }: ModelCardProps) {
-  // Get model icon based on characteristics
-  const getModelIcon = () => {
-    const movement = model.characteristics.find(c => c.name === 'M')?.value;
-    const toughness = parseInt(model.characteristics.find(c => c.name === 'T')?.value || '0');
-    
-    // Simple heuristic to determine model type
-    if (movement && movement.includes('"')) {
-      const moveValue = parseInt(movement.replace('"', ''));
-      if (moveValue >= 12) return '🏍️'; // Fast/Vehicle
-      if (toughness >= 8) return '🚗'; // Vehicle
-      if (toughness >= 6) return '🤖'; // Heavy Infantry
-      return '🪖'; // Regular Infantry
-    }
-    return '👤'; // Default person
-  };
+  // Remove model icon functionality
 
   // Model weapons (if any)
   const modelWeapons = weapons.filter(w => w.id); // Basic filter, could be more sophisticated
@@ -68,14 +54,11 @@ export default function ModelCard({
       {/* Header */}
       <div className="bg-gray-750 px-3 py-2 border-b border-gray-700">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="text-lg">{getModelIcon()}</span>
-            <div>
-              <h4 className="font-semibold text-white text-sm">{model.name}</h4>
-              {model.count > 1 && (
-                <span className="text-xs text-gray-400">×{model.count}</span>
-              )}
-            </div>
+          <div className="flex-1">
+            <h4 className="font-semibold text-white text-sm">{model.name}</h4>
+            {model.count > 1 && (
+              <span className="text-xs text-gray-400">×{model.count}</span>
+            )}
           </div>
         </div>
       </div>

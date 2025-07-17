@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { ModelList, ModelSummary } from './ModelCard';
 import { WeaponList } from './WeaponCard';
 import { KeywordList, extractFactionKeywords, extractGeneralKeywords } from './KeywordBadge';
+import { COMMON_RULES } from './RulePopup';
 
 interface UnitCardProps {
   unit: {
@@ -76,14 +77,14 @@ export default function UnitCard({
   const factionKeywords = extractFactionKeywords(unit.categories);
   const generalKeywords = extractGeneralKeywords(unit.categories);
 
-  // Get unit icon based on categories
-  const getUnitIcon = () => {
-    if (unit.categories.includes('Character')) return '👑';
-    if (unit.categories.includes('Vehicle')) return '🚗';
-    if (unit.categories.includes('Monster')) return '🐲';
-    if (unit.categories.includes('Infantry')) return '🪖';
-    if (unit.categories.includes('Battleline')) return '🛡️';
-    return '⚔️';
+  // Calculate model configurations for collapsed view
+  const getModelConfigurations = () => {
+    if (!models || models.length === 0) return [];
+    
+    return models.map(model => ({
+      name: model.name,
+      count: model.count
+    }));
   };
 
   // Calculate total model count
@@ -106,125 +107,342 @@ export default function UnitCard({
         onClick={toggleExpanded}
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <span className="text-xl">{getUnitIcon()}</span>
-            <div>
-              <h3 className="font-semibold text-white">{unit.name}</h3>
-              <div className="flex items-center space-x-4 text-sm text-gray-400">
-                <span>{unit.cost} pts</span>
-                {totalModels > 0 && <span>{totalModels} models</span>}
-                {totalWeapons > 0 && <span>{totalWeapons} weapons</span>}
+          <div className="flex-1">
+            <h3 className="font-medium text-white text-sm">
+              {totalModels > 1 ? `${totalModels} ` : ''}{unit.name}
+            </h3>
+            {/* Model configurations when collapsed */}
+            {!isExpanded && models.length > 0 && (
+              <div className="mt-1 space-y-0.5">
+                {getModelConfigurations().map((config, index) => (
+                  <div key={index} className="text-xs text-gray-400 leading-tight">
+                    • {config.count}x {config.name}
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
           </div>
           
-          <div className="flex items-center space-x-2">
-            {/* Faction keywords */}
-            {factionKeywords.length > 0 && (
-              <KeywordList
-                keywords={factionKeywords}
-                onKeywordClick={onKeywordClick}
-                variant="faction"
-              />
-            )}
-            
-            {expandable && (
-              <span className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                ▼
-              </span>
-            )}
-          </div>
+          {expandable && (
+            <span className={`text-gray-400 transition-transform ml-2 ${isExpanded ? 'rotate-180' : ''}`}>
+              ▼
+            </span>
+          )}
         </div>
-
-        {/* Quick info when collapsed */}
-        {!isExpanded && generalKeywords.length > 0 && (
-          <div className="mt-2">
-            <KeywordList
-              keywords={generalKeywords.slice(0, 5)} // Show first 5 keywords
-              onKeywordClick={onKeywordClick}
-              variant="keyword"
-            />
-            {generalKeywords.length > 5 && (
-              <span className="text-xs text-gray-500 ml-2">
-                +{generalKeywords.length - 5} more
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Expanded Content */}
       {(isExpanded || !expandable) && (
         <div className="p-4 space-y-4">
-          {/* Keywords */}
-          {generalKeywords.length > 0 && (
+          {/* Unit Stats Table */}
+          {models.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-300 mb-2">Keywords</h4>
-              <KeywordList
-                keywords={generalKeywords}
-                onKeywordClick={onKeywordClick}
-                variant="keyword"
-              />
+              <div className="bg-gray-700 rounded-lg overflow-hidden">
+                <div className="grid gap-0" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 1fr' }}>
+                  {/* Headers */}
+                  <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                    <div className="text-xs font-semibold text-gray-200 uppercase">Unit</div>
+                  </div>
+                  <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                    <div className="text-xs font-semibold text-gray-200 uppercase">M</div>
+                  </div>
+                  <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                    <div className="text-xs font-semibold text-gray-200 uppercase">T</div>
+                  </div>
+                  <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                    <div className="text-xs font-semibold text-gray-200 uppercase">SV</div>
+                  </div>
+                  <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                    <div className="text-xs font-semibold text-gray-200 uppercase">W</div>
+                  </div>
+                  <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                    <div className="text-xs font-semibold text-gray-200 uppercase">LD</div>
+                  </div>
+                  <div className="bg-gray-600 px-1 py-1 text-center">
+                    <div className="text-xs font-semibold text-gray-200 uppercase">OC</div>
+                  </div>
+                  
+                  {/* Values - Use first model's stats as representative */}
+                  {models[0] && (
+                    <>
+                      <div className="bg-gray-700 px-1 py-1 text-left border-r border-gray-600">
+                        <div className="text-xs font-mono text-white truncate">{unit.name}</div>
+                      </div>
+                      <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                        <div className="text-xs font-mono text-white">
+                          {models[0].characteristics.find(c => c.name === 'M')?.value || '-'}
+                        </div>
+                      </div>
+                      <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                        <div className="text-xs font-mono text-white">
+                          {models[0].characteristics.find(c => c.name === 'T')?.value || '-'}
+                        </div>
+                      </div>
+                      <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                        <div className="text-xs font-mono text-white">
+                          {models[0].characteristics.find(c => c.name === 'SV')?.value || '-'}
+                        </div>
+                      </div>
+                      <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                        <div className="text-xs font-mono text-white">
+                          {models[0].characteristics.find(c => c.name === 'W')?.value || '-'}
+                        </div>
+                      </div>
+                      <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                        <div className="text-xs font-mono text-white">
+                          {models[0].characteristics.find(c => c.name === 'LD')?.value || '-'}
+                        </div>
+                      </div>
+                      <div className="bg-gray-700 px-1 py-1 text-center">
+                        <div className="text-xs font-mono text-white">
+                          {models[0].characteristics.find(c => c.name === 'OC')?.value || '-'}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Rules */}
+          {/* Ranged Weapons */}
+          {weapons.filter(w => w.type === 'ranged').length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-300 mb-2">Ranged Weapons</h4>
+              <div className="space-y-3">
+                {weapons.filter(w => w.type === 'ranged').map((weapon) => {
+                  const keywordsValue = weapon.characteristics.find(c => c.name === 'Keywords')?.value || '-';
+                  const keywords = keywordsValue !== '-' ? keywordsValue.split(',').map(k => k.trim()) : [];
+                  
+                  return (
+                    <div key={weapon.id} className="bg-gray-700 rounded-lg overflow-hidden">
+                      {/* Weapon Name Header */}
+                      <div className="bg-gray-600 px-2 py-1">
+                        <div className="text-xs font-medium text-white">
+                          {weapon.name}{weapon.count > 1 ? ` (x${weapon.count})` : ''}
+                        </div>
+                      </div>
+                      
+                      {/* Weapon Stats Table */}
+                      <div className="bg-gray-700">
+                        <div className="grid grid-cols-7 gap-0">
+                          {/* Headers */}
+                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">Range</div>
+                          </div>
+                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">A</div>
+                          </div>
+                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">BS</div>
+                          </div>
+                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">S</div>
+                          </div>
+                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">AP</div>
+                          </div>
+                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">D</div>
+                          </div>
+                          <div className="bg-gray-600 px-1 py-1 text-center">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">Keywords</div>
+                          </div>
+                          
+                          {/* Values */}
+                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                            <div className="text-xs font-mono text-white">
+                              {weapon.characteristics.find(c => c.name === 'Range')?.value || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                            <div className="text-xs font-mono text-white">
+                              {weapon.characteristics.find(c => c.name === 'A')?.value || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                            <div className="text-xs font-mono text-white">
+                              {weapon.characteristics.find(c => c.name === 'BS')?.value || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                            <div className="text-xs font-mono text-white">
+                              {weapon.characteristics.find(c => c.name === 'S')?.value || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                            <div className="text-xs font-mono text-white">
+                              {weapon.characteristics.find(c => c.name === 'AP')?.value || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                            <div className="text-xs font-mono text-white">
+                              {weapon.characteristics.find(c => c.name === 'D')?.value || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 px-1 py-1 text-left">
+                            <div className="text-xs">
+                              {keywords.length > 0 ? (
+                                keywords.map((keyword, index) => {
+                                  const hasRule = COMMON_RULES[keyword];
+                                  return (
+                                    <span key={index}>
+                                      {index > 0 && ', '}
+                                                                             <span
+                                         className={hasRule ? 'text-blue-400 cursor-pointer hover:text-blue-300 underline' : 'text-blue-400'}
+                                         onClick={hasRule && onKeywordClick ? () => onKeywordClick(keyword) : undefined}
+                                         title={hasRule ? 'Click for details' : undefined}
+                                       >
+                                        {keyword}
+                                      </span>
+                                    </span>
+                                  );
+                                })
+                              ) : (
+                                <span className="text-blue-400">-</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Melee Weapons */}
+          {weapons.filter(w => w.type === 'melee').length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-300 mb-2">Melee Weapons</h4>
+              <div className="space-y-3">
+                {weapons.filter(w => w.type === 'melee').map((weapon) => {
+                  const keywordsValue = weapon.characteristics.find(c => c.name === 'Keywords')?.value || '-';
+                  const keywords = keywordsValue !== '-' ? keywordsValue.split(',').map(k => k.trim()) : [];
+                  
+                  return (
+                    <div key={weapon.id} className="bg-gray-700 rounded-lg overflow-hidden">
+                      {/* Weapon Name Header */}
+                      <div className="bg-gray-600 px-2 py-1">
+                        <div className="text-xs font-medium text-white">
+                          {weapon.name}{weapon.count > 1 ? ` (x${weapon.count})` : ''}
+                        </div>
+                      </div>
+                      
+                      {/* Weapon Stats Table */}
+                      <div className="bg-gray-700">
+                        <div className="grid grid-cols-7 gap-0">
+                          {/* Headers */}
+                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">Range</div>
+                          </div>
+                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">A</div>
+                          </div>
+                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">WS</div>
+                          </div>
+                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">S</div>
+                          </div>
+                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">AP</div>
+                          </div>
+                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">D</div>
+                          </div>
+                          <div className="bg-gray-600 px-1 py-1 text-center">
+                            <div className="text-xs font-semibold text-gray-200 uppercase">Keywords</div>
+                          </div>
+                          
+                          {/* Values */}
+                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                            <div className="text-xs font-mono text-white">
+                              {weapon.characteristics.find(c => c.name === 'Range')?.value || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                            <div className="text-xs font-mono text-white">
+                              {weapon.characteristics.find(c => c.name === 'A')?.value || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                            <div className="text-xs font-mono text-white">
+                              {weapon.characteristics.find(c => c.name === 'WS')?.value || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                            <div className="text-xs font-mono text-white">
+                              {weapon.characteristics.find(c => c.name === 'S')?.value || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                            <div className="text-xs font-mono text-white">
+                              {weapon.characteristics.find(c => c.name === 'AP')?.value || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                            <div className="text-xs font-mono text-white">
+                              {weapon.characteristics.find(c => c.name === 'D')?.value || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 px-1 py-1 text-left">
+                            <div className="text-xs">
+                              {keywords.length > 0 ? (
+                                keywords.map((keyword, index) => {
+                                  const hasRule = COMMON_RULES[keyword];
+                                  return (
+                                    <span key={index}>
+                                      {index > 0 && ', '}
+                                      <span
+                                        className={hasRule ? 'text-blue-400 cursor-pointer hover:text-blue-300 underline' : 'text-blue-400'}
+                                        onClick={hasRule && onKeywordClick ? () => onKeywordClick(keyword) : undefined}
+                                        title={hasRule ? 'Click for details' : undefined}
+                                      >
+                                        {keyword}
+                                      </span>
+                                    </span>
+                                  );
+                                })
+                              ) : (
+                                <span className="text-blue-400">-</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Abilities */}
           {unit.rules && unit.rules.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-300 mb-2">Special Rules</h4>
+              <h4 className="text-sm font-semibold text-gray-300 mb-2">Abilities</h4>
               <div className="space-y-2">
                 {unit.rules.map((rule) => (
-                  <div key={rule.id} className="bg-gray-700 rounded-lg p-3">
-                    <button
-                      onClick={() => onKeywordClick?.(rule.name, rule.description)}
-                      className="text-left w-full"
-                    >
-                      <h5 className="text-sm font-medium text-blue-300 hover:text-blue-200 transition-colors">
-                        {rule.name}
-                      </h5>
-                      <p className="text-xs text-gray-400 mt-1 line-clamp-2">
-                        {rule.description}
-                      </p>
-                    </button>
+                  <div key={rule.id} className="bg-gray-700 rounded-lg p-2">
+                    <div className="text-xs font-medium text-white mb-1">{rule.name}</div>
+                    <div className="text-xs text-gray-300">{rule.description}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Model Summary */}
-          {models.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-300 mb-2">Model Summary</h4>
-              <ModelSummary models={models} />
-            </div>
-          )}
-
-          {/* Models Details */}
-          {models.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-300 mb-2">Models ({models.length})</h4>
-              <ModelList
-                models={models}
-                weapons={weapons}
-                onKeywordClick={onKeywordClick}
-                compact={true}
-                showWeapons={false} // Show weapons separately
-              />
-            </div>
-          )}
-
-          {/* Weapons */}
-          {weapons.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-300 mb-2">Weapons ({weapons.length})</h4>
-              <WeaponList
-                weapons={weapons}
-                onKeywordClick={onKeywordClick}
-                groupByType={true}
-              />
-            </div>
-          )}
+          {/* Keywords */}
+          <div>
+            <h4 className="text-sm font-semibold text-gray-300 mb-2">Keywords</h4>
+            <KeywordList
+              keywords={[...factionKeywords, ...generalKeywords]}
+              onKeywordClick={onKeywordClick}
+              variant="keyword"
+            />
+          </div>
         </div>
       )}
     </div>
@@ -283,14 +501,8 @@ export function UnitList({
 
           return (
             <div key={type}>
-              <h3 className="text-lg font-semibold text-gray-200 mb-3 flex items-center">
-                {type === 'Character' && '👑'}
-                {type === 'Battleline' && '🛡️'}
-                {type === 'Infantry' && '🪖'}
-                {type === 'Vehicle' && '🚗'}
-                {type === 'Monster' && '🐲'}
-                {type === 'Other' && '⚔️'}
-                <span className="ml-2">{type} ({typeUnits.length})</span>
+              <h3 className="text-lg font-semibold text-gray-200 mb-3">
+                {type} ({typeUnits.length})
               </h3>
               <div className="space-y-3">
                 {typeUnits.map((unitData, index) => (

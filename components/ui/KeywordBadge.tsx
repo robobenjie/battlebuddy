@@ -1,5 +1,7 @@
 'use client';
 
+import { COMMON_RULES } from './RulePopup';
+
 interface KeywordBadgeProps {
   keyword: string;
   description?: string;
@@ -15,8 +17,12 @@ export default function KeywordBadge({
   variant = 'keyword',
   className = '' 
 }: KeywordBadgeProps) {
+  // Check if this keyword has an associated rule (either provided description or in common rules)
+  const hasRule = description || COMMON_RULES[keyword];
+  const isClickable = onClick && hasRule;
+
   const handleClick = () => {
-    if (onClick) {
+    if (isClickable) {
       onClick(keyword, description);
     }
   };
@@ -25,18 +31,26 @@ export default function KeywordBadge({
   const getVariantStyles = () => {
     switch (variant) {
       case 'faction':
-        return 'bg-red-700 hover:bg-red-600 text-red-100 border-red-600';
+        return isClickable 
+          ? 'bg-red-700 hover:bg-red-600 text-red-100 border-red-600'
+          : 'bg-red-800 text-red-200 border-red-700';
       case 'rule':
-        return 'bg-blue-700 hover:bg-blue-600 text-blue-100 border-blue-600';
+        return isClickable 
+          ? 'bg-blue-700 hover:bg-blue-600 text-blue-100 border-blue-600'
+          : 'bg-blue-800 text-blue-200 border-blue-700';
       case 'weapon':
-        return 'bg-purple-700 hover:bg-purple-600 text-purple-100 border-purple-600';
+        return isClickable 
+          ? 'bg-purple-700 hover:bg-purple-600 text-purple-100 border-purple-600'
+          : 'bg-purple-800 text-purple-200 border-purple-700';
       case 'keyword':
       default:
-        return 'bg-gray-700 hover:bg-gray-600 text-gray-100 border-gray-600';
+        return isClickable 
+          ? 'bg-gray-700 hover:bg-gray-600 text-gray-100 border-gray-600'
+          : 'bg-gray-800 text-gray-300 border-gray-700';
     }
   };
 
-  const baseStyles = onClick 
+  const baseStyles = isClickable 
     ? 'cursor-pointer transition-colors hover:shadow-sm'
     : 'cursor-default';
 
@@ -49,7 +63,7 @@ export default function KeywordBadge({
         ${baseStyles}
         ${className}
       `}
-      title={onClick ? 'Click for details' : undefined}
+      title={isClickable ? 'Click for details' : undefined}
     >
       {keyword}
     </span>

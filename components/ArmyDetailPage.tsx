@@ -86,9 +86,8 @@ export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageP
     return (
       <div className="min-h-screen bg-gray-900 p-4 pt-20">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4">🏛️</div>
-            <h2 className="text-xl font-semibold text-gray-300 mb-2">Army not found</h2>
+                  <div className="text-center py-12">
+          <h2 className="text-xl font-semibold text-gray-300 mb-2">Army not found</h2>
             <p className="text-gray-400 mb-4">
               The requested army could not be found or you don't have access to it.
             </p>
@@ -211,8 +210,8 @@ export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageP
 
         {/* Units */}
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-200 mb-4 flex items-center">
-            ⚔️ Units ({totalUnits})
+          <h2 className="text-xl font-semibold text-gray-200 mb-4">
+            Units ({totalUnits})
           </h2>
           
           {unitsWithDetails.length > 0 ? (
@@ -224,7 +223,6 @@ export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageP
             />
           ) : (
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-8 text-center">
-              <div className="text-4xl mb-4">📋</div>
               <h3 className="text-lg font-medium text-gray-300 mb-2">
                 No units found
               </h3>
