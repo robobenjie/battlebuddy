@@ -98,9 +98,9 @@ describe('Army Import - Model Count Preservation', () => {
       console.log('🧪 Player 1 model transactions:', player1ModelTransactions.length);
       
       player1ModelTransactions.forEach((transaction, index) => {
-        console.log(`🧪 Player 1 Model ${index + 1}: ${transaction.data.name}, count: ${transaction.data.count}`);
-        expect(transaction.data.count).toBeGreaterThan(0);
-        expect(transaction.data.count).toBeDefined();
+        console.log(`🧪 Player 1 Model ${index + 1}: ${transaction.data.name} (individual)`);
+        // Individual models don't have count field
+        expect(transaction.data.hasOwnProperty('count')).toBe(false);
       });
       
       // Clear transactions and test player 2
@@ -114,28 +114,24 @@ describe('Army Import - Model Count Preservation', () => {
       console.log('🧪 Player 2 model transactions:', player2ModelTransactions.length);
       
       player2ModelTransactions.forEach((transaction, index) => {
-        console.log(`🧪 Player 2 Model ${index + 1}: ${transaction.data.name}, count: ${transaction.data.count}`);
-        expect(transaction.data.count).toBeGreaterThan(0);
-        expect(transaction.data.count).toBeDefined();
+        console.log(`🧪 Player 2 Model ${index + 1}: ${transaction.data.name} (individual)`);
+        // Individual models don't have count field
+        expect(transaction.data.hasOwnProperty('count')).toBe(false);
       });
       
       // Compare counts between players
       expect(player1ModelTransactions.length).toBe(player2ModelTransactions.length);
       
-      for (let i = 0; i < player1ModelTransactions.length; i++) {
-        const p1Model = player1ModelTransactions[i];
-        const p2Model = player2ModelTransactions[i];
-        
-        console.log(`🧪 Comparing model ${i + 1}: P1=${p1Model.data.count}, P2=${p2Model.data.count}`);
-        expect(p1Model.data.count).toBe(p2Model.data.count);
-      }
+      // Compare that both players have same number of individual models
+      console.log(`🧪 Both players have ${player1ModelTransactions.length} individual models`);
+      expect(player1ModelTransactions.length).toBe(player2ModelTransactions.length);
     });
   });
 
   describe('Different Army Data Structures', () => {
     it('should handle armies with different model configurations', async () => {
       // Create test data with known model counts
-      const testArmy1: NewRecruitRoster = {
+      const testArmy1 = {
         roster: {
           name: "Test Army 1",
           costs: [{ name: "pts", typeId: "points", value: 500 }],
@@ -165,7 +161,7 @@ describe('Army Import - Model Count Preservation', () => {
         }
       };
 
-      const testArmy2: NewRecruitRoster = {
+      const testArmy2 = {
         roster: {
           name: "Test Army 2", 
           costs: [{ name: "pts", typeId: "points", value: 500 }],
@@ -197,24 +193,29 @@ describe('Army Import - Model Count Preservation', () => {
 
       // Test both armies
       console.log('🧪 Testing Army 1 (5 models)');
-      await importArmyForGame(testArmy1, userId1, gameId);
+      await importArmyForGame(testArmy1 as NewRecruitRoster, userId1, gameId);
       const army1Models = mockTransactions.filter(t => t.type === 'model-update');
       
       mockTransactions.length = 0;
       
       console.log('🧪 Testing Army 2 (10 models)');
-      await importArmyForGame(testArmy2, userId2, gameId);
+      await importArmyForGame(testArmy2 as NewRecruitRoster, userId2, gameId);
       const army2Models = mockTransactions.filter(t => t.type === 'model-update');
       
-      // Verify counts are preserved
+      // Verify individual model counts are correct
+      console.log(`🧪 Army 1 created ${army1Models.length} individual models (expected: 5)`);
+      expect(army1Models.length).toBe(5);
+      
+      console.log(`🧪 Army 2 created ${army2Models.length} individual models (expected: 10)`);  
+      expect(army2Models.length).toBe(10);
+      
+      // Verify individual models don't have count field
       army1Models.forEach(transaction => {
-        console.log(`🧪 Army 1 Model: ${transaction.data.name}, count: ${transaction.data.count}`);
-        expect(transaction.data.count).toBe(5);
+        expect(transaction.data.hasOwnProperty('count')).toBe(false);
       });
       
       army2Models.forEach(transaction => {
-        console.log(`🧪 Army 2 Model: ${transaction.data.name}, count: ${transaction.data.count}`);
-        expect(transaction.data.count).toBe(10);
+        expect(transaction.data.hasOwnProperty('count')).toBe(false);
       });
     });
   });
@@ -691,8 +692,8 @@ describe('Army Import - Phase 3: Model Processing', () => {
       expect(typeof model.armyId).toBe('string');
       expect(typeof model.ownerId).toBe('string');
       
-      // Required number field
-      expect(typeof model.count).toBe('number');
+      // Individual models don't have count field
+      expect(model.hasOwnProperty('count')).toBe(false);
       
       // Required array field
       expect(Array.isArray(model.characteristics)).toBe(true);
@@ -714,7 +715,7 @@ describe('Army Import - Phase 3: Model Processing', () => {
       // Log model information for verification
       console.log('Extracted models:', allModels.map(m => ({ 
         name: m.name, 
-        count: m.count, 
+        individual: true, // Each model is now an individual record
         characteristics: m.characteristics.length 
       })));
     });
