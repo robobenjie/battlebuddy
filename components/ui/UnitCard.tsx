@@ -33,7 +33,6 @@ interface UnitCardProps {
   models?: Array<{
     id: string;
     name: string;
-    count: number;
     characteristics: Array<{
       name: string;
       value: string;
@@ -77,18 +76,23 @@ export default function UnitCard({
   const factionKeywords = extractFactionKeywords(unit.categories);
   const generalKeywords = extractGeneralKeywords(unit.categories);
 
-  // Calculate model configurations for collapsed view
+  // Calculate model configurations for collapsed view (group by name)
   const getModelConfigurations = () => {
     if (!models || models.length === 0) return [];
     
-    return models.map(model => ({
-      name: model.name,
-      count: model.count
+    const configMap = new Map<string, number>();
+    models.forEach(model => {
+      configMap.set(model.name, (configMap.get(model.name) || 0) + 1);
+    });
+    
+    return Array.from(configMap.entries()).map(([name, count]) => ({
+      name,
+      count
     }));
   };
 
   // Calculate total model count
-  const totalModels = models.reduce((sum, model) => sum + model.count, 0);
+  const totalModels = models.length;
 
   // Calculate total weapon count
   const totalWeapons = weapons.reduce((sum, weapon) => sum + weapon.count, 0);

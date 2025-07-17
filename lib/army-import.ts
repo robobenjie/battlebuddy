@@ -54,7 +54,6 @@ export interface UnitData {
 export interface ModelData {
   id: string;
   name: string;
-  count: number;
   characteristics: Array<{
     name: string;
     value: string;
@@ -377,15 +376,17 @@ export function extractModels(unit: UnitData): ModelData[] {
   const models: ModelData[] = [];
 
   for (const statline of statlines) {
-    models.push({
-      id: id(),
-      name: statline.modelName,
-      count: statline.count,
-      characteristics: statline.characteristics,
-      unitId: unit.id,
-      armyId: unit.armyId,
-      ownerId: unit.ownerId
-    });
+    // Create individual model records for each count
+    for (let i = 0; i < statline.count; i++) {
+      models.push({
+        id: id(),
+        name: statline.modelName,
+        characteristics: statline.characteristics,
+        unitId: unit.id,
+        armyId: unit.armyId,
+        ownerId: unit.ownerId
+      });
+    }
   }
 
   return models;
@@ -623,7 +624,6 @@ export async function importArmyWithUnitsAndModels(jsonData: NewRecruitRoster, u
       transactions.push(
         db.tx.models[model.id].update({
           name: model.name,
-          count: model.count,
           characteristics: model.characteristics,
           unitId: model.unitId,
           armyId: model.armyId,
@@ -866,7 +866,6 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
       transactions.push(
         db.tx.models[model.id].update({
           name: model.name,
-          count: model.count,
           characteristics: model.characteristics,
           unitId: model.unitId,
           armyId: model.armyId,
@@ -972,18 +971,27 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
     );
     
     console.log('📥 Building unit transactions...');
-    // Add unit transactions with required fields that database expects
+    // Add unit transactions with same structure as template armies
     for (const unit of units) {
       const unitModels = allModels.filter(m => m.unitId === unit.id);
+      // Calculate total model count for this unit (count individual models)
+      const totalModelCount = unitModels.length;
+      
       transactions.push(
         db.tx.units[unit.id].update({
+          // Template army fields (keep data structure consistent)
           name: unit.name,
-          type: unit.type || 'Infantry',
-          abilities: unit.rules || [],
-          modelIds: unitModels.map(m => m.id),
-          keywords: unit.categories || [],
-          startingModels: unit.count || 1,
-          currentModels: unit.count || 1,
+          type: unit.type,
+          cost: unit.cost,
+          count: unit.count,
+          categories: unit.categories,
+          profiles: unit.profiles,
+          rules: unit.rules,
+          sourceData: unit.sourceData,
+          armyId: unit.armyId,
+          ownerId: unit.ownerId,
+          // Game-specific fields  
+          startingModels: totalModelCount,
           currentWounds: 0,
           hasMoved: false,
           hasAdvanced: false,
@@ -994,8 +1002,11 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
           isDestroyed: false,
           turnHistory: [],
           lastActionTurn: 0,
-          armyId: unit.armyId,
-          gameId: gameId
+          gameId: gameId,
+          // Legacy fields for backward compatibility
+          abilities: unit.rules || [],
+          modelIds: unitModels.map(m => m.id),
+          keywords: unit.categories || []
         })
       );
     }
@@ -1029,7 +1040,6 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
           gameId: gameId,
           // Add missing required fields that database expects
           characteristics: model.characteristics || [],
-          count: model.count,
           armyId: model.armyId,
           ownerId: model.ownerId
         })

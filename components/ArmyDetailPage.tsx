@@ -163,7 +163,7 @@ export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageP
                   </div>
                   <div>
                     <div className="text-gray-400 text-xs uppercase tracking-wider">Created</div>
-                    <div className="text-white font-medium">{formatDate(army.createdAt)}</div>
+                    <div className="text-white font-medium">{army.createdAt ? formatDate(army.createdAt) : 'Unknown'}</div>
                   </div>
                 </div>
               </div>

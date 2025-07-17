@@ -7,7 +7,6 @@ interface ModelCardProps {
   model: {
     id: string;
     name: string;
-    count: number;
     characteristics: Array<{
       name: string;
       value: string;
@@ -56,9 +55,7 @@ export default function ModelCard({
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <h4 className="font-semibold text-white text-sm">{model.name}</h4>
-            {model.count > 1 && (
-              <span className="text-xs text-gray-400">×{model.count}</span>
-            )}
+            {/* Individual model, no count needed */}
           </div>
         </div>
       </div>
@@ -147,15 +144,18 @@ export function ModelSummary({ models, className = '' }: ModelSummaryProps) {
     return null;
   }
 
-  const totalModels = models.reduce((sum, model) => sum + model.count, 0);
-  const uniqueTypes = models.length;
+  const totalModels = models.length;
+  
+  // Group models by name to get unique types
+  const uniqueTypeNames = new Set(models.map(m => m.name));
+  const uniqueTypes = uniqueTypeNames.size;
 
   // Calculate average stats (if useful)
   const avgToughness = models.length > 0 
     ? Math.round(
         models.reduce((sum, model) => {
           const t = parseInt(model.characteristics.find(c => c.name === 'T')?.value || '0');
-          return sum + t * model.count;
+          return sum + t;
         }, 0) / totalModels
       )
     : 0;
@@ -164,7 +164,7 @@ export function ModelSummary({ models, className = '' }: ModelSummaryProps) {
     ? Math.round(
         models.reduce((sum, model) => {
           const w = parseInt(model.characteristics.find(c => c.name === 'W')?.value || '0');
-          return sum + w * model.count;
+          return sum + w;
         }, 0) / totalModels
       )
     : 0;

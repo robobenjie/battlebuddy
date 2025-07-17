@@ -76,12 +76,12 @@ describe('Army Import - Model Count Preservation', () => {
         console.log(`🧪 Unit ${index + 1}: ${unit.name}, count: ${unit.count}`);
         
         const models = extractModels(unit);
-        console.log(`🧪 Models for unit ${unit.name}:`, models.map(m => ({ name: m.name, count: m.count })));
+        console.log(`🧪 Models for unit ${unit.name}:`, models.map(m => ({ name: m.name, individual: true })));
         
-        // Verify no model has count of 1 unless that's actually correct
+        // Verify each model is an individual record (no count field)
         models.forEach(model => {
-          expect(model.count).toBeGreaterThan(0);
-          console.log(`🧪 Model: ${model.name}, count: ${model.count}`);
+          expect(model.hasOwnProperty('count')).toBe(false); // Individual models don't have count
+          console.log(`🧪 Model: ${model.name} (individual record)`);
         });
       });
     });
@@ -588,8 +588,8 @@ describe('Army Import - Phase 3: Model Processing', () => {
         expect(model.unitId).toBe(firstUnit.id);
         expect(model.armyId).toBe(armyId);
         expect(model.ownerId).toBe(userId);
-        expect(typeof model.count).toBe('number');
-        expect(model.count).toBeGreaterThan(0);
+        // Individual models don't have count field
+        expect(model.hasOwnProperty('count')).toBe(false);
         expect(Array.isArray(model.characteristics)).toBe(true);
       }
     });
@@ -662,13 +662,13 @@ describe('Army Import - Phase 3: Model Processing', () => {
       for (const unit of units) {
         const models = extractModels(unit);
         
-        // Total model count should make sense
-        const totalModelCount = models.reduce((sum, model) => sum + model.count, 0);
+        // Total model count is now just the number of individual model records
+        const totalModelCount = models.length;
         expect(totalModelCount).toBeGreaterThan(0);
         
-        // Each model should have a positive count
+        // Each model should be an individual record (no count field)
         for (const model of models) {
-          expect(model.count).toBeGreaterThan(0);
+          expect(model.hasOwnProperty('count')).toBe(false);
         }
       }
     });

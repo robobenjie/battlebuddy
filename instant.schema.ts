@@ -53,7 +53,6 @@ const _schema = i.schema({
       modelIds: i.json(), // array of model IDs
       keywords: i.json(), // array of keywords
       startingModels: i.number(),
-      currentModels: i.number(),
       currentWounds: i.number(),
       hasMoved: i.boolean(),
       hasAdvanced: i.boolean(),
@@ -68,6 +67,12 @@ const _schema = i.schema({
       armyId: i.string().indexed(),
       gameId: i.string().optional(), // null for user templates, gameId for game copies
       cost: i.number(), // cost in points for this unit
+      count: i.number(), // number of this unit in the army
+      categories: i.json(), // array of categories (e.g., ["Infantry", "Faction: Adeptus Astartes"])
+      profiles: i.json(), // array of unit profiles with characteristics
+      rules: i.json(), // array of unit rules
+      sourceData: i.json(), // original source data for re-parsing
+      ownerId: i.string().indexed(), // user who owns this unit
     }),
 
     models: i.entity({
@@ -84,8 +89,7 @@ const _schema = i.schema({
       lastActionTurn: i.number().optional(),
       unitId: i.string().indexed(),
       gameId: i.string().optional(), // null for user templates, gameId for game copies
-      // Model count and characteristics for game copies
-      count: i.number(),
+      // Individual model characteristics
       characteristics: i.json(), // array of characteristics
       armyId: i.string().indexed(),
       ownerId: i.string().indexed(),
