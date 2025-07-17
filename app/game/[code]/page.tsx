@@ -197,6 +197,7 @@ export default function GamePage() {
           <div className="space-y-3">
             {players.map((player) => {
               const playerArmy = allArmies.find(a => a.id === player.armyId && !a.gameId);
+              const isCurrentUser = player.userId === user?.id;
               return (
                 <div
                   key={player.id}
@@ -210,15 +211,31 @@ export default function GamePage() {
                         HOST
                       </span>
                     )}
-                    {player.userId === user?.id && (
+                    {isCurrentUser && (
                       <span className="bg-blue-600 text-blue-100 px-2 py-1 rounded text-xs font-medium">
                         YOU
                       </span>
                     )}
                   </div>
-                  <div className="text-sm text-gray-400">
+                  <div className="text-sm text-gray-400 flex items-center space-x-2">
                     {playerArmy ? (
-                      <span className="text-green-400">{playerArmy.name}</span>
+                      <>
+                        <span className="text-green-400">{playerArmy.name}</span>
+                        {isCurrentUser && (
+                          <button
+                            onClick={async () => {
+                              await db.transact([
+                                db.tx.players[player.id].update({ armyId: null })
+                              ]);
+                            }}
+                            className="ml-2 text-red-400 hover:text-red-600 text-lg font-bold focus:outline-none"
+                            title="Undo army selection"
+                            aria-label="Undo army selection"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </>
                     ) : (
                       <span>No army selected</span>
                     )}
