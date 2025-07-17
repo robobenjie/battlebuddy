@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { db } from '../lib/db';
 import AuthenticatedApp from '../components/AuthenticatedApp';
 import EmailModal from '../components/EmailModal';
+import { CurrentGames } from '../components/CurrentGamesPage';
 
 export default function Home() {
   const { isLoading, user, error } = db.useAuth();
+  const { data } = db.useQuery({ games: {}, players: {} });
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [isEmailSending, setIsEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);

@@ -10,9 +10,8 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose, currentPage, onNavigate, onLogout }: SidebarProps) {
   const menuItems = [
-    { id: 'home', label: 'Create/Join Game', icon: '🎮' },
-    { id: 'current-games', label: 'Current Games', icon: '⚔️' },
-    { id: 'view-armies', label: 'View Armies', icon: '🏛️' },
+    { id: 'home', label: 'Games', icon: '🎮' },
+    { id: 'view-armies', label: 'Armies', icon: '🏛️' },
   ];
 
   const handleNavigate = (page: string) => {

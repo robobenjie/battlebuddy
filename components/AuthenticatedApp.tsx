@@ -7,7 +7,7 @@ import HamburgerMenu from './HamburgerMenu';
 import Sidebar from './Sidebar';
 import ViewArmiesPage from './ViewArmiesPage';
 import ArmyDetailPage from './ArmyDetailPage';
-import CurrentGamesPage from './CurrentGamesPage';
+import { CurrentGames } from './CurrentGamesPage';
 
 interface AuthenticatedAppProps {
   user: any;
@@ -166,9 +166,15 @@ export default function AuthenticatedApp({ user }: AuthenticatedAppProps) {
           <ViewArmiesPage user={user} onNavigateToArmy={handleNavigateToArmy} />
         );
       case 'current-games':
-        return <CurrentGamesPage user={user} />;
+        return <CurrentGames user={user} />;
       case 'home':
       default:
+        // Query games and players for the current user
+        const userGames = games.filter((game: any) => {
+          const gameStatus = game.status === 'waiting' || game.status === 'active';
+          const isUserInGame = players.some((player: any) => player.gameId === game.id && player.userId === user.id);
+          return gameStatus && isUserInGame;
+        });
         return (
           <div className="min-h-screen bg-gray-900 flex items-center justify-center p-8 pt-20">
             <div className="max-w-md w-full space-y-8">
@@ -178,41 +184,43 @@ export default function AuthenticatedApp({ user }: AuthenticatedAppProps) {
                 <p className="text-gray-400 mb-8">Welcome, {user.email}!</p>
               </div>
 
-              <div className="space-y-6">
-                {/* Create Game */}
-                <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                  <h3 className="text-xl font-semibold mb-4">Create New Game</h3>
+              {/* Unified New Game Box */}
+              <div className="bg-gray-800 p-8 rounded-lg border border-gray-700 flex flex-col items-center space-y-6">
+                <div className="w-full text-center">
+                  <h3 className="text-2xl font-semibold text-white mb-6">New Game</h3>
+                </div>
+                <div className="w-full flex flex-row items-center space-x-2">
+                  <input
+                    type="text"
+                    placeholder="Enter 5-digit code"
+                    value={gameCode}
+                    onChange={(e) => setGameCode(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                    className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    maxLength={5}
+                  />
                   <button
-                    onClick={createGame}
-                    disabled={isCreating}
-                    className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+                    onClick={joinGame}
+                    disabled={isJoining || gameCode.length !== 5}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
                   >
-                    {isCreating ? 'Creating...' : 'Create Game'}
+                    {isJoining ? 'Joining...' : 'Join Game'}
                   </button>
                 </div>
-
-                {/* Join Game */}
-                <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                  <h3 className="text-xl font-semibold mb-4">Join Existing Game</h3>
-                  <div className="space-y-4">
-                    <input
-                      type="text"
-                      placeholder="Enter 5-digit game code"
-                      value={gameCode}
-                      onChange={(e) => setGameCode(e.target.value.replace(/\D/g, '').slice(0, 5))}
-                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
-                      maxLength={5}
-                    />
-                    <button
-                      onClick={joinGame}
-                      disabled={isJoining || gameCode.length !== 5}
-                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
-                    >
-                      {isJoining ? 'Joining...' : 'Join Game'}
-                    </button>
-                  </div>
-                </div>
+                <button
+                  onClick={createGame}
+                  disabled={isCreating}
+                  className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors mt-2"
+                >
+                  {isCreating ? 'Creating...' : 'Create Game'}
+                </button>
+                
               </div>
+            {/* Current Games List (embedded) */}
+              {userGames.length > 0 && (
+                <div className="pt-4 w-full">
+                  <CurrentGames user={user} embedded={true} />
+                </div>
+              )}
             </div>
           </div>
         );
