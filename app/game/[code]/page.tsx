@@ -42,45 +42,31 @@ export default function GamePage() {
 
   // Function to copy an army using the original JSON and import logic
   const copyArmyToGame = async (armyId: string, playerId: string) => {
-    console.log('🎯 copyArmyToGame called with:', { armyId, playerId, gameId: game?.id });
     
     const army = userArmies.find(a => a.id === armyId);
-    console.log('🎯 Found army:', army);
     
     if (!army || !army.sourceData || !game?.id) {
-      console.error('❌ Army not found, missing source data, or no game ID', {
-        armyFound: !!army,
-        hasSourceData: !!army?.sourceData,
-        hasGameId: !!game?.id
-      });
       return null;
     }
 
     try {
-      console.log('🎯 Parsing JSON data...');
       // Parse the original JSON data
       const originalJsonData = JSON.parse(army.sourceData);
-      console.log('🎯 JSON parsed successfully:', originalJsonData);
       
-      console.log('🎯 Calling importArmyForGame...');
       // Import the army with a new function that creates game copies
       const result = await importArmyForGame(originalJsonData, army.ownerId, game.id);
-      console.log('🎯 Import result:', result);
       
       if (result?.armyId) {
-        console.log('🎯 Updating player with new army ID...');
         // Update player with the new army reference
         await db.transact([
           db.tx.players[playerId].update({
             armyId: result.armyId
           })
         ]);
-        console.log('🎯 Player updated successfully');
         
         return result.armyId;
       }
       
-      console.log('❌ No armyId in result');
       return null;
       
     } catch (error) {
@@ -128,28 +114,20 @@ export default function GamePage() {
 
   // Function to start the game with army copying
   const startGame = async () => {
-    console.log('🚀 Starting game...');
     setIsStartingGame(true);
     try {
-      console.log('🚀 Players:', players);
-      console.log('🚀 All armies:', allArmies);
-      console.log('🚀 User armies:', userArmies);
       
       // Copy armies for all players who have selected them
       for (const player of players) {
-        console.log('🚀 Checking player:', player);
         
         if (player.armyId && !allArmies.find(a => a.id === player.armyId && a.gameId === game?.id)) {
-          console.log('🚀 Player needs army copy:', player.name, 'armyId:', player.armyId);
+          
           // This player has selected an army template but it's not copied to the game yet
           const newArmyId = await copyArmyToGame(player.armyId, player.id);
-          console.log('🚀 Copy result for player', player.name, ':', newArmyId);
         } else {
-          console.log('🚀 Player already has game army or no army selected:', player.name);
         }
       }
 
-      console.log('🚀 Setting game to active...');
       // Start the game with first player and command phase
       await db.transact([
         db.tx.games[game.id].update({ 
@@ -160,7 +138,6 @@ export default function GamePage() {
           phaseHistory: []
         })
       ]);
-      console.log('🚀 Game started successfully');
     } catch (error) {
       console.error('❌ Error starting game:', error);
     } finally {

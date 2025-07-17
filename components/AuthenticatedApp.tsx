@@ -5,7 +5,6 @@ import { db } from '../lib/db';
 import { useRouter } from 'next/navigation';
 import HamburgerMenu from './HamburgerMenu';
 import Sidebar from './Sidebar';
-import UploadArmyPage from './UploadArmyPage';
 import ViewArmiesPage from './ViewArmiesPage';
 import ArmyDetailPage from './ArmyDetailPage';
 import CurrentGamesPage from './CurrentGamesPage';
@@ -154,8 +153,6 @@ export default function AuthenticatedApp({ user }: AuthenticatedAppProps) {
   // Render current page content
   const renderCurrentPage = () => {
     switch (currentPage) {
-      case 'upload-army':
-        return <UploadArmyPage user={user} onSuccess={() => setCurrentPage('view-armies')} />;
       case 'view-armies':
         return <ViewArmiesPage user={user} onNavigateToArmy={handleNavigateToArmy} />;
       case 'army-detail':

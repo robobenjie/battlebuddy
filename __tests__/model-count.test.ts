@@ -131,23 +131,19 @@ describe('Model Count Preservation Bug', () => {
   };
 
   it('should extract correct model counts from raw data', () => {
-    console.log('🧪 Testing model count extraction...');
     
     const armyMetadata = extractArmyMetadata(testArmyData, hostUserId);
     const units = extractUnits(testArmyData, armyMetadata.id, hostUserId);
     
-    console.log('🧪 Extracted units:', units.length);
     
     let totalModelsExtracted = 0;
     const expectedModelCounts = [3, 5]; // Individual model counts: Eradicator Squad (3), Terminator Squad (5) = 8 total
     let unitIndex = 0;
     
     units.forEach((unit) => {
-      console.log(`🧪 Unit ${unitIndex + 1}: ${unit.name}`);
       
       const models = extractModels(unit);
       // Just verify we have individual models, don't check exact count since test data may vary
-      console.log(`🧪   Unit has ${models.length} individual models`);
       expect(models.length).toBeGreaterThan(0);
       
       // Verify each model is individual (no count field)
@@ -159,30 +155,25 @@ describe('Model Count Preservation Bug', () => {
       unitIndex++;
     });
     
-    console.log('🧪 Total models extracted:', totalModelsExtracted);
     expect(totalModelsExtracted).toBeGreaterThan(0); // Should have individual models from extracted units
   });
 
   it('should preserve model counts for host player', async () => {
-    console.log('🧪 Testing model count preservation for HOST player...');
     
     await importArmyForGame(testArmyData, hostUserId, gameId);
     
     const modelTransactions = mockTransactions.filter(t => t.type === 'model-update');
-    console.log('🧪 Host model transactions:', modelTransactions.length);
     
     // With individual models, we expect the actual number of model transactions from the real data
     expect(modelTransactions.length).toBeGreaterThan(0); // Just verify we have models
     
     modelTransactions.forEach((transaction, index) => {
-      console.log(`🧪 Host Model ${index + 1}: ${transaction.data.name} (individual)`);
       // Individual models don't have count field in transactions
       expect(transaction.data.hasOwnProperty('count')).toBe(false);
     });
   });
 
   it('should preserve model counts for non-host player (BUG TEST)', async () => {
-    console.log('🧪 Testing model count preservation for NON-HOST player...');
     
     // Clear previous transactions
     mockTransactions.length = 0;
@@ -190,13 +181,11 @@ describe('Model Count Preservation Bug', () => {
     await importArmyForGame(testArmyData, nonHostUserId, gameId);
     
     const modelTransactions = mockTransactions.filter(t => t.type === 'model-update');
-    console.log('🧪 Non-host model transactions:', modelTransactions.length);
     
     // With individual models, we expect the actual number of model transactions
     expect(modelTransactions.length).toBeGreaterThan(0); // Just verify we have models
     
     modelTransactions.forEach((transaction, index) => {
-      console.log(`🧪 Non-host Model ${index + 1}: ${transaction.data.name} (individual)`);
       
       // Individual models don't have count field
       expect(transaction.data.hasOwnProperty('count')).toBe(false);
@@ -204,7 +193,6 @@ describe('Model Count Preservation Bug', () => {
   });
 
   it('should have identical model counts between host and non-host', async () => {
-    console.log('🧪 Testing model count consistency between players...');
     
     // Import for host
     await importArmyForGame(testArmyData, hostUserId, gameId);
@@ -222,9 +210,6 @@ describe('Model Count Preservation Bug', () => {
       const hostModel = hostModelTransactions[i];
       const nonHostModel = nonHostModelTransactions[i];
       
-      console.log(`🧪 Model ${i + 1} comparison:`);
-      console.log(`🧪   Host: ${hostModel.data.name} (count: ${hostModel.data.count})`);
-      console.log(`🧪   Non-host: ${nonHostModel.data.name} (count: ${nonHostModel.data.count})`);
       
       expect(hostModel.data.count).toBe(nonHostModel.data.count);
     }

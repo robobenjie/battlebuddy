@@ -69,19 +69,15 @@ describe('Army Import - Model Count Preservation', () => {
       const armyMetadata = extractArmyMetadata(jsonData, userId1);
       const units = extractUnits(jsonData, armyMetadata.id, userId1);
       
-      console.log('🧪 Extracted units:', units.length);
       
       // Test model extraction for each unit
       units.forEach((unit, index) => {
-        console.log(`🧪 Unit ${index + 1}: ${unit.name}, count: ${unit.count}`);
         
         const models = extractModels(unit);
-        console.log(`🧪 Models for unit ${unit.name}:`, models.map(m => ({ name: m.name, individual: true })));
         
         // Verify each model is an individual record (no count field)
         models.forEach(model => {
           expect(model.hasOwnProperty('count')).toBe(false); // Individual models don't have count
-          console.log(`🧪 Model: ${model.name} (individual record)`);
         });
       });
     });
@@ -90,15 +86,12 @@ describe('Army Import - Model Count Preservation', () => {
       const jsonData = testData as NewRecruitRoster;
       
       // Test import for player 1 (host)
-      console.log('🧪 Testing import for Player 1 (host)');
       const result1 = await importArmyForGame(jsonData, userId1, gameId);
       
       // Extract model transactions for player 1
       const player1ModelTransactions = mockTransactions.filter(t => t.type === 'model-update');
-      console.log('🧪 Player 1 model transactions:', player1ModelTransactions.length);
       
       player1ModelTransactions.forEach((transaction, index) => {
-        console.log(`🧪 Player 1 Model ${index + 1}: ${transaction.data.name} (individual)`);
         // Individual models don't have count field
         expect(transaction.data.hasOwnProperty('count')).toBe(false);
       });
@@ -106,15 +99,12 @@ describe('Army Import - Model Count Preservation', () => {
       // Clear transactions and test player 2
       mockTransactions.length = 0;
       
-      console.log('🧪 Testing import for Player 2 (non-host)');
       const result2 = await importArmyForGame(jsonData, userId2, gameId);
       
       // Extract model transactions for player 2
       const player2ModelTransactions = mockTransactions.filter(t => t.type === 'model-update');
-      console.log('🧪 Player 2 model transactions:', player2ModelTransactions.length);
       
       player2ModelTransactions.forEach((transaction, index) => {
-        console.log(`🧪 Player 2 Model ${index + 1}: ${transaction.data.name} (individual)`);
         // Individual models don't have count field
         expect(transaction.data.hasOwnProperty('count')).toBe(false);
       });
@@ -123,7 +113,6 @@ describe('Army Import - Model Count Preservation', () => {
       expect(player1ModelTransactions.length).toBe(player2ModelTransactions.length);
       
       // Compare that both players have same number of individual models
-      console.log(`🧪 Both players have ${player1ModelTransactions.length} individual models`);
       expect(player1ModelTransactions.length).toBe(player2ModelTransactions.length);
     });
   });
@@ -192,21 +181,17 @@ describe('Army Import - Model Count Preservation', () => {
       };
 
       // Test both armies
-      console.log('🧪 Testing Army 1 (5 models)');
       await importArmyForGame(testArmy1 as NewRecruitRoster, userId1, gameId);
       const army1Models = mockTransactions.filter(t => t.type === 'model-update');
       
       mockTransactions.length = 0;
       
-      console.log('🧪 Testing Army 2 (10 models)');
       await importArmyForGame(testArmy2 as NewRecruitRoster, userId2, gameId);
       const army2Models = mockTransactions.filter(t => t.type === 'model-update');
       
       // Verify individual model counts are correct
-      console.log(`🧪 Army 1 created ${army1Models.length} individual models (expected: 5)`);
       expect(army1Models.length).toBe(5);
       
-      console.log(`🧪 Army 2 created ${army2Models.length} individual models (expected: 10)`);  
       expect(army2Models.length).toBe(10);
       
       // Verify individual models don't have count field
@@ -381,8 +366,6 @@ describe('Army Import - Phase 2: Unit Extraction', () => {
       // (not including configuration items)
       expect(units.length).toBeGreaterThan(0);
       
-      // Log units for debugging
-      console.log('Extracted units:', units.map(u => ({ name: u.name, categories: u.categories })));
     });
 
     it('should filter out configuration items', () => {
@@ -525,7 +508,6 @@ describe('Army Import - Phase 2: Unit Extraction', () => {
       expect(units.length).toBeGreaterThan(0);
       
       // Log extracted unit names for verification
-      console.log('Unit names found:', units.map(u => u.name));
       
       // Check that we have some recognizable 40k unit types
       const hasSpaceMarineUnits = units.some(unit => 
@@ -596,7 +578,6 @@ describe('Army Import - Phase 3: Model Processing', () => {
         }
         
         // Log characteristics for debugging
-        console.log(`Model ${model.name} characteristics:`, model.characteristics);
       }
     });
 
@@ -693,13 +674,6 @@ describe('Army Import - Phase 3: Model Processing', () => {
       }
       
       expect(allModels.length).toBeGreaterThan(0);
-      
-      // Log model information for verification
-      console.log('Extracted models:', allModels.map(m => ({ 
-        name: m.name, 
-        individual: true, // Each model is now an individual record
-        characteristics: m.characteristics.length 
-      })));
     });
 
     it('should maintain data integrity across army -> units -> models', () => {
@@ -798,13 +772,6 @@ describe('Army Import - Phase 4: Weapon Processing', () => {
         // Should have some weapons
         expect(allWeapons.length).toBeGreaterThan(0);
         
-        // Log weapon breakdown for verification
-        console.log('Weapon breakdown:', {
-          total: allWeapons.length,
-          ranged: rangedWeapons.length,
-          melee: meleeWeapons.length,
-          weaponNames: allWeapons.map(w => ({ name: w.name, type: w.type }))
-        });
       }
     });
 
@@ -825,7 +792,6 @@ describe('Army Import - Phase 4: Weapon Processing', () => {
             }
             
             // Log characteristics for debugging
-            console.log(`Weapon ${weapon.name} (${weapon.type}) characteristics:`, weapon.characteristics);
           }
         }
       }
@@ -962,14 +928,7 @@ describe('Army Import - Phase 4: Weapon Processing', () => {
       }
       
       expect(allWeapons.length).toBeGreaterThan(0);
-      
-      // Log weapon information for verification
-      console.log('Extracted weapons:', allWeapons.map(w => ({ 
-        name: w.name, 
-        type: w.type,
-        count: w.count, 
-        characteristics: w.characteristics.length 
-      })));
+
     });
 
     it('should maintain data integrity across army -> units -> models -> weapons', () => {

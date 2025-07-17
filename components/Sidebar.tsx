@@ -12,7 +12,6 @@ export default function Sidebar({ isOpen, onClose, currentPage, onNavigate, onLo
   const menuItems = [
     { id: 'home', label: 'Create/Join Game', icon: '🎮' },
     { id: 'current-games', label: 'Current Games', icon: '⚔️' },
-    { id: 'upload-army', label: 'Upload Army', icon: '📤' },
     { id: 'view-armies', label: 'View Armies', icon: '🏛️' },
   ];
 

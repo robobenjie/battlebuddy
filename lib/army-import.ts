@@ -913,41 +913,31 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
   modelIds: string[]; 
   weaponIds: string[] 
 }> {
-  console.log('📥 importArmyForGame called with:', { userId, gameId });
   
   // Phase 1: Import army metadata
-  console.log('📥 Phase 1: Extracting army metadata...');
   const armyMetadata = extractArmyMetadata(jsonData, userId);
-  console.log('📥 Army metadata:', armyMetadata);
   
   // Phase 2: Extract units
-  console.log('📥 Phase 2: Extracting units...');
   const units = extractUnits(jsonData, armyMetadata.id, userId);
-  console.log('📥 Units extracted:', units.length, units);
   
   // Phase 3: Extract models from units
-  console.log('📥 Phase 3: Extracting models...');
   const allModels: ModelData[] = [];
   for (const unit of units) {
     const unitModels = extractModels(unit);
     allModels.push(...unitModels);
   }
-  console.log('📥 Models extracted:', allModels.length, allModels);
   
   // Phase 4: Extract weapons from units
-  console.log('📥 Phase 4: Extracting weapons...');
   const allWeapons: WeaponData[] = [];
   for (const unit of units) {
     const unitModels = allModels.filter(model => model.unitId === unit.id);
     const unitWeapons = extractWeapons(unit, unitModels);
     allWeapons.push(...unitWeapons);
   }
-  console.log('📥 Weapons extracted:', allWeapons.length, allWeapons);
   
   try {
     const transactions = [];
     
-    console.log('📥 Building army transaction...');
     // Add army transaction with required fields that database expects
     transactions.push(
       db.tx.armies[armyMetadata.id].update({
@@ -967,7 +957,6 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
       })
     );
     
-    console.log('📥 Building unit transactions...');
     // Add unit transactions with same structure as template armies
     for (const unit of units) {
       const unitModels = allModels.filter(m => m.unitId === unit.id);
@@ -1007,7 +996,6 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
       );
     }
     
-    console.log('📥 Building model transactions...');
     // Add model transactions with required fields that database expects
     for (const model of allModels) {
       const modelWeapons = allWeapons.filter(w => w.modelId === model.id);
@@ -1042,7 +1030,6 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
       );
     }
     
-    console.log('📥 Building weapon transactions...');
     // Add weapon transactions with required fields that database expects
     for (const weapon of allWeapons) {
       transactions.push(
@@ -1064,10 +1051,8 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
       );
     }
     
-    console.log('📥 Executing transactions:', transactions.length, 'total');
     // Execute all transactions
     await db.transact(transactions);
-    console.log('📥 Transactions completed successfully');
     
     const result = {
       armyId: armyMetadata.id,
@@ -1075,7 +1060,6 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
       modelIds: allModels.map(m => m.id),
       weaponIds: allWeapons.map(w => w.id)
     };
-    console.log('📥 Returning result:', result);
     
     return result;
   } catch (error) {
