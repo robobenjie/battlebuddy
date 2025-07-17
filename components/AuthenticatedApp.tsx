@@ -8,6 +8,7 @@ import Sidebar from './Sidebar';
 import UploadArmyPage from './UploadArmyPage';
 import ViewArmiesPage from './ViewArmiesPage';
 import ArmyDetailPage from './ArmyDetailPage';
+import CurrentGamesPage from './CurrentGamesPage';
 
 interface AuthenticatedAppProps {
   user: any;
@@ -167,6 +168,8 @@ export default function AuthenticatedApp({ user }: AuthenticatedAppProps) {
         ) : (
           <ViewArmiesPage user={user} onNavigateToArmy={handleNavigateToArmy} />
         );
+      case 'current-games':
+        return <CurrentGamesPage user={user} />;
       case 'home':
       default:
         return (

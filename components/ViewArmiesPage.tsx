@@ -24,7 +24,8 @@ export default function ViewArmiesPage({ user, onNavigateToArmy }: ViewArmiesPag
     },
   });
 
-  const armies = armyData?.armies || [];
+  // Filter out game copies (armies with gameId set)
+  const armies = (armyData?.armies || []).filter((army: any) => !army.gameId);
 
   const handleDeleteClick = (armyId: string) => {
     setDeletingArmyId(armyId);

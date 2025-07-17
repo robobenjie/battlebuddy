@@ -10,12 +10,15 @@ const _schema = i.schema({
     // Game entities
     games: i.entity({
       name: i.string(),
+      code: i.string().unique().indexed(), // 5-digit game code
+      hostId: i.string().indexed(), // user ID of the host
       createdAt: i.number().indexed(),
-      status: i.string(), // "setup", "active", "completed", "archived"
+      status: i.string(), // "waiting", "setup", "active", "completed", "archived"
       currentTurn: i.number(),
-      currentPhase: i.string(),
+      currentPhase: i.string(), // "command", "move", "shoot", "charge", "fight"
       activePlayerId: i.string().optional(),
       playerIds: i.json(), // array of player IDs
+      phaseHistory: i.json(), // track phase progression for undo functionality
     }),
 
     players: i.entity({
@@ -53,6 +56,9 @@ const _schema = i.schema({
       hasFallenBack: i.boolean(),
       isEngaged: i.boolean(),
       isDestroyed: i.boolean(),
+      // Turn tracking for undo functionality
+      turnHistory: i.json(), // array of actions per turn: {turn: number, phase: string, action: string, timestamp: number}
+      lastActionTurn: i.number().optional(), // track which turn the last action was taken
       armyId: i.string().indexed(),
       gameId: i.string().optional(), // null for user templates, gameId for game copies
     }),
@@ -66,6 +72,9 @@ const _schema = i.schema({
       weaponIds: i.json(), // array of weapon IDs
       isLeader: i.boolean(),
       isDestroyed: i.boolean(),
+      // Turn tracking for individual model actions
+      turnHistory: i.json(), // array of actions per turn
+      lastActionTurn: i.number().optional(),
       unitId: i.string().indexed(),
       gameId: i.string().optional(), // null for user templates, gameId for game copies
     }),
@@ -77,6 +86,7 @@ const _schema = i.schema({
       abilities: i.json(), // array of weapon abilities
       keywords: i.json(), // array of weapon keywords
       modelId: i.string().indexed(),
+      ownerId: i.string().indexed(), // Add missing ownerId field
       gameId: i.string().optional(), // null for user templates, gameId for game copies
     }),
 
@@ -153,6 +163,11 @@ const _schema = i.schema({
     weaponGame: {
       forward: { on: "weapons", has: "one", label: "game" },
       reverse: { on: "games", has: "many", label: "weapons" },
+    },
+
+    weaponOwner: {
+      forward: { on: "weapons", has: "one", label: "owner", required: true },
+      reverse: { on: "$users", has: "many", label: "weapons" },
     },
 
     // Rule and keyword relationships

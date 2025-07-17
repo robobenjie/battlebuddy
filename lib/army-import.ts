@@ -906,3 +906,174 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
     throw new Error(`Complete army import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 } 
+
+/**
+ * Import an army for a specific game (creates game copies instead of user templates)
+ * Simplified version that only uses core schema fields to test the copying functionality
+ */
+export async function importArmyForGame(jsonData: NewRecruitRoster, userId: string, gameId: string): Promise<{ 
+  armyId: string; 
+  unitIds: string[]; 
+  modelIds: string[]; 
+  weaponIds: string[] 
+}> {
+  console.log('📥 importArmyForGame called with:', { userId, gameId });
+  
+  // Phase 1: Import army metadata
+  console.log('📥 Phase 1: Extracting army metadata...');
+  const armyMetadata = extractArmyMetadata(jsonData, userId);
+  console.log('📥 Army metadata:', armyMetadata);
+  
+  // Phase 2: Extract units
+  console.log('📥 Phase 2: Extracting units...');
+  const units = extractUnits(jsonData, armyMetadata.id, userId);
+  console.log('📥 Units extracted:', units.length, units);
+  
+  // Phase 3: Extract models from units
+  console.log('📥 Phase 3: Extracting models...');
+  const allModels: ModelData[] = [];
+  for (const unit of units) {
+    const unitModels = extractModels(unit);
+    allModels.push(...unitModels);
+  }
+  console.log('📥 Models extracted:', allModels.length, allModels);
+  
+  // Phase 4: Extract weapons from units
+  console.log('📥 Phase 4: Extracting weapons...');
+  const allWeapons: WeaponData[] = [];
+  for (const unit of units) {
+    const unitModels = allModels.filter(model => model.unitId === unit.id);
+    const unitWeapons = extractWeapons(unit, unitModels);
+    allWeapons.push(...unitWeapons);
+  }
+  console.log('📥 Weapons extracted:', allWeapons.length, allWeapons);
+  
+  try {
+    const transactions = [];
+    
+    console.log('📥 Building army transaction...');
+    // Add army transaction with required fields that database expects
+    transactions.push(
+      (db.tx.armies[armyMetadata.id] as any).update({
+        name: armyMetadata.name,
+        faction: armyMetadata.faction,
+        pointsValue: armyMetadata.totalPoints,
+        unitIds: units.map(u => u.id),
+        ownerId: armyMetadata.ownerId,
+        sourceData: armyMetadata.sourceData,
+        gameId: gameId,
+        // Add missing required fields that database expects
+        detachment: armyMetadata.detachment,
+        battleSize: armyMetadata.battleSize,
+        totalPoints: armyMetadata.totalPoints,
+        pointsLimit: armyMetadata.pointsLimit,
+        createdAt: armyMetadata.createdAt
+      })
+    );
+    
+    console.log('📥 Building unit transactions...');
+    // Add unit transactions with required fields that database expects
+    for (const unit of units) {
+      const unitModels = allModels.filter(m => m.unitId === unit.id);
+      transactions.push(
+        (db.tx.units[unit.id] as any).update({
+          name: unit.name,
+          type: unit.type || 'Infantry',
+          abilities: unit.rules || [],
+          modelIds: unitModels.map(m => m.id),
+          keywords: unit.categories || [],
+          startingModels: unit.count || 1,
+          currentModels: unit.count || 1,
+          currentWounds: 0,
+          hasMoved: false,
+          hasAdvanced: false,
+          hasCharged: false,
+          isBattleShocked: false,
+          hasFallenBack: false,
+          isEngaged: false,
+          isDestroyed: false,
+          turnHistory: [],
+          lastActionTurn: 0,
+          armyId: unit.armyId,
+          gameId: gameId
+        })
+      );
+    }
+    
+    console.log('📥 Building model transactions...');
+    // Add model transactions with required fields that database expects
+    for (const model of allModels) {
+      const modelWeapons = allWeapons.filter(w => w.modelId === model.id);
+      
+      // Convert characteristics to baseStats format
+      const baseStats: Record<string, any> = {};
+      if (model.characteristics && Array.isArray(model.characteristics)) {
+        model.characteristics.forEach((char: any) => {
+          baseStats[char.name] = char.value;
+        });
+      }
+      
+      transactions.push(
+        (db.tx.models[model.id] as any).update({
+          name: model.name,
+          baseStats: baseStats,
+          currentWounds: 0,
+          keywords: [],
+          specialRules: [],
+          weaponIds: modelWeapons.map(w => w.id),
+          isLeader: false,
+          isDestroyed: false,
+          turnHistory: [],
+          lastActionTurn: 0,
+          unitId: model.unitId,
+          gameId: gameId,
+          // Add missing required fields that database expects
+          characteristics: model.characteristics || [],
+          count: model.count,
+          armyId: model.armyId,
+          ownerId: model.ownerId
+        })
+      );
+    }
+    
+    console.log('📥 Building weapon transactions...');
+    // Add weapon transactions with required fields that database expects
+    for (const weapon of allWeapons) {
+      transactions.push(
+        (db.tx.weapons[weapon.id] as any).update({
+          name: weapon.name,
+          type: weapon.type,
+          profiles: weapon.profiles || [],
+          abilities: [],
+          keywords: [],
+          modelId: weapon.modelId,
+          ownerId: weapon.ownerId,
+          gameId: gameId,
+          // Add missing required fields that database expects
+          count: weapon.count,
+          characteristics: weapon.characteristics,
+          armyId: weapon.armyId,
+          unitId: weapon.unitId
+        })
+      );
+    }
+    
+    console.log('📥 Executing transactions:', transactions.length, 'total');
+    // Execute all transactions
+    await db.transact(transactions);
+    console.log('📥 Transactions completed successfully');
+    
+    const result = {
+      armyId: armyMetadata.id,
+      unitIds: units.map(u => u.id),
+      modelIds: allModels.map(m => m.id),
+      weaponIds: allWeapons.map(w => w.id)
+    };
+    console.log('📥 Returning result:', result);
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Failed to import army for game:', error);
+    throw new Error(`Game army import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+} 
