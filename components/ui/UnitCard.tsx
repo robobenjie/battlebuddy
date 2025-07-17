@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { ModelList, ModelSummary } from './ModelCard';
 import { WeaponList } from './WeaponCard';
 import { KeywordList, extractFactionKeywords, extractGeneralKeywords } from './KeywordBadge';
-import { COMMON_RULES } from './RulePopup';
+import { COMMON_RULES, parseRuleDescription } from './RulePopup';
 
 interface UnitCardProps {
   unit: {
@@ -284,7 +284,7 @@ export default function UnitCard({
                             <div className="text-xs">
                               {keywords.length > 0 ? (
                                 keywords.map((keyword, index) => {
-                                  const hasRule = COMMON_RULES[keyword];
+                                  const hasRule = COMMON_RULES[keyword] || parseRuleDescription(keyword);
                                   return (
                                     <span key={index}>
                                       {index > 0 && ', '}
@@ -391,7 +391,7 @@ export default function UnitCard({
                             <div className="text-xs">
                               {keywords.length > 0 ? (
                                 keywords.map((keyword, index) => {
-                                  const hasRule = COMMON_RULES[keyword];
+                                  const hasRule = COMMON_RULES[keyword] || parseRuleDescription(keyword);
                                   return (
                                     <span key={index}>
                                       {index > 0 && ', '}

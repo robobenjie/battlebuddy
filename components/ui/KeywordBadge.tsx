@@ -1,6 +1,6 @@
 'use client';
 
-import { COMMON_RULES } from './RulePopup';
+import { COMMON_RULES, parseRuleDescription } from './RulePopup';
 
 interface KeywordBadgeProps {
   keyword: string;
@@ -17,8 +17,8 @@ export default function KeywordBadge({
   variant = 'keyword',
   className = '' 
 }: KeywordBadgeProps) {
-  // Check if this keyword has an associated rule (either provided description or in common rules)
-  const hasRule = description || COMMON_RULES[keyword];
+  // Check if this keyword has an associated rule (provided description, in common rules, or can be dynamically parsed)
+  const hasRule = description || COMMON_RULES[keyword] || parseRuleDescription(keyword);
   const isClickable = onClick && hasRule;
 
   const handleClick = () => {

@@ -13,52 +13,106 @@ interface RulePopupProps {
   rule: Rule | null;
 }
 
-// Common 40k rules database for quick lookup
+// Function to parse and generate descriptions for parameterized rules
+export function parseRuleDescription(ruleName: string): string | null {
+  // Handle Anti-X Y+ rules
+  const antiMatch = ruleName.match(/^Anti-(\w+)\s+(\d+)\+$/);
+  if (antiMatch) {
+    const [, keyword, threshold] = antiMatch;
+    return `Anti-keyword ${threshold}+ abilities allow models to score Critical Wounds against ${keyword} units on to-wound rolls of ${threshold}+.`;
+  }
+
+  // Handle Rapid Fire X rules
+  const rapidFireMatch = ruleName.match(/^Rapid Fire (\d+)$/);
+  if (rapidFireMatch) {
+    const [, shots] = rapidFireMatch;
+    return `Rapid Fire ${shots} weapons fire ${shots} extra shot${shots === '1' ? '' : 's'} against targets within half range.`;
+  }
+
+  // Handle Melta X rules
+  const meltaMatch = ruleName.match(/^Melta (\d+)$/);
+  if (meltaMatch) {
+    const [, damage] = meltaMatch;
+    return `Melta ${damage} weapons do an additional ${damage} damage against targets within half their weapon range.`;
+  }
+
+  // Handle Sustained Hits X rules
+  const sustainedHitsMatch = ruleName.match(/^Sustained Hits (\d+)$/);
+  if (sustainedHitsMatch) {
+    const [, hits] = sustainedHitsMatch;
+    return `A Sustained Hits ${hits} weapon inflicts ${hits} additional hit${hits === '1' ? '' : 's'} on Critical Hit rolls.`;
+  }
+
+  // Handle Feel No Pain X+ rules
+  const feelNoPainMatch = ruleName.match(/^Feel No Pain (\d+)\+$/);
+  if (feelNoPainMatch) {
+    const [, threshold] = feelNoPainMatch;
+    return `Each time this model would lose a wound, roll one D6: on a ${threshold}+, that wound is not lost.`;
+  }
+
+  // Handle Scouts X" rules
+  const scoutsMatch = ruleName.match(/^Scouts (\d+)"$/);
+  if (scoutsMatch) {
+    const [, distance] = scoutsMatch;
+    return `Units with the Scouts ${distance}" ability get a free ${distance}" move after deployment.`;
+  }
+
+  // Handle Firing Deck X rules
+  const firingDeckMatch = ruleName.match(/^Firing Deck (\d+)$/);
+  if (firingDeckMatch) {
+    const [, weapons] = firingDeckMatch;
+    return `A vehicle unit with Firing Deck ${weapons} can make additional ranged attacks using up to ${weapons} weapon${weapons === '1' ? '' : 's'} held by embarked models.`;
+  }
+
+  // Handle Deadly Demise X rules
+  const deadlyDemiseMatch = ruleName.match(/^Deadly Demise (\d+)$/);
+  if (deadlyDemiseMatch) {
+    const [, damage] = deadlyDemiseMatch;
+    return `When a unit with Deadly Demise ${damage} loses its last wound, roll D6. On a 6, the unit deals ${damage} mortal wound${damage === '1' ? '' : 's'} to all units within range.`;
+  }
+
+  return null;
+}
+
+// Updated 40k rules database with correct 10th edition rules
 export const COMMON_RULES: Record<string, string> = {
-  'Assault': 'Weapons with this ability can be fired after the bearer\'s unit has Advanced.',
-  'Heavy': 'Weapons with this ability can only be fired if the bearer\'s unit Remained Stationary this turn.',
-  'Pistol': 'Weapons with this ability can be fired even if the bearer\'s unit is within Engagement Range of enemy units.',
-  'Rapid Fire 1': 'Weapons with this ability make 1 additional attack when targeting units within half range.',
-  'Rapid Fire 2': 'Weapons with this ability make 2 additional attacks when targeting units within half range.',
-  'Rapid Fire 3': 'Weapons with this ability make 3 additional attacks when targeting units within half range.',
-  'Melta 1': 'Weapons with this ability deal +1 damage when targeting units within half range.',
-  'Melta 2': 'Weapons with this ability deal +2 damage when targeting units within half range.',
-  'Melta 3': 'Weapons with this ability deal +3 damage when targeting units within half range.',
-  'Lethal Hits': 'Critical Hit rolls of 6 automatically wound the target.',
-  'Sustained Hits 1': 'Each Critical Hit generates 1 additional hit.',
-  'Sustained Hits 2': 'Each Critical Hit generates 2 additional hits.',
-  'Sustained Hits 3': 'Each Critical Hit generates 3 additional hits.',
-  'Devastating Wounds': 'Critical Wound rolls inflict mortal wounds equal to the weapon\'s Damage characteristic.',
-  'Anti-Infantry 4+': 'This weapon has improved wounding against Infantry units (4+ to wound).',
-  'Anti-Vehicle 3+': 'This weapon has improved wounding against Vehicle units (3+ to wound).',
-  'Anti-Monster 4+': 'This weapon has improved wounding against Monster units (4+ to wound).',
-  'Torrent': 'This weapon automatically hits its target.',
-  'Ignores Cover': 'Target cannot claim the benefit of cover against this weapon.',
-  'Precision': 'This weapon can target Character models even if they are not the closest visible target.',
-  'Blast': 'This weapon can target units that are not visible to the bearer.',
-  'Indirect Fire': 'This weapon can target units that are not visible to the bearer.',
-  'One Shot': 'This weapon can only be used once per battle.',
-  'Hazardous': 'After attacking with this weapon, roll one D6: on a 1, the bearer suffers 1 mortal wound.',
-  'Twin-linked': 'Re-roll failed Hit rolls for attacks made with this weapon.',
-  'Lance': 'Each time an attack made with this weapon targets a unit that has moved, add 1 to the Wound roll.',
-  'Extra Attacks': '+1 Attack when fighting.',
-  'Fights First': 'Units with this ability always fight first in the Fight phase.',
-  'Feel No Pain 6+': 'Each time this model would lose a wound, roll one D6: on a 6, that wound is not lost.',
-  'Feel No Pain 5+': 'Each time this model would lose a wound, roll one D6: on a 5+, that wound is not lost.',
-  'Stealth': 'Ranged attacks against this unit suffer -1 to hit.',
-  'Infiltrators': 'This unit can be set up anywhere on the battlefield that is more than 9" from enemy models.',
-  'Deep Strike': 'This unit can be set up in the Reinforcements step instead of being deployed at the start of the battle.',
-  'Leader': 'This model can be attached to a Bodyguard unit.',
-  'Lone Operative': 'Unless part of an Attached unit, this unit can only be selected as the target of a ranged attack if it is the closest eligible target.',
-  'Scouts 6"': 'At the start of the first turn, this unit can make a Normal move of up to 6".',
-  'Scouts 9"': 'At the start of the first turn, this unit can make a Normal move of up to 9".',
+  // Weapon Abilities
+  'Assault': 'A unit that Advances during the movement phase can still shoot its Assault weapons.',
+  'Heavy': 'Units that Remain Stationary get +1 to hit with Heavy Weapons they fire that turn.',
+  'Pistol': 'You can fire these weapons while in engagement range of enemy units (but only at units you\'re in engagement range with.)',
+  'Blast': 'When shooting a Blast weapon, add one to the attack characteristic for every five models in the target unit.',
+  'Conversion': 'When firing at a target at least 12" away, this weapon inflicts Critical Hits on hit rolls of 4+.',
+  'Devastating Wounds': 'When this weapon scores a Critical Wound, the target cannot take saves or invulnerable saves against that wound.',
+  'Extra Attacks': 'When you declare melee attacks, you can also attack with Extra Attacks weapons.',
+  'Hazardous': 'Roll one D6 for each Hazardous weapon used. On a 1, deal 3 mortal wounds to Characters/Vehicles/Monsters or remove 1 model.',
+  'Indirect Fire': 'This weapon doesn\'t need line of sight to the target but suffers -1 to hit and target gains Benefit of Cover.',
+  'Ignores Cover': 'Weapons with this ability ignore the Benefit of Cover.',
+  'Lance': 'On the turn that a unit Charges, weapons with the Lance ability have +1 to wound.',
+  'Lethal Hits': 'Critical Hits with this weapon automatically wound without rolling.',
+  'Linked Fire': 'This weapon can draw line of sight and measure range from another friendly unit that it can see.',
+  'Precision': 'When attacking a unit with an attached Character, you can direct attacks at the Character.',
+  'Psychic': 'This weapon has the Psychic ability. Some other abilities respond to Psychic attacks.',
+  'Torrent': 'Torrent weapons automatically hit.',
+  'Twin-linked': 'Twin-Linked weapons can re-roll To Wound rolls.',
+
+  // Core Abilities
+  'Deep Strike': 'Deep Strike units start in Reserves and enter the battlefield more than 9" away from enemy units.',
+  'Fights First': 'Units with this ability fight in the \'Fights First\' step of the Fight Phase.',
+  'Infiltrators': 'This unit can be deployed anywhere on the board more than 9" away from enemy units.',
+  'Leader': 'This Character can join other squads during deployment, becoming their bodyguard.',
+  'Lone Operative': 'Lone operatives can\'t be targeted by enemies more than 12" away.',
+  'Stealth': 'If every model in the unit has Stealth, ranged attacks targeting that unit take -1 to hit.',
 };
 
 export default function RulePopup({ isOpen, onClose, rule }: RulePopupProps) {
   if (!isOpen || !rule) return null;
 
-  // Get description from common rules or use provided description
-  const description = rule.description || COMMON_RULES[rule.name] || 'No description available.';
+  // Try to get description from dynamic parsing first, then common rules, then provided description
+  const description = 
+    parseRuleDescription(rule.name) || 
+    rule.description || 
+    COMMON_RULES[rule.name] || 
+    'No description available.';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -69,22 +123,22 @@ export default function RulePopup({ isOpen, onClose, rule }: RulePopupProps) {
       />
 
       {/* Modal */}
-      <div className="relative bg-gray-800 border border-gray-600 rounded-lg max-w-md w-full max-h-96 overflow-hidden">
+      <div className="relative bg-gray-800 border border-gray-600 rounded-lg max-w-lg w-full max-h-80 overflow-hidden shadow-xl">
         {/* Header */}
-        <div className="bg-gray-700 px-4 py-3 border-b border-gray-600 flex items-center justify-between">
+        <div className="bg-gray-700 px-4 py-2 border-b border-gray-600 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-white">{rule.name}</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white p-1 rounded transition-colors"
+            className="text-gray-400 hover:text-white p-1 rounded transition-colors text-xl leading-none"
             aria-label="Close"
           >
-            ✕
+            ×
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto max-h-80">
-          <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+        <div className="p-4 overflow-y-auto max-h-64">
+          <p className="text-gray-300 leading-relaxed">
             {description}
           </p>
         </div>
