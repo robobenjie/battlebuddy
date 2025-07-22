@@ -4,6 +4,7 @@ import { db } from '../lib/db';
 import { UnitList } from './ui/UnitCard';
 import { KeywordList, extractFactionKeywords } from './ui/KeywordBadge';
 import RulePopup, { useRulePopup } from './ui/RulePopup';
+import { formatUnitForCard, calculateArmyStats, getAllCategories } from '../lib/unit-utils';
 
 interface ArmyDetailPageProps {
   armyId: string;
@@ -105,25 +106,14 @@ export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageP
     );
   }
 
-  // Organize data by relationships
-  const unitsWithDetails = units.map(unit => {
-    const unitModels = models.filter(model => model.unitId === unit.id);
-    const unitWeapons = weapons.filter(weapon => weapon.unitId === unit.id);
-    
-    return {
-      unit: unit as any, // Type assertion for InstantDB data
-      models: unitModels as any[],
-      weapons: unitWeapons as any[],
-    };
-  });
+  // Organize data by relationships using utilities
+  const unitsWithDetails = units.map(unit => formatUnitForCard(unit, models, weapons));
 
-  // Calculate army statistics
-  const totalModels = models.reduce((sum, model) => sum + model.count, 0);
-  const totalWeapons = weapons.reduce((sum, weapon) => sum + weapon.count, 0);
-  const totalUnits = units.length;
+  // Calculate army statistics using utilities
+  const { totalUnits, totalModels, totalWeapons } = calculateArmyStats(units, models, weapons);
 
   // Army-level keywords (could be extracted from all units)
-  const allCategories = units.flatMap(unit => unit.categories);
+  const allCategories = getAllCategories(units);
   const factionKeywords = [...new Set(extractFactionKeywords(allCategories))];
 
   const formatDate = (timestamp: number) => {

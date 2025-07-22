@@ -101,13 +101,15 @@ const _schema = i.schema({
       abilities: i.json(), // array of weapon abilities
       keywords: i.json(), // array of weapon keywords
       modelId: i.string().indexed(),
-      ownerId: i.string().indexed(), // Add missing ownerId field
+      ownerId: i.string().indexed(),
       gameId: i.string().optional(), // null for user templates, gameId for game copies
-      // Weapon count and characteristics for game copies
-      count: i.number(),
+      // Individual weapon characteristics
       characteristics: i.json(), // array of characteristics
       armyId: i.string().indexed(),
-      unitId: i.string().indexed(),
+      // Shooting state tracking
+      hasShot: i.boolean(),
+      shotHistory: i.json(), // array of shooting actions: {turn: number, phase: string, target: string, timestamp: number}
+      lastShotTurn: i.number().optional(), // track which turn this weapon last shot
     }),
 
     rules: i.entity({

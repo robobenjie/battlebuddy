@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { db } from '../../lib/db';
 import UnitCard from '../ui/UnitCard';
+import { getModelsForUnit, getWeaponsForUnit, formatUnitForCard, getUnitMovement } from '../../lib/unit-utils';
 
 interface MovementPhaseProps {
   gameId: string;
@@ -66,33 +67,6 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
 
   // Check if current user is the active player
   const isActivePlayer = currentUser?.id === currentPlayer.userId;
-
-  // Helper function to get models for a unit
-  const getModelsForUnit = (unitId: string) => {
-    return models.filter(model => model.unitId === unitId);
-  };
-
-  // Helper function to get weapons for models in a unit
-  const getWeaponsForUnit = (unitId: string) => {
-    const unitModels = getModelsForUnit(unitId);
-    const modelIds = unitModels.map(model => model.id);
-    return weapons.filter(weapon => modelIds.includes(weapon.modelId));
-  };
-
-  // Helper function to determine if all models in a unit have the same movement
-  const getUnitMovement = (unitId: string) => {
-    const unitModels = getModelsForUnit(unitId);
-    if (unitModels.length === 0) return null;
-
-    const movements = unitModels.map(model => {
-      const stats = model.baseStats || {};
-      return stats.M || stats.Movement || stats.Move || '-';
-    });
-
-    const uniqueMovements = [...new Set(movements)].filter(m => m !== '-' && m !== undefined);
-    if (uniqueMovements.length === 0) return null;
-    return uniqueMovements.length === 1 ? uniqueMovements[0] : null;
-  };
 
   // Helper function to record an action in turn history
   const recordAction = async (unitId: string, action: string) => {
@@ -205,39 +179,6 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
     );
   };
 
-  // Convert units to UnitCard format
-  const formatUnitForCard = (unit: any) => {
-    const unitModels = getModelsForUnit(unit.id);
-    const unitWeapons = getWeaponsForUnit(unit.id);
-    return {
-      unit: {
-        id: unit.id,
-        name: unit.name,
-        type: unit.type,
-        cost: 0, // Not used in game view
-        count: unitModels.filter(model => !model.isDestroyed).length,
-        categories: unit.keywords || [],
-        rules: unit.rules || []
-      },
-      models: unitModels.map(model => ({
-        id: model.id,
-        name: model.name,
-        characteristics: Object.entries(model.baseStats || {}).map(([name, value]) => ({
-          name,
-          value: String(value)
-        }))
-      })),
-      weapons: unitWeapons.map(weapon => ({
-        id: weapon.id,
-        name: weapon.name,
-        type: weapon.type,
-        count: 1,
-        characteristics: weapon.profiles?.[0]?.characteristics || [],
-        profiles: weapon.profiles || []
-      }))
-    };
-  };
-
   if (units.length === 0) {
     return (
       <div className="text-center py-12">
@@ -257,8 +198,8 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
 
       <div className="space-y-4">
         {units.map(unit => {
-          const unitData = formatUnitForCard(unit);
-          const movement = getUnitMovement(unit.id);
+          const unitData = formatUnitForCard(unit, models, weapons);
+          const movement = getUnitMovement(models, unit.id);
           const hasActions = hasActionsThisTurn(unit);
           
           return (

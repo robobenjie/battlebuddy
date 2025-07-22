@@ -5,6 +5,7 @@ import { ModelList, ModelSummary } from './ModelCard';
 import { WeaponList } from './WeaponCard';
 import { KeywordList, extractFactionKeywords, extractGeneralKeywords } from './KeywordBadge';
 import { COMMON_RULES, parseRuleDescription } from './RulePopup';
+import { getWeaponCount } from '../../lib/unit-utils';
 
 interface UnitCardProps {
   unit: {
@@ -77,6 +78,21 @@ export default function UnitCard({
 }: UnitCardProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
+  // Helper: group weapons by name+type (optionally add more fields for uniqueness)
+  function groupWeapons(weapons: any[]) {
+    const map = new Map<string, { weapon: any, count: number }>();
+    for (const weapon of weapons) {
+      // Key by name+type (add more fields if needed for uniqueness)
+      const key = `${weapon.name}__${weapon.type}`;
+      if (map.has(key)) {
+        map.get(key)!.count += 1;
+      } else {
+        map.set(key, { weapon, count: 1 });
+      }
+    }
+    return Array.from(map.values());
+  }
+
   // Extract keywords from categories
   const factionKeywords = extractFactionKeywords(unit.categories);
   const generalKeywords = extractGeneralKeywords(unit.categories);
@@ -107,6 +123,10 @@ export default function UnitCard({
       setIsExpanded(!isExpanded);
     }
   };
+
+  // Grouped weapons for rendering
+  const groupedRangedWeapons = groupWeapons(weapons.filter(w => w.type === 'ranged'));
+  const groupedMeleeWeapons = groupWeapons(weapons.filter(w => w.type === 'melee'));
 
   return (
     <div className={`bg-gray-800 rounded-lg border border-gray-700 overflow-hidden ${className}`}>
@@ -215,23 +235,21 @@ export default function UnitCard({
           )}
 
           {/* Ranged Weapons */}
-          {weapons.filter(w => w.type === 'ranged').length > 0 && (
+          {groupedRangedWeapons.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-gray-300 mb-2">Ranged Weapons</h4>
               <div className="space-y-3">
-                {weapons.filter(w => w.type === 'ranged').map((weapon) => {
-                  const keywordsValue = weapon.characteristics.find(c => c.name === 'Keywords')?.value || '-';
-                  const keywords = keywordsValue !== '-' ? keywordsValue.split(',').map(k => k.trim()) : [];
-                  
+                {groupedRangedWeapons.map(({ weapon, count }) => {
+                  const keywordsValue = weapon.characteristics.find((c: any) => c.name === 'Keywords')?.value || '-';
+                  const keywords = keywordsValue !== '-' ? keywordsValue.split(',').map((k: string) => k.trim()) : [];
                   return (
-                    <div key={weapon.id} className="bg-gray-700 rounded-lg overflow-hidden">
+                    <div key={weapon.name + weapon.type} className="bg-gray-700 rounded-lg overflow-hidden">
                       {/* Weapon Name Header */}
                       <div className="bg-gray-600 px-2 py-1">
                         <div className="text-xs font-medium text-white">
-                          {weapon.name}{weapon.count > 1 ? ` (x${weapon.count})` : ''}
+                          {weapon.name}{count > 1 ? ` (x${count})` : ''}
                         </div>
                       </div>
-                      
                       {/* Weapon Stats Table */}
                       <div className="bg-gray-700">
                         <div className="grid grid-cols-7 gap-0">
@@ -257,51 +275,50 @@ export default function UnitCard({
                           <div className="bg-gray-600 px-1 py-1 text-center">
                             <div className="text-xs font-semibold text-gray-200 uppercase">Keywords</div>
                           </div>
-                          
                           {/* Values */}
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find(c => c.name === 'Range')?.value || '-'}
+                              {weapon.characteristics.find((c: any) => c.name === 'Range')?.value || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find(c => c.name === 'A')?.value || '-'}
+                              {weapon.characteristics.find((c: any) => c.name === 'A')?.value || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find(c => c.name === 'BS')?.value || '-'}
+                              {weapon.characteristics.find((c: any) => c.name === 'BS')?.value || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find(c => c.name === 'S')?.value || '-'}
+                              {weapon.characteristics.find((c: any) => c.name === 'S')?.value || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find(c => c.name === 'AP')?.value || '-'}
+                              {weapon.characteristics.find((c: any) => c.name === 'AP')?.value || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find(c => c.name === 'D')?.value || '-'}
+                              {weapon.characteristics.find((c: any) => c.name === 'D')?.value || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-left">
                             <div className="text-xs">
                               {keywords.length > 0 ? (
-                                keywords.map((keyword, index) => {
+                                keywords.map((keyword: string, index: number) => {
                                   const hasRule = COMMON_RULES[keyword] || parseRuleDescription(keyword);
                                   return (
                                     <span key={index}>
                                       {index > 0 && ', '}
-                                                                             <span
-                                         className={hasRule ? 'text-blue-400 cursor-pointer hover:text-blue-300 underline' : 'text-blue-400'}
-                                         onClick={hasRule && onKeywordClick ? () => onKeywordClick(keyword) : undefined}
-                                         title={hasRule ? 'Click for details' : undefined}
-                                       >
+                                      <span
+                                        className={hasRule ? 'text-blue-400 cursor-pointer hover:text-blue-300 underline' : 'text-blue-400'}
+                                        onClick={hasRule && onKeywordClick ? () => onKeywordClick(keyword) : undefined}
+                                        title={hasRule ? 'Click for details' : undefined}
+                                      >
                                         {keyword}
                                       </span>
                                     </span>
@@ -322,23 +339,21 @@ export default function UnitCard({
           )}
 
           {/* Melee Weapons */}
-          {weapons.filter(w => w.type === 'melee').length > 0 && (
+          {groupedMeleeWeapons.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-gray-300 mb-2">Melee Weapons</h4>
               <div className="space-y-3">
-                {weapons.filter(w => w.type === 'melee').map((weapon) => {
-                  const keywordsValue = weapon.characteristics.find(c => c.name === 'Keywords')?.value || '-';
-                  const keywords = keywordsValue !== '-' ? keywordsValue.split(',').map(k => k.trim()) : [];
-                  
+                {groupedMeleeWeapons.map(({ weapon, count }) => {
+                  const keywordsValue = weapon.characteristics.find((c: any) => c.name === 'Keywords')?.value || '-';
+                  const keywords = keywordsValue !== '-' ? keywordsValue.split(',').map((k: string) => k.trim()) : [];
                   return (
-                    <div key={weapon.id} className="bg-gray-700 rounded-lg overflow-hidden">
+                    <div key={weapon.name + weapon.type} className="bg-gray-700 rounded-lg overflow-hidden">
                       {/* Weapon Name Header */}
                       <div className="bg-gray-600 px-2 py-1">
                         <div className="text-xs font-medium text-white">
-                          {weapon.name}{weapon.count > 1 ? ` (x${weapon.count})` : ''}
+                          {weapon.name}{count > 1 ? ` (x${count})` : ''}
                         </div>
                       </div>
-                      
                       {/* Weapon Stats Table */}
                       <div className="bg-gray-700">
                         <div className="grid grid-cols-7 gap-0">
@@ -364,42 +379,41 @@ export default function UnitCard({
                           <div className="bg-gray-600 px-1 py-1 text-center">
                             <div className="text-xs font-semibold text-gray-200 uppercase">Keywords</div>
                           </div>
-                          
                           {/* Values */}
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find(c => c.name === 'Range')?.value || '-'}
+                              {weapon.characteristics.find((c: any) => c.name === 'Range')?.value || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find(c => c.name === 'A')?.value || '-'}
+                              {weapon.characteristics.find((c: any) => c.name === 'A')?.value || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find(c => c.name === 'WS')?.value || '-'}
+                              {weapon.characteristics.find((c: any) => c.name === 'WS')?.value || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find(c => c.name === 'S')?.value || '-'}
+                              {weapon.characteristics.find((c: any) => c.name === 'S')?.value || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find(c => c.name === 'AP')?.value || '-'}
+                              {weapon.characteristics.find((c: any) => c.name === 'AP')?.value || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find(c => c.name === 'D')?.value || '-'}
+                              {weapon.characteristics.find((c: any) => c.name === 'D')?.value || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-left">
                             <div className="text-xs">
                               {keywords.length > 0 ? (
-                                keywords.map((keyword, index) => {
+                                keywords.map((keyword: string, index: number) => {
                                   const hasRule = COMMON_RULES[keyword] || parseRuleDescription(keyword);
                                   return (
                                     <span key={index}>

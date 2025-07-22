@@ -646,19 +646,136 @@ export async function importArmyWithUnitsAndModels(jsonData: NewRecruitRoster, u
 
 /**
  * Extract weapons from a unit for all models - Phase 4 functionality
+ * New approach: iterate over models and create weapons for each model
  */
 export function extractWeapons(unit: UnitData, models: ModelData[]): WeaponData[] {
   const allWeapons: WeaponData[] = [];
   
-  // Extract ranged weapons
-  const rangedWeapons = extractWeaponsFromUnit(unit, models, 'Ranged Weapons');
-  allWeapons.push(...rangedWeapons);
+  // For each model, find and create its weapons
+  for (const model of models) {
+    const modelWeapons = extractWeaponsForModel(unit, model);
+    allWeapons.push(...modelWeapons);
+  }
   
-  // Extract melee weapons
-  const meleeWeapons = extractWeaponsFromUnit(unit, models, 'Melee Weapons');
-  allWeapons.push(...meleeWeapons);
+  console.log('🔍 Total weapons created:', {
+    unitName: unit.name,
+    totalModels: models.length,
+    totalWeapons: allWeapons.length,
+    weaponsByName: allWeapons.reduce((acc, w) => {
+      acc[w.name] = (acc[w.name] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+  });
   
   return allWeapons;
+}
+
+/**
+ * Extract weapons for a specific model by finding the model's selection in the unit data
+ */
+function extractWeaponsForModel(unit: UnitData, model: ModelData): WeaponData[] {
+  const weapons: WeaponData[] = [];
+  
+  if (!unit.sourceData?.selections) {
+    return weapons;
+  }
+  
+  // Find the model selection that corresponds to this model
+  const modelSelection = findModelSelectionForModel(unit.sourceData.selections, model);
+  
+  if (modelSelection) {
+    // Extract weapons from this specific model selection
+    const rangedWeapons = extractWeaponsFromModelSelection(modelSelection, model, unit, 'Ranged Weapons');
+    const meleeWeapons = extractWeaponsFromModelSelection(modelSelection, model, unit, 'Melee Weapons');
+    
+    weapons.push(...rangedWeapons, ...meleeWeapons);
+  }
+  
+  return weapons;
+}
+
+/**
+ * Find the model selection that corresponds to a specific model
+ */
+function findModelSelectionForModel(selections: any[], model: ModelData): any | null {
+  for (const selection of selections) {
+    // Check if this is a model selection
+    const isModelSelection = selection.type === 'model' || 
+      (selection.profiles && selection.profiles.some((p: any) => p.typeName === 'Unit'));
+    
+    if (isModelSelection) {
+      // Check if this selection matches our model
+      const selectionModelName = extractModelNameFromSelection(selection) || selection.name;
+      if (model.name === selectionModelName || 
+          model.name.includes(selectionModelName) ||
+          selectionModelName.includes(model.name)) {
+        return selection;
+      }
+    }
+    
+    // Recursively search nested selections
+    if (selection.selections) {
+      const found = findModelSelectionForModel(selection.selections, model);
+      if (found) return found;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Extract weapons from a specific model selection
+ */
+function extractWeaponsFromModelSelection(
+  modelSelection: any, 
+  model: ModelData, 
+  unit: UnitData, 
+  weaponType: string
+): WeaponData[] {
+  const weapons: WeaponData[] = [];
+  
+  // Look for weapon profiles in this model selection and its children
+  const findWeaponsRecursively = (selections: any[]) => {
+    for (const selection of selections) {
+      if (selection.profiles) {
+        for (const profile of selection.profiles) {
+          if (profile.typeName === weaponType) {
+            const weaponCharacteristics = profile.characteristics?.map((c: any) => ({ 
+              name: c.name, 
+              value: c.$text || '' 
+            })) || [];
+            
+            weapons.push({
+              id: id(),
+              name: profile.name,
+              type: weaponType === 'Ranged Weapons' ? 'ranged' : 'melee',
+              count: 1, // Each weapon row represents one weapon instance
+              characteristics: weaponCharacteristics,
+              profiles: [{
+                name: 'Standard',
+                characteristics: weaponCharacteristics
+              }],
+              modelId: model.id,
+              unitId: unit.id,
+              armyId: unit.armyId,
+              ownerId: unit.ownerId
+            });
+          }
+        }
+      }
+      
+      // Recursively search nested selections
+      if (selection.selections) {
+        findWeaponsRecursively(selection.selections);
+      }
+    }
+  };
+  
+  if (modelSelection.selections) {
+    findWeaponsRecursively(modelSelection.selections);
+  }
+  
+  return weapons;
 }
 
 /**
@@ -680,26 +797,10 @@ function extractWeaponsFromUnit(unit: UnitData, models: ModelData[], weaponType:
     extractWeaponsFromSelections(unit.sourceData.selections, weaponType, weaponMap, models, unit);
   }
 
-  // Convert map to weapon data array
+  // Note: This old approach is deprecated, but keeping the code for reference
+  // The new approach directly iterates over models in extractWeapons()
   const weapons: WeaponData[] = [];
-  for (const [weaponName, weaponInfo] of weaponMap.entries()) {
-    // For now, assign weapons to the first model they're associated with
-    // In a more sophisticated implementation, we might distribute them more intelligently
-    const modelId = weaponInfo.modelIds.size > 0 ? Array.from(weaponInfo.modelIds)[0] : models[0]?.id || '';
-    
-    weapons.push({
-      id: id(),
-      name: weaponName,
-      type: weaponType === 'Ranged Weapons' ? 'ranged' : 'melee',
-      count: weaponInfo.count,
-      characteristics: weaponInfo.characteristics,
-      profiles: weaponInfo.profiles,
-      modelId,
-      unitId: unit.id,
-      armyId: unit.armyId,
-      ownerId: unit.ownerId
-    });
-  }
+  console.log('⚠️ Using deprecated extractWeaponsFromUnit - this should not be called anymore');
 
   return weapons;
 }
@@ -744,16 +845,25 @@ function extractWeaponsFromSelections(
               value: c.$text || '' 
             })) || [];
             
-            // Find matching model for this weapon
-            let associatedModelId = '';
+            // Find ALL matching models for this weapon (not just the first)
+            let associatedModelIds: string[] = [];
             if (parentModelSelection) {
               const parentModelName = extractModelNameFromSelection(parentModelSelection) || parentModelSelection.name;
-              const matchingModel = models.find(model => 
+              const matchingModels = models.filter(model => 
                 model.name === parentModelName || 
                 model.name.includes(parentModelName) ||
                 parentModelName.includes(model.name)
               );
-              associatedModelId = matchingModel?.id || '';
+              associatedModelIds = matchingModels.map(m => m.id);
+              
+              console.log('🔍 Model association debug:', {
+                weaponName: profile.name,
+                parentModelName,
+                availableModelNames: models.map(m => m.name),
+                foundModelIds: associatedModelIds,
+                foundModelNames: matchingModels.map(m => m.name),
+                matchingModelsCount: matchingModels.length
+              });
             }
             
             // Calculate weapon count
@@ -763,9 +873,10 @@ function extractWeaponsFromSelections(
             const existing = weaponMap.get(weaponName);
             if (existing) {
               existing.count += weaponCount;
-              if (associatedModelId) {
-                existing.modelIds.add(associatedModelId);
-              }
+              // Add all matching model IDs to the set
+              associatedModelIds.forEach(modelId => {
+                if (modelId) existing.modelIds.add(modelId);
+              });
             } else {
               weaponMap.set(weaponName, {
                 count: weaponCount,
@@ -774,7 +885,7 @@ function extractWeaponsFromSelections(
                   name: 'Standard',
                   characteristics: weaponCharacteristics
                 }],
-                modelIds: associatedModelId ? new Set([associatedModelId]) : new Set()
+                modelIds: new Set(associatedModelIds.filter(id => id))
               });
             }
           }
@@ -880,10 +991,8 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
           modelId: weapon.modelId,
           ownerId: weapon.ownerId,
           // Add missing required fields that database expects
-          count: weapon.count,
           characteristics: weapon.characteristics,
-          armyId: weapon.armyId,
-          unitId: weapon.unitId
+          armyId: weapon.armyId
         })
       );
     }
@@ -1043,10 +1152,8 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
           ownerId: weapon.ownerId,
           gameId: gameId,
           // Add missing required fields that database expects
-          count: weapon.count,
           characteristics: weapon.characteristics,
-          armyId: weapon.armyId,
-          unitId: weapon.unitId
+          armyId: weapon.armyId
         })
       );
     }
