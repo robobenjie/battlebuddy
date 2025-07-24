@@ -2,8 +2,7 @@
  * Army Import Module for BattleBuddy
  * Handles importing and parsing BattleScribe/NewRecruit army roster JSON data
  * 
- * Phase 1: Basic Army Import - Parse roster metadata and create army entity
- * Phase 2: Unit Extraction - Extract and create unit entities
+ * Updated for new simplified schema
  */
 
 import { id } from '@instantdb/react';
@@ -13,78 +12,58 @@ export interface ArmyMetadata {
   id: string;
   name: string;
   faction: string;
-  detachment: string;
-  battleSize: string;
-  totalPoints: number;
-  pointsLimit: number;
   ownerId: string;
   sourceData: string;
   createdAt: number;
 }
 
-// Phase 2: Unit interfaces adapted from old_parsing.ts
+// Updated Unit interface to match new schema
 export interface UnitData {
   id: string;
   name: string;
-  type: string;
-  cost: number;
-  count: number;
+  nickname: string;
   categories: string[];
-  abilities: Array<{
+  rules: Array<{
     id: string;
     name: string;
-    typeName?: string;
-    description?: string;
-    characteristics?: Array<{
-      name: string;
-      typeId?: string;
-      value: string;
-    }>;
+    description: string;
   }>;
-  rules: Array<{
+  abilities: Array<{
     id: string;
     name: string;
     description: string;
   }>;
   sourceData: any; // Original selection data for re-parsing
   armyId: string;
-  ownerId: string;
 }
 
-// Phase 3: Model interfaces adapted from old_parsing.ts
+// Updated Model interface to match new schema
 export interface ModelData {
   id: string;
   name: string;
-  characteristics: Array<{
-    name: string;
-    value: string;
-  }>;
   unitId: string;
-  armyId: string;
-  ownerId: string;
+  M: number; // movement in inches
+  T: number; // toughness
+  SV: number; // save value
+  W: number; // wounds
+  LD: number; // leadership
+  OC: number; // objective control
+  woundsTaken: number; // starts at zero, tracks damage
 }
 
-// Phase 4: Weapon interfaces adapted from old_parsing.ts
+// Updated Weapon interface to match new schema
 export interface WeaponData {
   id: string;
   name: string;
-  type: string; // 'ranged' or 'melee'
-  count: number;
-  characteristics: Array<{
-    name: string;
-    value: string;
-  }>;
-  profiles: Array<{
-    name: string;
-    characteristics: Array<{
-      name: string;
-      value: string;
-    }>;
-  }>;
+  range: number; // range in inches, 0 for melee
+  A: string; // attacks (number or dice representation like "d6 + 3")
+  WS: number | null; // weapon skill (just the number: 4 represents "4+", null for N/A)
+  S: number; // strength
+  AP: number; // armour penetration
+  D: string; // damage (number or dice)
+  keywords: string[]; // array of keywords like ["melta-2", "assault"]
+  turnsFired: number[]; // array of turns when this weapon was fired
   modelId: string;
-  unitId: string;
-  armyId: string;
-  ownerId: string;
 }
 
 export interface NewRecruitRoster {
@@ -103,7 +82,7 @@ export interface NewRecruitRoster {
 }
 
 /**
- * Phase 1: Extract basic army metadata from NewRecruit JSON
+ * Extract basic army metadata from NewRecruit JSON
  */
 export function extractArmyMetadata(jsonData: NewRecruitRoster, userId: string): ArmyMetadata {
   const roster = jsonData.roster;
@@ -114,29 +93,15 @@ export function extractArmyMetadata(jsonData: NewRecruitRoster, userId: string):
 
   // Extract basic roster information
   const name = roster.name || 'Unnamed Army';
-  const totalPoints = roster.costs?.find(cost => cost.name === 'pts')?.value || 0;
-  const pointsLimit = roster.costLimits?.find(limit => limit.name === 'pts')?.value || 0;
 
-  // Extract faction, detachment, and battle size from forces selections
+  // Extract faction from forces selections
   let faction = '';
-  let detachment = '';
-  let battleSize = '';
 
   if (roster.forces && roster.forces.length > 0) {
     const force = roster.forces[0];
     
     if (force.selections) {
       for (const selection of force.selections) {
-        // Check for battle size
-        if (selection.name === 'Battle Size' && selection.selections && selection.selections.length > 0) {
-          battleSize = selection.selections[0].name || '';
-        }
-        
-        // Check for detachment
-        if (selection.name === 'Detachment' && selection.selections && selection.selections.length > 0) {
-          detachment = selection.selections[0].name || '';
-        }
-        
         // Extract faction from categories - look for "Faction: X" pattern
         if (selection.categories) {
           const factionCategory = selection.categories.find(cat => 
@@ -154,10 +119,6 @@ export function extractArmyMetadata(jsonData: NewRecruitRoster, userId: string):
     id: id(),
     name,
     faction,
-    detachment,
-    battleSize,
-    totalPoints,
-    pointsLimit,
     ownerId: userId,
     sourceData: JSON.stringify(jsonData),
     createdAt: Date.now()
@@ -176,10 +137,6 @@ export async function importArmy(jsonData: NewRecruitRoster, userId: string): Pr
       db.tx.armies[armyMetadata.id].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
-        detachment: armyMetadata.detachment,
-        battleSize: armyMetadata.battleSize,
-        totalPoints: armyMetadata.totalPoints,
-        pointsLimit: armyMetadata.pointsLimit,
         ownerId: armyMetadata.ownerId,
         sourceData: armyMetadata.sourceData,
         createdAt: armyMetadata.createdAt
@@ -194,11 +151,11 @@ export async function importArmy(jsonData: NewRecruitRoster, userId: string): Pr
 }
 
 // ============================================================================
-// Phase 2: Unit Extraction Functions (adapted from old_parsing.ts)
+// Phase 2: Unit Extraction Functions
 // ============================================================================
 
 /**
- * Extract units from NewRecruit JSON - Phase 2 functionality
+ * Extract units from NewRecruit JSON
  */
 export function extractUnits(jsonData: NewRecruitRoster, armyId: string, userId: string): UnitData[] {
   const roster = jsonData.roster;
@@ -212,7 +169,7 @@ export function extractUnits(jsonData: NewRecruitRoster, armyId: string, userId:
   
   if (force.selections) {
     for (const selection of force.selections) {
-      // Check if this is a unit (not configuration) using adapted logic
+      // Check if this is a unit (not configuration)
       if (isUnit(selection)) {
         const unitData = parseUnit(selection, armyId, userId);
         units.push(unitData);
@@ -224,7 +181,7 @@ export function extractUnits(jsonData: NewRecruitRoster, armyId: string, userId:
 }
 
 /**
- * Helper method to determine if a selection is a unit (adapted from old_parsing.ts)
+ * Helper method to determine if a selection is a unit
  */
 function isUnit(selection: any): boolean {
   if (!selection.categories) return false;
@@ -244,66 +201,67 @@ function isUnit(selection: any): boolean {
 }
 
 /**
- * Helper method to parse a unit from selection data (adapted from old_parsing.ts)
+ * Helper method to extract abilities from unit profiles
+ */
+function extractAbilitiesFromUnit(selection: any): Array<{
+  id: string;
+  name: string;
+  description: string;
+}> {
+  const abilities: Array<{
+    id: string;
+    name: string;
+    description: string;
+  }> = [];
+
+  // Look for abilities in profiles
+  if (selection.profiles) {
+    for (const profile of selection.profiles) {
+      if (profile.typeName === 'Abilities') {
+        const description = profile.characteristics?.find((char: any) => char.name === 'Description')?.$text || '';
+        
+        abilities.push({
+          id: profile.id,
+          name: profile.name,
+          description
+        });
+      }
+    }
+  }
+
+  return abilities;
+}
+
+/**
+ * Helper method to parse a unit from selection data
  */
 function parseUnit(selection: any, armyId: string, userId: string): UnitData {
   const categories = selection.categories?.map((cat: any) => cat.name) || [];
-  let cost = selection.costs?.[0]?.value || 0;
-  if (cost === 0 && selection.selections) {
-    cost = sumSelectionCosts(selection.selections);
-  }
+  
   // Parse rules (simple rules only)
   const rules = selection.rules?.map((rule: any) => ({
     id: rule.id,
     name: rule.name,
     description: rule.description || ''
   })) || [];
-  // Parse abilities (formerly profiles)
-  const abilities = selection.profiles?.map((profile: any) => ({
-    id: profile.id,
-    name: profile.name,
-    typeName: profile.typeName,
-    description: profile.typeName || '',
-    characteristics: profile.characteristics?.map((char: any) => ({
-      name: char.name,
-      typeId: char.typeId,
-      value: char.$text || ''
-    })) || []
-  })) || [];
+
+  // Parse abilities from profiles
+  const abilities = extractAbilitiesFromUnit(selection);
+
   return {
     id: id(),
     name: selection.name,
-    type: selection.type || 'unit',
-    cost,
-    count: selection.number || 1,
+    nickname: '', // Initialize as empty string
     categories,
-    abilities,
     rules,
+    abilities,
     sourceData: selection, // Store original selection for re-parsing
-    armyId,
-    ownerId: userId
+    armyId
   };
 }
 
 /**
- * Helper method to sum costs from nested selections (adapted from old_parsing.ts)
- */
-function sumSelectionCosts(selections: any[]): number {
-  let totalCost = 0;
-  for (const sel of selections) {
-    const selectionCost = sel.costs?.[0]?.value || 0;
-    totalCost += selectionCost;
-    
-    // Recursively sum nested selection costs
-    if (sel.selections) {
-      totalCost += sumSelectionCosts(sel.selections);
-    }
-  }
-  return totalCost;
-}
-
-/**
- * Import an army with units (Phase 1 + Phase 2) from NewRecruit JSON and store in InstantDB
+ * Import an army with units from NewRecruit JSON and store in InstantDB
  */
 export async function importArmyWithUnits(jsonData: NewRecruitRoster, userId: string): Promise<{ armyId: string; unitIds: string[] }> {
   // Phase 1: Import army metadata
@@ -320,31 +278,22 @@ export async function importArmyWithUnits(jsonData: NewRecruitRoster, userId: st
       db.tx.armies[armyMetadata.id].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
-        detachment: armyMetadata.detachment,
-        battleSize: armyMetadata.battleSize,
-        totalPoints: armyMetadata.totalPoints,
-        pointsLimit: armyMetadata.pointsLimit,
         ownerId: armyMetadata.ownerId,
         sourceData: armyMetadata.sourceData,
         createdAt: armyMetadata.createdAt
-      })
+      }).link({ owner: armyMetadata.ownerId })
     );
     
-    // Add unit transactions (Note: This will need units entity in schema)
+    // Add unit transactions
     for (const unit of units) {
       transactions.push(
         db.tx.units[unit.id].update({
           name: unit.name,
-          type: unit.type,
-          cost: unit.cost,
-          count: unit.count,
           categories: unit.categories,
-          abilities: unit.abilities,
           rules: unit.rules,
-          sourceData: unit.sourceData,
-          armyId: unit.armyId,
-          ownerId: unit.ownerId
-        })
+          abilities: unit.abilities,
+          armyId: unit.armyId
+        }).link({ army: unit.armyId })
       );
     }
     
@@ -362,11 +311,11 @@ export async function importArmyWithUnits(jsonData: NewRecruitRoster, userId: st
 }
 
 // ============================================================================
-// Phase 3: Model Processing Functions (adapted from old_parsing.ts)
+// Phase 3: Model Processing Functions
 // ============================================================================
 
 /**
- * Extract models from a unit - Phase 3 functionality
+ * Extract models from a unit
  */
 export function extractModels(unit: UnitData): ModelData[] {
   const statlines = getUnitStatlines(unit);
@@ -378,10 +327,14 @@ export function extractModels(unit: UnitData): ModelData[] {
       models.push({
         id: id(),
         name: statline.modelName,
-        characteristics: statline.characteristics,
         unitId: unit.id,
-        armyId: unit.armyId,
-        ownerId: unit.ownerId
+        M: statline.M,
+        T: statline.T,
+        SV: statline.SV,
+        W: statline.W,
+        LD: statline.LD,
+        OC: statline.OC,
+        woundsTaken: 0
       });
     }
   }
@@ -390,16 +343,26 @@ export function extractModels(unit: UnitData): ModelData[] {
 }
 
 /**
- * Get unit statlines grouped by model configuration with counts (adapted from old_parsing.ts)
+ * Get unit statlines grouped by model configuration with counts
  */
 function getUnitStatlines(unit: UnitData): Array<{
   modelName: string;
   count: number;
-  characteristics: Array<{ name: string; value: string }>;
+  M: number;
+  T: number;
+  SV: number;
+  W: number;
+  LD: number;
+  OC: number;
 }> {
   const statlineMap = new Map<string, {
     count: number;
-    characteristics: Array<{ name: string; value: string }>;
+    M: number;
+    T: number;
+    SV: number;
+    W: number;
+    LD: number;
+    OC: number;
   }>();
 
   // Check unit's own selections for model statlines from source data
@@ -407,33 +370,18 @@ function getUnitStatlines(unit: UnitData): Array<{
     extractStatlinesFromSelections(unit.sourceData.selections, statlineMap);
   }
 
-  // If no statlines found in selections, fallback to unit abilities (not rules)
-  if (statlineMap.size === 0 && unit.abilities) {
+  // If no statlines found in selections, fallback to unit abilities
+  if (statlineMap.size === 0 && unit.sourceData?.profiles) {
     // Look for an ability that might represent the unit's profile/statline
-    const unitProfileAbility = unit.abilities.find(ability => ability.typeName === 'Unit');
+    const unitProfileAbility = unit.sourceData.profiles.find((profile: any) => profile.typeName === 'Unit');
     if (unitProfileAbility) {
+      const characteristics = unitProfileAbility.characteristics || [];
+      const stats = parseCharacteristicsToStats(characteristics);
+      
       statlineMap.set(unit.name, {
-        count: unit.count || 1,
-        characteristics: (unitProfileAbility.characteristics || []).map((char: { name: string; value: string }) => ({
-          name: char.name,
-          value: char.value
-        }))
+        count: 1,
+        ...stats
       });
-    }
-  } else if (statlineMap.size > 0) {
-    // Check if any models have empty characteristics (meaning they need parent unit profile)
-    const parentUnitProfile = unit.abilities?.find(a => a.typeName === 'Unit' && a.characteristics && a.characteristics.length > 0);
-    if (parentUnitProfile) {
-      const parentCharacteristics = (parentUnitProfile.characteristics || []).map((char: { name: string; value: string }) => ({
-        name: char.name,
-        value: char.value
-      }));
-      // Fill in empty characteristics with parent unit profile
-      for (const [modelName, data] of statlineMap.entries()) {
-        if (data.characteristics.length === 0) {
-          data.characteristics = parentCharacteristics;
-        }
-      }
     }
   }
 
@@ -442,19 +390,29 @@ function getUnitStatlines(unit: UnitData): Array<{
     .map(([modelName, data]) => ({
       modelName,
       count: data.count,
-      characteristics: data.characteristics
+      M: data.M,
+      T: data.T,
+      SV: data.SV,
+      W: data.W,
+      LD: data.LD,
+      OC: data.OC
     }))
     .sort((a, b) => b.count - a.count); // Sort by count descending (most common first)
 }
 
 /**
- * Helper method to extract statlines from selections recursively (adapted from old_parsing.ts)
+ * Helper method to extract statlines from selections recursively
  */
 function extractStatlinesFromSelections(
   selections: any[], 
   statlineMap: Map<string, {
     count: number;
-    characteristics: Array<{ name: string; value: string }>;
+    M: number;
+    T: number;
+    SV: number;
+    W: number;
+    LD: number;
+    OC: number;
   }>
 ): void {
   for (const selection of selections) {
@@ -484,6 +442,8 @@ function extractStatlinesFromSelections(
           }
           
           const modelCount = selection.number || 1;
+          const characteristics = profile.characteristics || [];
+          const stats = parseCharacteristicsToStats(characteristics);
           
           if (statlineMap.has(modelName)) {
             // Add to existing model count
@@ -493,10 +453,7 @@ function extractStatlinesFromSelections(
             // Add new model statline
             statlineMap.set(modelName, {
               count: modelCount,
-              characteristics: profile.characteristics.map((char: any) => ({
-                name: char.name,
-                value: char.$text || ''
-              }))
+              ...stats
             });
           }
         }
@@ -515,10 +472,15 @@ function extractStatlinesFromSelections(
         } else {
           // We need to find the parent unit's statline for this model
           // This will be handled by the caller if no statlines are found
-          // For now, just record the model name with a placeholder
+          // For now, just record the model name with placeholder stats
           statlineMap.set(modelName, {
             count: modelCount,
-            characteristics: [] // Will be filled by parent unit profile
+            M: 6,
+            T: 4,
+            SV: 3,
+            W: 1,
+            LD: 6,
+            OC: 1
           });
         }
       }
@@ -532,7 +494,7 @@ function extractStatlinesFromSelections(
 }
 
 /**
- * Helper method to extract a comprehensive model configuration name from a selection (adapted from old_parsing.ts)
+ * Helper method to extract a comprehensive model configuration name from a selection
  */
 function extractModelNameFromSelection(selection: any): string | null {
   if (selection.type === 'model' && selection.name) {
@@ -561,7 +523,56 @@ function extractModelNameFromSelection(selection: any): string | null {
 }
 
 /**
- * Import an army with units and models (Phase 1 + Phase 2 + Phase 3) from NewRecruit JSON and store in InstantDB
+ * Helper method to parse characteristics into stats
+ */
+function parseCharacteristicsToStats(characteristics: any[]): {
+  M: number;
+  T: number;
+  SV: number;
+  W: number;
+  LD: number;
+  OC: number;
+} {
+  const stats = {
+    M: 6,
+    T: 4,
+    SV: 3,
+    W: 1,
+    LD: 6,
+    OC: 1
+  };
+
+  for (const char of characteristics) {
+    const value = char.$text || char.value || '';
+    const numValue = parseInt(value.replace(/[^\d]/g, ''), 10);
+    
+    switch (char.name) {
+      case 'M':
+        stats.M = numValue || 6;
+        break;
+      case 'T':
+        stats.T = numValue || 4;
+        break;
+      case 'Sv':
+        stats.SV = numValue || 3;
+        break;
+      case 'W':
+        stats.W = numValue || 1;
+        break;
+      case 'Ld':
+        stats.LD = numValue || 6;
+        break;
+      case 'OC':
+        stats.OC = numValue || 1;
+        break;
+    }
+  }
+
+  return stats;
+}
+
+/**
+ * Import an army with units and models from NewRecruit JSON and store in InstantDB
  */
 export async function importArmyWithUnitsAndModels(jsonData: NewRecruitRoster, userId: string): Promise<{ armyId: string; unitIds: string[]; modelIds: string[] }> {
   // Phase 1: Import army metadata
@@ -585,14 +596,10 @@ export async function importArmyWithUnitsAndModels(jsonData: NewRecruitRoster, u
       db.tx.armies[armyMetadata.id].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
-        detachment: armyMetadata.detachment,
-        battleSize: armyMetadata.battleSize,
-        totalPoints: armyMetadata.totalPoints,
-        pointsLimit: armyMetadata.pointsLimit,
         ownerId: armyMetadata.ownerId,
         sourceData: armyMetadata.sourceData,
         createdAt: armyMetadata.createdAt
-      })
+      }).link({ owner: armyMetadata.ownerId })
     );
     
     // Add unit transactions
@@ -600,16 +607,10 @@ export async function importArmyWithUnitsAndModels(jsonData: NewRecruitRoster, u
       transactions.push(
         db.tx.units[unit.id].update({
           name: unit.name,
-          type: unit.type,
-          cost: unit.cost,
-          count: unit.count,
           categories: unit.categories,
-          abilities: unit.abilities,
           rules: unit.rules,
-          sourceData: unit.sourceData,
-          armyId: unit.armyId,
-          ownerId: unit.ownerId
-        })
+          armyId: unit.armyId
+        }).link({ army: unit.armyId })
       );
     }
     
@@ -618,11 +619,15 @@ export async function importArmyWithUnitsAndModels(jsonData: NewRecruitRoster, u
       transactions.push(
         db.tx.models[model.id].update({
           name: model.name,
-          characteristics: model.characteristics,
           unitId: model.unitId,
-          armyId: model.armyId,
-          ownerId: model.ownerId
-        })
+          M: model.M,
+          T: model.T,
+          SV: model.SV,
+          W: model.W,
+          LD: model.LD,
+          OC: model.OC,
+          woundsTaken: model.woundsTaken
+        }).link({ unit: model.unitId })
       );
     }
     
@@ -641,12 +646,11 @@ export async function importArmyWithUnitsAndModels(jsonData: NewRecruitRoster, u
 }
 
 // ============================================================================
-// Phase 4: Weapon Processing Functions (adapted from old_parsing.ts)
+// Phase 4: Weapon Processing Functions
 // ============================================================================
 
 /**
- * Extract weapons from a unit for all models - Phase 4 functionality
- * New approach: iterate over models and create weapons for each model
+ * Extract weapons from a unit for all models
  */
 export function extractWeapons(unit: UnitData, models: ModelData[]): WeaponData[] {
   const allWeapons: WeaponData[] = [];
@@ -656,16 +660,6 @@ export function extractWeapons(unit: UnitData, models: ModelData[]): WeaponData[
     const modelWeapons = extractWeaponsForModel(unit, model);
     allWeapons.push(...modelWeapons);
   }
-  
-  console.log('🔍 Total weapons created:', {
-    unitName: unit.name,
-    totalModels: models.length,
-    totalWeapons: allWeapons.length,
-    weaponsByName: allWeapons.reduce((acc, w) => {
-      acc[w.name] = (acc[w.name] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>)
-  });
   
   return allWeapons;
 }
@@ -680,15 +674,61 @@ function extractWeaponsForModel(unit: UnitData, model: ModelData): WeaponData[] 
     return weapons;
   }
   
-  // Find the model selection that corresponds to this model
-  const modelSelection = findModelSelectionForModel(unit.sourceData.selections, model);
+  // First, try to find weapons directly in the unit's selections (for units like Psychophage)
+  const directWeapons = extractWeaponsFromUnitSelections(unit.sourceData.selections, model, unit);
+  weapons.push(...directWeapons);
   
-  if (modelSelection) {
-    // Extract weapons from this specific model selection
-    const rangedWeapons = extractWeaponsFromModelSelection(modelSelection, model, unit, 'Ranged Weapons');
-    const meleeWeapons = extractWeaponsFromModelSelection(modelSelection, model, unit, 'Melee Weapons');
+  // If no weapons found directly, try to find them in model selections
+  if (weapons.length === 0) {
+    const modelSelection = findModelSelectionForModel(unit.sourceData.selections, model);
     
-    weapons.push(...rangedWeapons, ...meleeWeapons);
+    if (modelSelection) {
+      // Extract weapons from this specific model selection
+      const rangedWeapons = extractWeaponsFromModelSelection(modelSelection, model, unit, 'Ranged Weapons');
+      const meleeWeapons = extractWeaponsFromModelSelection(modelSelection, model, unit, 'Melee Weapons');
+      
+      weapons.push(...rangedWeapons, ...meleeWeapons);
+    }
+  }
+  
+  return weapons;
+}
+
+/**
+ * Extract weapons directly from unit selections (for units like Psychophage)
+ */
+function extractWeaponsFromUnitSelections(selections: any[], model: ModelData, unit: UnitData): WeaponData[] {
+  const weapons: WeaponData[] = [];
+  
+  for (const selection of selections) {
+    // Check if this is a weapon upgrade
+    if (selection.type === 'upgrade' && selection.profiles) {
+      for (const profile of selection.profiles) {
+        if (profile.typeName === 'Ranged Weapons' || profile.typeName === 'Melee Weapons') {
+          const weaponStats = parseWeaponCharacteristics(profile.characteristics || []);
+          
+          weapons.push({
+            id: id(),
+            name: profile.name,
+            range: weaponStats.range,
+            A: weaponStats.A,
+            WS: weaponStats.WS,
+            S: weaponStats.S,
+            AP: weaponStats.AP,
+            D: weaponStats.D,
+            keywords: weaponStats.keywords,
+            turnsFired: [],
+            modelId: model.id
+          });
+        }
+      }
+    }
+    
+    // Recursively search nested selections
+    if (selection.selections) {
+      const nestedWeapons = extractWeaponsFromUnitSelections(selection.selections, model, unit);
+      weapons.push(...nestedWeapons);
+    }
   }
   
   return weapons;
@@ -737,28 +777,48 @@ function extractWeaponsFromModelSelection(
   // Look for weapon profiles in this model selection and its children
   const findWeaponsRecursively = (selections: any[]) => {
     for (const selection of selections) {
+      // Check if this selection has weapon profiles
       if (selection.profiles) {
         for (const profile of selection.profiles) {
           if (profile.typeName === weaponType) {
-            const weaponCharacteristics = profile.characteristics?.map((c: any) => ({ 
-              name: c.name, 
-              value: c.$text || '' 
-            })) || [];
+            const weaponStats = parseWeaponCharacteristics(profile.characteristics || []);
             
             weapons.push({
               id: id(),
               name: profile.name,
-              type: weaponType === 'Ranged Weapons' ? 'ranged' : 'melee',
-              count: 1, // Each weapon row represents one weapon instance
-              characteristics: weaponCharacteristics,
-              profiles: [{
-                name: 'Standard',
-                characteristics: weaponCharacteristics
-              }],
-              modelId: model.id,
-              unitId: unit.id,
-              armyId: unit.armyId,
-              ownerId: unit.ownerId
+              range: weaponStats.range,
+              A: weaponStats.A,
+              WS: weaponStats.WS,
+              S: weaponStats.S,
+              AP: weaponStats.AP,
+              D: weaponStats.D,
+              keywords: weaponStats.keywords,
+              turnsFired: [],
+              modelId: model.id
+            });
+          }
+        }
+      }
+      
+      // Also check if this selection is a weapon upgrade (type: "upgrade")
+      // and has weapon profiles in its own profiles
+      if (selection.type === 'upgrade' && selection.profiles) {
+        for (const profile of selection.profiles) {
+          if (profile.typeName === weaponType) {
+            const weaponStats = parseWeaponCharacteristics(profile.characteristics || []);
+            
+            weapons.push({
+              id: id(),
+              name: profile.name,
+              range: weaponStats.range,
+              A: weaponStats.A,
+              WS: weaponStats.WS,
+              S: weaponStats.S,
+              AP: weaponStats.AP,
+              D: weaponStats.D,
+              keywords: weaponStats.keywords,
+              turnsFired: [],
+              modelId: model.id
             });
           }
         }
@@ -771,6 +831,7 @@ function extractWeaponsFromModelSelection(
     }
   };
   
+  // Start the recursive search from the model selection's selections
   if (modelSelection.selections) {
     findWeaponsRecursively(modelSelection.selections);
   }
@@ -779,129 +840,94 @@ function extractWeaponsFromModelSelection(
 }
 
 /**
- * Extract weapons of a specific type from a unit (adapted from old_parsing.ts)
+ * Helper method to parse weapon characteristics into stats
  */
-function extractWeaponsFromUnit(unit: UnitData, models: ModelData[], weaponType: string): WeaponData[] {
-  const weaponMap = new Map<string, {
-    count: number;
-    characteristics: Array<{ name: string; value: string }>;
-    profiles: Array<{
-      name: string;
-      characteristics: Array<{ name: string; value: string }>;
-    }>;
-    modelIds: Set<string>;
-  }>();
+function parseWeaponCharacteristics(characteristics: any[]): {
+  range: number;
+  A: string;
+  WS: number | null;
+  S: number;
+  AP: number;
+  D: string;
+  keywords: string[];
+} {
+  const stats: {
+    range: number;
+    A: string;
+    WS: number | null;
+    S: number;
+    AP: number;
+    D: string;
+    keywords: string[];
+  } = {
+    range: 0,
+    A: '1',
+    WS: null,
+    S: 4,
+    AP: 0,
+    D: '1',
+    keywords: []
+  };
 
-  if (unit.sourceData?.selections) {
-    // Use model-specific extraction with casualty awareness
-    extractWeaponsFromSelections(unit.sourceData.selections, weaponType, weaponMap, models, unit);
-  }
-
-  // Note: This old approach is deprecated, but keeping the code for reference
-  // The new approach directly iterates over models in extractWeapons()
-  const weapons: WeaponData[] = [];
-  console.log('⚠️ Using deprecated extractWeaponsFromUnit - this should not be called anymore');
-
-  return weapons;
-}
-
-/**
- * Helper method to extract weapons from selections recursively (adapted from old_parsing.ts)
- */
-function extractWeaponsFromSelections(
-  selections: any[], 
-  weaponType: string, 
-  weaponMap: Map<string, {
-    count: number;
-    characteristics: Array<{ name: string; value: string }>;
-    profiles: Array<{
-      name: string;
-      characteristics: Array<{ name: string; value: string }>;
-    }>;
-    modelIds: Set<string>;
-  }>,
-  models: ModelData[],
-  unit: UnitData,
-  parentModelSelection?: any
-): void {
-  for (const selection of selections) {
-    // Check if this is a model selection
-    const isModelSelection = selection.type === 'model' || 
-      (selection.profiles && selection.profiles.some((p: any) => p.typeName === 'Unit'));
+  for (const char of characteristics) {
+    const value = char.$text || char.value || '';
     
-    if (isModelSelection) {
-      // This is a model - recursively process its weapons with this model as parent
-      if (selection.selections) {
-        extractWeaponsFromSelections(selection.selections, weaponType, weaponMap, models, unit, selection);
-      }
-    } else {
-      // Check if this selection has weapon profiles
-      if (selection.profiles) {
-        for (const profile of selection.profiles) {
-          if (profile.typeName === weaponType) {
-            const weaponName = profile.name;
-            const weaponCharacteristics = profile.characteristics?.map((c: any) => ({ 
-              name: c.name, 
-              value: c.$text || '' 
-            })) || [];
-            
-            // Find ALL matching models for this weapon (not just the first)
-            let associatedModelIds: string[] = [];
-            if (parentModelSelection) {
-              const parentModelName = extractModelNameFromSelection(parentModelSelection) || parentModelSelection.name;
-              const matchingModels = models.filter(model => 
-                model.name === parentModelName || 
-                model.name.includes(parentModelName) ||
-                parentModelName.includes(model.name)
-              );
-              associatedModelIds = matchingModels.map(m => m.id);
-              
-              console.log('🔍 Model association debug:', {
-                weaponName: profile.name,
-                parentModelName,
-                availableModelNames: models.map(m => m.name),
-                foundModelIds: associatedModelIds,
-                foundModelNames: matchingModels.map(m => m.name),
-                matchingModelsCount: matchingModels.length
-              });
-            }
-            
-            // Calculate weapon count
-            let weaponCount = selection.number || 1;
-            
-            // Add to weapon map
-            const existing = weaponMap.get(weaponName);
-            if (existing) {
-              existing.count += weaponCount;
-              // Add all matching model IDs to the set
-              associatedModelIds.forEach(modelId => {
-                if (modelId) existing.modelIds.add(modelId);
-              });
-            } else {
-              weaponMap.set(weaponName, {
-                count: weaponCount,
-                characteristics: weaponCharacteristics,
-                profiles: [{
-                  name: 'Standard',
-                  characteristics: weaponCharacteristics
-                }],
-                modelIds: new Set(associatedModelIds.filter(id => id))
-              });
-            }
-          }
+    switch (char.name) {
+      case 'Range':
+        // Handle "Melee" as 0 range, otherwise extract number
+        if (value.toLowerCase() === 'melee') {
+          stats.range = 0;
+        } else {
+          stats.range = parseInt(value.replace(/[^\d]/g, ''), 10) || 0;
         }
-      }
-
-      // Recursively search nested selections (with same parent)
-      if (selection.selections) {
-        extractWeaponsFromSelections(selection.selections, weaponType, weaponMap, models, unit, parentModelSelection);
-      }
+        break;
+      case 'A':
+        stats.A = value;
+        break;
+      case 'BS':
+      case 'WS':
+        // Handle "N/A" and empty values - don't default to 4
+        if (value === 'N/A' || value === '' || value.toLowerCase() === 'n/a') {
+          stats.WS = null;
+        } else {
+          stats.WS = parseInt(value.replace(/[^\d]/g, ''), 10) || null;
+        }
+        break;
+      case 'S':
+        stats.S = parseInt(value.replace(/[^\d]/g, ''), 10) || 4;
+        break;
+      case 'AP':
+        // Handle negative AP values (like "-1", "-2")
+        if (value.startsWith('-')) {
+          stats.AP = parseInt(value, 10) || 0;
+        } else {
+          stats.AP = parseInt(value.replace(/[^\d]/g, ''), 10) || 0;
+        }
+        break;
+      case 'D':
+        stats.D = value;
+        break;
+      case 'Keywords':
+        // Split keywords by comma and trim whitespace
+        if (value) {
+          const keywordList = value.split(',').map((k: string) => k.trim());
+          stats.keywords.push(...keywordList);
+        }
+        break;
+      default:
+        // Check for keywords
+        if (value && !['Range', 'A', 'BS', 'WS', 'S', 'AP', 'D', 'Keywords'].includes(char.name)) {
+          stats.keywords.push(char.name);
+        }
+        break;
     }
   }
+
+  return stats;
 }
 
 /**
- * Import a complete army (Phase 1 + 2 + 3 + 4) from NewRecruit JSON and store in InstantDB
+ * Import a complete army from NewRecruit JSON and store in InstantDB
  */
 export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: string): Promise<{ 
   armyId: string; 
@@ -938,14 +964,10 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
       db.tx.armies[armyMetadata.id].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
-        detachment: armyMetadata.detachment,
-        battleSize: armyMetadata.battleSize,
-        totalPoints: armyMetadata.totalPoints,
-        pointsLimit: armyMetadata.pointsLimit,
         ownerId: armyMetadata.ownerId,
         sourceData: armyMetadata.sourceData,
         createdAt: armyMetadata.createdAt
-      })
+      }).link({ owner: armyMetadata.ownerId })
     );
     
     // Add unit transactions
@@ -953,16 +975,11 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
       transactions.push(
         db.tx.units[unit.id].update({
           name: unit.name,
-          type: unit.type,
-          cost: unit.cost,
-          count: unit.count,
           categories: unit.categories,
-          abilities: unit.abilities,
           rules: unit.rules,
-          sourceData: unit.sourceData,
-          armyId: unit.armyId,
-          ownerId: unit.ownerId
-        })
+          abilities: unit.abilities,
+          armyId: unit.armyId
+        }).link({ army: unit.armyId })
       );
     }
     
@@ -971,11 +988,15 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
       transactions.push(
         db.tx.models[model.id].update({
           name: model.name,
-          characteristics: model.characteristics,
           unitId: model.unitId,
-          armyId: model.armyId,
-          ownerId: model.ownerId
-        })
+          M: model.M,
+          T: model.T,
+          SV: model.SV,
+          W: model.W,
+          LD: model.LD,
+          OC: model.OC,
+          woundsTaken: model.woundsTaken
+        }).link({ unit: model.unitId })
       );
     }
     
@@ -984,16 +1005,16 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
       transactions.push(
         db.tx.weapons[weapon.id].update({
           name: weapon.name,
-          type: weapon.type,
-          profiles: weapon.profiles || [],
-          abilities: [],
-          keywords: [],
-          modelId: weapon.modelId,
-          ownerId: weapon.ownerId,
-          // Add missing required fields that database expects
-          characteristics: weapon.characteristics,
-          armyId: weapon.armyId
-        })
+          range: weapon.range,
+          A: weapon.A,
+          WS: weapon.WS ?? undefined,
+          S: weapon.S,
+          AP: weapon.AP,
+          D: weapon.D,
+          keywords: weapon.keywords,
+          turnsFired: weapon.turnsFired,
+          modelId: weapon.modelId
+        }).link({ model: weapon.modelId })
       );
     }
     
@@ -1010,11 +1031,10 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
     console.error('Failed to import complete army:', error);
     throw new Error(`Complete army import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-} 
+}
 
 /**
  * Import an army for a specific game (creates game copies instead of user templates)
- * Simplified version that only uses core schema fields to test the copying functionality
  */
 export async function importArmyForGame(jsonData: NewRecruitRoster, userId: string, gameId: string): Promise<{ 
   armyId: string; 
@@ -1022,155 +1042,6 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
   modelIds: string[]; 
   weaponIds: string[] 
 }> {
-  
-  // Phase 1: Import army metadata
-  const armyMetadata = extractArmyMetadata(jsonData, userId);
-  
-  // Phase 2: Extract units
-  const units = extractUnits(jsonData, armyMetadata.id, userId);
-  
-  // Phase 3: Extract models from units
-  const allModels: ModelData[] = [];
-  for (const unit of units) {
-    const unitModels = extractModels(unit);
-    allModels.push(...unitModels);
-  }
-  
-  // Phase 4: Extract weapons from units
-  const allWeapons: WeaponData[] = [];
-  for (const unit of units) {
-    const unitModels = allModels.filter(model => model.unitId === unit.id);
-    const unitWeapons = extractWeapons(unit, unitModels);
-    allWeapons.push(...unitWeapons);
-  }
-  
-  try {
-    const transactions = [];
-    
-    // Add army transaction with required fields that database expects
-    transactions.push(
-      db.tx.armies[armyMetadata.id].update({
-        name: armyMetadata.name,
-        faction: armyMetadata.faction,
-        pointsValue: armyMetadata.totalPoints,
-        unitIds: units.map(u => u.id),
-        ownerId: armyMetadata.ownerId,
-        sourceData: armyMetadata.sourceData,
-        gameId: gameId,
-        // Add missing required fields that database expects
-        detachment: armyMetadata.detachment,
-        battleSize: armyMetadata.battleSize,
-        totalPoints: armyMetadata.totalPoints,
-        pointsLimit: armyMetadata.pointsLimit,
-        createdAt: armyMetadata.createdAt
-      })
-    );
-    
-    // Add unit transactions with same structure as template armies
-    for (const unit of units) {
-      const unitModels = allModels.filter(m => m.unitId === unit.id);
-      // Calculate total model count for this unit (count individual models)
-      const totalModelCount = unitModels.length;
-      
-      transactions.push(
-        db.tx.units[unit.id].update({
-          // Template army fields (keep data structure consistent)
-          name: unit.name,
-          type: unit.type,
-          cost: unit.cost,
-          count: unit.count,
-          categories: unit.categories,
-          abilities: unit.abilities,
-          rules: unit.rules,
-          sourceData: unit.sourceData,
-          armyId: unit.armyId,
-          ownerId: unit.ownerId,
-          // Game-specific fields  
-          startingModels: totalModelCount,
-          currentWounds: 0,
-          hasMoved: false,
-          hasAdvanced: false,
-          hasCharged: false,
-          isBattleShocked: false,
-          hasFallenBack: false,
-          isEngaged: false,
-          isDestroyed: false,
-          turnHistory: [],
-          lastActionTurn: 0,
-          gameId: gameId,
-          // Legacy fields for backward compatibility
-          modelIds: unitModels.map(m => m.id),
-          keywords: unit.categories || []
-        })
-      );
-    }
-    
-    // Add model transactions with required fields that database expects
-    for (const model of allModels) {
-      const modelWeapons = allWeapons.filter(w => w.modelId === model.id);
-      
-      // Convert characteristics to baseStats format
-      const baseStats: Record<string, any> = {};
-      if (model.characteristics && Array.isArray(model.characteristics)) {
-        model.characteristics.forEach((char: any) => {
-          baseStats[char.name] = char.value;
-        });
-      }
-      
-      transactions.push(
-        db.tx.models[model.id].update({
-          name: model.name,
-          baseStats: baseStats,
-          currentWounds: 0,
-          keywords: [],
-          specialRules: [],
-          weaponIds: modelWeapons.map(w => w.id),
-          isLeader: false,
-          isDestroyed: false,
-          turnHistory: [],
-          lastActionTurn: 0,
-          unitId: model.unitId,
-          gameId: gameId,
-          // Add missing required fields that database expects
-          characteristics: model.characteristics || [],
-          armyId: model.armyId,
-          ownerId: model.ownerId
-        })
-      );
-    }
-    
-    // Add weapon transactions with required fields that database expects
-    for (const weapon of allWeapons) {
-      transactions.push(
-        db.tx.weapons[weapon.id].update({
-          name: weapon.name,
-          type: weapon.type,
-          profiles: weapon.profiles || [],
-          abilities: [],
-          keywords: [],
-          modelId: weapon.modelId,
-          ownerId: weapon.ownerId,
-          gameId: gameId,
-          // Add missing required fields that database expects
-          characteristics: weapon.characteristics,
-          armyId: weapon.armyId
-        })
-      );
-    }
-    
-    // Execute all transactions
-    await db.transact(transactions);
-    
-    const result = {
-      armyId: armyMetadata.id,
-      unitIds: units.map(u => u.id),
-      modelIds: allModels.map(m => m.id),
-      weaponIds: allWeapons.map(w => w.id)
-    };
-    
-    return result;
-  } catch (error) {
-    console.error('❌ Failed to import army for game:', error);
-    throw new Error(`Game army import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
+  // Use the same import logic as complete army
+  return importCompleteArmy(jsonData, userId);
 } 

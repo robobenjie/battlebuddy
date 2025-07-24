@@ -7,200 +7,102 @@ const _schema = i.schema({
       email: i.string().unique().indexed().optional(),
     }),
 
-    // Game entities
-    games: i.entity({
-      name: i.string(),
-      code: i.string().unique().indexed(), // 5-digit game code
-      hostId: i.string().indexed(), // user ID of the host
-      createdAt: i.number().indexed(),
-      status: i.string(), // "waiting", "setup", "active", "completed", "archived"
-      currentTurn: i.number(),
-      currentPhase: i.string(), // "command", "move", "shoot", "charge", "fight"
-      activePlayerId: i.string().optional(),
-      playerIds: i.json(), // array of player IDs
-      phaseHistory: i.json(), // track phase progression for undo functionality
-    }),
-
-    players: i.entity({
-      name: i.string(),
-      userId: i.string().indexed(),
-      gameId: i.string().indexed(),
-      armyId: i.string().optional(),
-      isHost: i.boolean(),
-    }),
-
-    // Army entities (both user templates and game copies)
+    // Core army entity
     armies: i.entity({
-      name: i.string(),
+      id: i.string().unique().indexed(),
+      createdAt: i.number(),
       faction: i.string(),
-      pointsValue: i.number(),
-      unitIds: i.json(), // array of unit IDs
+      name: i.string(),
       ownerId: i.string().indexed(),
-      sourceData: i.string().optional(), // JSON string of original import
-      gameId: i.string().optional(), // null for user templates, gameId for game copies
-      // Additional army metadata
-      detachment: i.string().optional(),
-      battleSize: i.string().optional(),
-      totalPoints: i.number().optional(),
-      pointsLimit: i.number().optional(),
-      createdAt: i.number().optional(),
+      sourceData: i.string(), // raw json
     }),
 
+    // Core unit entity
     units: i.entity({
-      name: i.string(),
-      type: i.string(), // "Infantry", "Vehicle", "Monster"
-      abilities: i.json(), // array of structured ability objects (formerly 'profiles')
-      modelIds: i.json(), // array of model IDs
-      keywords: i.json(), // array of keywords
-      startingModels: i.number(),
-      currentWounds: i.number(),
-      hasMoved: i.boolean(),
-      hasAdvanced: i.boolean(),
-      hasCharged: i.boolean(),
-      isBattleShocked: i.boolean(),
-      hasFallenBack: i.boolean(),
-      isEngaged: i.boolean(),
-      isDestroyed: i.boolean(),
-      // Turn tracking for undo functionality
-      turnHistory: i.json(), // array of actions per turn: {turn: number, phase: string, action: string, timestamp: number}
-      lastActionTurn: i.number().optional(), // track which turn the last action was taken
+      id: i.string().unique().indexed(),
       armyId: i.string().indexed(),
-      gameId: i.string().optional(), // null for user templates, gameId for game copies
-      cost: i.number(), // cost in points for this unit
-      count: i.number(), // number of this unit in the army
-      categories: i.json(), // array of categories (e.g., ["Infantry", "Faction: Adeptus Astartes"])
-      rules: i.json(), // array of unit rules
-      sourceData: i.json(), // original source data for re-parsing
-      ownerId: i.string().indexed(), // user who owns this unit
+      name: i.string(),
+      nickname: i.string().optional(),
+      categories: i.json(), // array of categories
+      rules: i.json(), // array of rules
+      abilities: i.json(), // array of abilities
     }),
 
-    models: i.entity({
-      name: i.string(),
-      baseStats: i.json(), // M, T, Sv, W, Ld, OC
-      currentWounds: i.number(),
-      keywords: i.json(), // array of keywords
-      specialRules: i.json(), // array of model-specific rules
-      weaponIds: i.json(), // array of weapon IDs
-      isLeader: i.boolean(),
-      isDestroyed: i.boolean(),
-      // Turn tracking for individual model actions
-      turnHistory: i.json(), // array of actions per turn
-      lastActionTurn: i.number().optional(),
+    // Unit status tracking for game state
+    unitStatuses: i.entity({
+      id: i.string().unique().indexed(),
       unitId: i.string().indexed(),
-      gameId: i.string().optional(), // null for user templates, gameId for game copies
-      // Individual model characteristics
-      characteristics: i.json(), // array of characteristics
-      armyId: i.string().indexed(),
-      ownerId: i.string().indexed(),
-    }),
-
-    weapons: i.entity({
+      turns: i.json(), // list of turns for which the status is applicable
       name: i.string(),
-      type: i.string(), // "Ranged", "Melee"
-      profiles: i.json(), // array of weapon profiles
-      abilities: i.json(), // array of weapon abilities
-      keywords: i.json(), // array of weapon keywords
-      modelId: i.string().indexed(),
-      ownerId: i.string().indexed(),
-      gameId: i.string().optional(), // null for user templates, gameId for game copies
-      // Individual weapon characteristics
-      characteristics: i.json(), // array of characteristics
-      armyId: i.string().indexed(),
-      // Shooting state tracking
-      hasShot: i.boolean(),
-      shotHistory: i.json(), // array of shooting actions: {turn: number, phase: string, target: string, timestamp: number}
-      lastShotTurn: i.number().optional(), // track which turn this weapon last shot
+      rules: i.json(), // array of rules
     }),
 
-    rules: i.entity({
-      name: i.string().indexed(),
+    // Shared abilities table
+    abilities: i.entity({
+      id: i.string().unique().indexed(),
+      name: i.string().unique().indexed(),
       description: i.string(),
-      type: i.string(), // "Unit Ability", "Weapon Ability", "Army Rule", "Core Rule"
-      ownerId: i.string().indexed(),
     }),
 
-    keywords: i.entity({
-      name: i.string().indexed(),
-      description: i.string().optional(),
-      ownerId: i.string().indexed(),
+    // Core model entity
+    models: i.entity({
+      id: i.string().unique().indexed(),
+      name: i.string(),
+      unitId: i.string().indexed(),
+      M: i.number(), // movement in inches
+      T: i.number(), // toughness
+      SV: i.number(), // save value
+      W: i.number(), // wounds
+      LD: i.number(), // leadership
+      OC: i.number(), // objective control
+      woundsTaken: i.number(), // starts at zero, tracks damage
+    }),
+
+    // Core weapon entity
+    weapons: i.entity({
+      id: i.string().unique().indexed(),
+      name: i.string().optional(), // weapon name
+      range: i.number(), // range in inches, 0 for melee
+      A: i.string(), // attacks (number or dice representation like "d6 + 3")
+      WS: i.number().optional(), // weapon skill (just the number: 4 represents "4+", null for N/A)
+      S: i.number(), // strength
+      AP: i.number(), // armour penetration
+      D: i.string(), // damage (number or dice)
+      keywords: i.json(), // array of keywords like ["melta-2", "assault"]
+      turnsFired: i.json(), // array of turns when this weapon was fired
+      modelId: i.string().indexed(),
     }),
   },
   
   links: {
-    // Game relationships
-    gameOwner: {
-      forward: { on: "games", has: "one", label: "owner" },
-      reverse: { on: "$users", has: "many", label: "ownedGames" },
-    },
-    
-    gamePlayers: {
-      forward: { on: "players", has: "one", label: "game", required: true },
-      reverse: { on: "games", has: "many", label: "players" },
-    },
-
-    playerUser: {
-      forward: { on: "players", has: "one", label: "user", required: true },
-      reverse: { on: "$users", has: "many", label: "playerProfiles" },
-    },
-
     // Army relationships
     armyOwner: {
       forward: { on: "armies", has: "one", label: "owner", required: true },
       reverse: { on: "$users", has: "many", label: "armies" },
     },
 
-    armyGame: {
-      forward: { on: "armies", has: "one", label: "game" },
-      reverse: { on: "games", has: "many", label: "armies" },
-    },
-
     // Unit relationships
     unitArmy: {
-      forward: { on: "units", has: "one", label: "army", required: true },
+      forward: { on: "units", has: "one", label: "army", required: true, onDelete: "cascade" },
       reverse: { on: "armies", has: "many", label: "units" },
     },
 
-    unitGame: {
-      forward: { on: "units", has: "one", label: "game" },
-      reverse: { on: "games", has: "many", label: "units" },
+    // Unit status relationships
+    unitStatusUnit: {
+      forward: { on: "unitStatuses", has: "one", label: "unit", required: true, onDelete: "cascade" },
+      reverse: { on: "units", has: "many", label: "statuses"},
     },
 
     // Model relationships
     modelUnit: {
-      forward: { on: "models", has: "one", label: "unit", required: true },
+      forward: { on: "models", has: "one", label: "unit", required: true, onDelete: "cascade" },
       reverse: { on: "units", has: "many", label: "models" },
-    },
-
-    modelGame: {
-      forward: { on: "models", has: "one", label: "game" },
-      reverse: { on: "games", has: "many", label: "models" },
     },
 
     // Weapon relationships
     weaponModel: {
-      forward: { on: "weapons", has: "one", label: "model", required: true },
+      forward: { on: "weapons", has: "one", label: "model", required: true, onDelete: "cascade" },
       reverse: { on: "models", has: "many", label: "weapons" },
-    },
-
-    weaponGame: {
-      forward: { on: "weapons", has: "one", label: "game" },
-      reverse: { on: "games", has: "many", label: "weapons" },
-    },
-
-    weaponOwner: {
-      forward: { on: "weapons", has: "one", label: "owner", required: true },
-      reverse: { on: "$users", has: "many", label: "weapons" },
-    },
-
-    // Rule and keyword relationships
-    ruleOwner: {
-      forward: { on: "rules", has: "one", label: "owner", required: true },
-      reverse: { on: "$users", has: "many", label: "rules" },
-    },
-
-    keywordOwner: {
-      forward: { on: "keywords", has: "one", label: "owner", required: true },
-      reverse: { on: "$users", has: "many", label: "keywords" },
     },
   },
 });

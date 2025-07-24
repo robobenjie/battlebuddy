@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ModelList, ModelSummary } from './ModelCard';
-import { WeaponList } from './WeaponCard';
+
 import { KeywordList, extractFactionKeywords, extractGeneralKeywords } from './KeywordBadge';
 import { COMMON_RULES, parseRuleDescription } from './RulePopup';
-import { getWeaponCount } from '../../lib/unit-utils';
+import { getWeaponCount, getModelsForUnit, getWeaponsForUnit } from '../../lib/unit-utils';
 
 interface UnitCardProps {
   unit: {
@@ -29,38 +28,37 @@ interface UnitCardProps {
     abilities?: Array<{
       id: string;
       name: string;
+      description?: string;
       characteristics?: Array<{
         name: string;
         typeId?: string;
         value: string;
       }>;
     }>;
-  };
-  models?: Array<{
-    id: string;
-    name: string;
-    characteristics: Array<{
+    models?: Array<{
+      id: string;
       name: string;
-      value: string;
-    }>;
-  }>;
-  weapons?: Array<{
-    id: string;
-    name: string;
-    type: string;
-    count: number;
-    characteristics: Array<{
-      name: string;
-      value: string;
-    }>;
-    profiles?: Array<{
-      name: string;
-      characteristics: Array<{
+      M: number; // movement in inches
+      T: number; // toughness
+      SV: number; // save value
+      W: number; // wounds
+      LD: number; // leadership
+      OC: number; // objective control
+      woundsTaken: number; // starts at zero, tracks damage
+      weapons?: Array<{
+        id: string;
         name: string;
-        value: string;
+        range: number; // range in inches, 0 for melee
+        A: string; // attacks (number or dice representation like "d6 + 3")
+        WS: number; // weapon skill (just the number: 4 represents "4+")
+        S: number; // strength
+        AP: number; // armour penetration
+        D: string; // damage (number or dice)
+        keywords: string[]; // array of keywords like ["melta-2", "assault"]
+        turnsFired: number[]; // array of turns when this weapon was fired
       }>;
     }>;
-  }>;
+  };
   onKeywordClick?: (name: string, description?: string) => void;
   className?: string;
   expandable?: boolean;
@@ -69,8 +67,6 @@ interface UnitCardProps {
 
 export default function UnitCard({ 
   unit, 
-  models = [],
-  weapons = [],
   onKeywordClick, 
   className = '',
   expandable = true,
@@ -78,12 +74,16 @@ export default function UnitCard({
 }: UnitCardProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
+  // Get models and weapons from the unit
+  const models = getModelsForUnit(unit);
+  const weapons = getWeaponsForUnit(unit);
+
   // Helper: group weapons by name+type (optionally add more fields for uniqueness)
   function groupWeapons(weapons: any[]) {
     const map = new Map<string, { weapon: any, count: number }>();
     for (const weapon of weapons) {
-      // Key by name+type (add more fields if needed for uniqueness)
-      const key = `${weapon.name}__${weapon.type}`;
+      // Key by name+range (add more fields if needed for uniqueness)
+      const key = `${weapon.name}__${weapon.range}`;
       if (map.has(key)) {
         map.get(key)!.count += 1;
       } else {
@@ -102,7 +102,7 @@ export default function UnitCard({
     if (!models || models.length === 0) return [];
     
     const configMap = new Map<string, number>();
-    models.forEach(model => {
+    models.forEach((model: any) => {
       configMap.set(model.name, (configMap.get(model.name) || 0) + 1);
     });
     
@@ -116,7 +116,7 @@ export default function UnitCard({
   const totalModels = models.length;
 
   // Calculate total weapon count
-  const totalWeapons = weapons.reduce((sum, weapon) => sum + weapon.count, 0);
+  const totalWeapons = weapons.length;
 
   const toggleExpanded = () => {
     if (expandable) {
@@ -125,8 +125,8 @@ export default function UnitCard({
   };
 
   // Grouped weapons for rendering
-  const groupedRangedWeapons = groupWeapons(weapons.filter(w => w.type === 'ranged'));
-  const groupedMeleeWeapons = groupWeapons(weapons.filter(w => w.type === 'melee'));
+  const groupedRangedWeapons = groupWeapons(weapons.filter((w: any) => w.range > 0));
+  const groupedMeleeWeapons = groupWeapons(weapons.filter((w: any) => w.range === 0));
 
   return (
     <div className={`bg-gray-800 rounded-lg border border-gray-700 overflow-hidden ${className}`}>
@@ -199,32 +199,32 @@ export default function UnitCard({
                       </div>
                       <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                         <div className="text-xs font-mono text-white">
-                          {models[0].characteristics.find(c => c.name === 'M')?.value || '-'}
+                          {models[0].M ? `${models[0].M}"` : '-'}
                         </div>
                       </div>
                       <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                         <div className="text-xs font-mono text-white">
-                          {models[0].characteristics.find(c => c.name === 'T')?.value || '-'}
+                          {models[0].T || '-'}
                         </div>
                       </div>
                       <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                         <div className="text-xs font-mono text-white">
-                          {models[0].characteristics.find(c => c.name === 'SV')?.value || '-'}
+                          {models[0].SV ? `${models[0].SV}+` : '-'}
                         </div>
                       </div>
                       <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                         <div className="text-xs font-mono text-white">
-                          {models[0].characteristics.find(c => c.name === 'W')?.value || '-'}
+                          {models[0].W || '-'}
                         </div>
                       </div>
                       <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                         <div className="text-xs font-mono text-white">
-                          {models[0].characteristics.find(c => c.name === 'LD')?.value || '-'}
+                          {models[0].LD ? `${models[0].LD}+` : '-'}
                         </div>
                       </div>
                       <div className="bg-gray-700 px-1 py-1 text-center">
                         <div className="text-xs font-mono text-white">
-                          {models[0].characteristics.find(c => c.name === 'OC')?.value || '-'}
+                          {models[0].OC || '-'}
                         </div>
                       </div>
                     </>
@@ -240,10 +240,9 @@ export default function UnitCard({
               <h4 className="text-sm font-semibold text-gray-300 mb-2">Ranged Weapons</h4>
               <div className="space-y-3">
                 {groupedRangedWeapons.map(({ weapon, count }) => {
-                  const keywordsValue = weapon.characteristics.find((c: any) => c.name === 'Keywords')?.value || '-';
-                  const keywords = keywordsValue !== '-' ? keywordsValue.split(',').map((k: string) => k.trim()) : [];
+                  const keywords = weapon.keywords || [];
                   return (
-                    <div key={weapon.name + weapon.type} className="bg-gray-700 rounded-lg overflow-hidden">
+                    <div key={weapon.name + weapon.range} className="bg-gray-700 rounded-lg overflow-hidden">
                       {/* Weapon Name Header */}
                       <div className="bg-gray-600 px-2 py-1">
                         <div className="text-xs font-medium text-white">
@@ -278,32 +277,32 @@ export default function UnitCard({
                           {/* Values */}
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find((c: any) => c.name === 'Range')?.value || '-'}
+                              {weapon.range ? `${weapon.range}"` : '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find((c: any) => c.name === 'A')?.value || '-'}
+                              {weapon.A || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find((c: any) => c.name === 'BS')?.value || '-'}
+                              {weapon.WS ? `${weapon.WS}+` : '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find((c: any) => c.name === 'S')?.value || '-'}
+                              {weapon.S || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find((c: any) => c.name === 'AP')?.value || '-'}
+                              {weapon.AP || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find((c: any) => c.name === 'D')?.value || '-'}
+                              {weapon.D || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-left">
@@ -344,10 +343,9 @@ export default function UnitCard({
               <h4 className="text-sm font-semibold text-gray-300 mb-2">Melee Weapons</h4>
               <div className="space-y-3">
                 {groupedMeleeWeapons.map(({ weapon, count }) => {
-                  const keywordsValue = weapon.characteristics.find((c: any) => c.name === 'Keywords')?.value || '-';
-                  const keywords = keywordsValue !== '-' ? keywordsValue.split(',').map((k: string) => k.trim()) : [];
+                  const keywords = weapon.keywords || [];
                   return (
-                    <div key={weapon.name + weapon.type} className="bg-gray-700 rounded-lg overflow-hidden">
+                    <div key={weapon.name + weapon.range} className="bg-gray-700 rounded-lg overflow-hidden">
                       {/* Weapon Name Header */}
                       <div className="bg-gray-600 px-2 py-1">
                         <div className="text-xs font-medium text-white">
@@ -382,32 +380,32 @@ export default function UnitCard({
                           {/* Values */}
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find((c: any) => c.name === 'Range')?.value || '-'}
+                              {weapon.range ? `${weapon.range}"` : '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find((c: any) => c.name === 'A')?.value || '-'}
+                              {weapon.A || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find((c: any) => c.name === 'WS')?.value || '-'}
+                              {weapon.WS ? `${weapon.WS}+` : '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find((c: any) => c.name === 'S')?.value || '-'}
+                              {weapon.S || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find((c: any) => c.name === 'AP')?.value || '-'}
+                              {weapon.AP || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                             <div className="text-xs font-mono text-white">
-                              {weapon.characteristics.find((c: any) => c.name === 'D')?.value || '-'}
+                              {weapon.D || '-'}
                             </div>
                           </div>
                           <div className="bg-gray-700 px-1 py-1 text-left">
@@ -450,6 +448,11 @@ export default function UnitCard({
                 {unit.abilities.map((ability) => (
                   <div key={ability.id} className="bg-gray-700 rounded-lg p-2">
                     <div className="text-xs font-medium text-white mb-1">{ability.name}</div>
+                    {ability.description && (
+                      <div className="text-xs text-gray-300">
+                        {ability.description}
+                      </div>
+                    )}
                     {ability.characteristics && ability.characteristics.length > 0 && (
                       <div className="text-xs text-gray-300">
                         {ability.characteristics.map((char, i) => (
@@ -499,8 +502,6 @@ export default function UnitCard({
 interface UnitListProps {
   units: Array<{
     unit: UnitCardProps['unit'];
-    models: UnitCardProps['models'];
-    weapons: UnitCardProps['weapons'];
   }>;
   onKeywordClick?: (name: string, description?: string) => void;
   className?: string;
@@ -555,8 +556,6 @@ export function UnitList({
                   <UnitCard
                     key={unitData.unit.id || index}
                     unit={unitData.unit}
-                    models={unitData.models}
-                    weapons={unitData.weapons}
                     onKeywordClick={onKeywordClick}
                     expandable={expandable}
                   />
@@ -575,8 +574,6 @@ export function UnitList({
         <UnitCard
           key={unitData.unit.id || index}
           unit={unitData.unit}
-          models={unitData.models}
-          weapons={unitData.weapons}
           onKeywordClick={onKeywordClick}
           expandable={expandable}
         />

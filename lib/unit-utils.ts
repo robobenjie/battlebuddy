@@ -2,16 +2,15 @@
  * Shared utilities for unit data transformation and manipulation
  */
 
-// Helper function to get models for a specific unit
-export const getModelsForUnit = (models: any[], unitId: string) => {
-  return models.filter(model => model.unitId === unitId);
+// Helper function to get models for a specific unit (now models are nested in unit)
+export const getModelsForUnit = (unit: any) => {
+  return unit.models || [];
 };
 
-// Helper function to get weapons for models in a unit
-export const getWeaponsForUnit = (weapons: any[], models: any[], unitId: string) => {
-  const unitModels = getModelsForUnit(models, unitId);
-  const modelIds = unitModels.map(model => model.id);
-  return weapons.filter(weapon => modelIds.includes(weapon.modelId));
+// Helper function to get weapons for models in a unit (now weapons are nested in models)
+export const getWeaponsForUnit = (unit: any) => {
+  const unitModels = getModelsForUnit(unit);
+  return unitModels.flatMap((model: any) => model.weapons || []);
 };
 
 // Alternative version that works with weapons that have unitId directly
@@ -20,12 +19,13 @@ export const getWeaponsForUnitDirect = (weapons: any[], unitId: string) => {
 };
 
 // Helper function to determine unit movement value
-export const getUnitMovement = (models: any[], unitId: string) => {
-  const unitModels = getModelsForUnit(models, unitId);
+export const getUnitMovement = (unit: any) => {
+  const unitModels = getModelsForUnit(unit);
   if (unitModels.length === 0) return null;
 
-  const movements = unitModels.map(model => {
-    const stats = model.baseStats || {};
+  const movements = unitModels.map((model: any) => {
+    // Handle both old and new data structures
+    const stats = model.baseStats || model;
     return stats.M || stats.Movement || stats.Move || '-';
   });
 
@@ -34,12 +34,10 @@ export const getUnitMovement = (models: any[], unitId: string) => {
   return uniqueMovements.length === 1 ? uniqueMovements[0] : null;
 };
 
-
-// Helper function to format unit data for ArmyDetailPage (preserves original structure)
-export const formatUnitForCard = (unit: any, models: any[], weapons: any[]) => {
-  const unitModels = getModelsForUnit(models, unit.id);
-  // Weapons are now linked to models via modelId
-  const unitWeapons = getWeaponsForUnit(weapons, models, unit.id);
+// Helper function to format unit data for ArmyDetailPage (updated for new structure)
+export const formatUnitForCard = (unit: any) => {
+  const unitModels = getModelsForUnit(unit);
+  const unitWeapons = getWeaponsForUnit(unit);
   
   return {
     unit: unit,
@@ -49,17 +47,24 @@ export const formatUnitForCard = (unit: any, models: any[], weapons: any[]) => {
 };
 
 // Helper function to calculate army statistics
-export const calculateArmyStats = (units: any[], models: any[], weapons: any[]) => {
+export const calculateArmyStats = (units: any[]) => {
   // For ArmyDetailPage, models don't have a count property - each model represents 1 model
   // For game phases, models might have count property
-  const totalModels = models.reduce((sum, model) => {
-    if (typeof model.count === 'number') {
-      return sum + model.count;
-    }
-    return sum + 1; // Each model record represents 1 model
+  const totalModels = units.reduce((sum, unit) => {
+    const unitModels = getModelsForUnit(unit);
+    return sum + unitModels.reduce((unitSum: number, model: any) => {
+      if (typeof model.count === 'number') {
+        return unitSum + model.count;
+      }
+      return unitSum + 1; // Each model record represents 1 model
+    }, 0);
   }, 0);
   
-  const totalWeapons = weapons.length;
+  const totalWeapons = units.reduce((sum, unit) => {
+    const unitWeapons = getWeaponsForUnit(unit);
+    return sum + unitWeapons.length;
+  }, 0);
+  
   const totalUnits = units.length;
   
   return {
@@ -75,30 +80,26 @@ export const getAllCategories = (units: any[]) => {
 };
 
 // Helper function to check if a unit has any unfired weapons
-export const hasUnfiredWeapons = (weapons: any[], models: any[], unitId: string) => {
-  const unitModels = getModelsForUnit(models, unitId);
-  const modelIds = unitModels.map(model => model.id);
-  const unitWeapons = weapons.filter(w => modelIds.includes(w.modelId));
-  return unitWeapons.some(w => !w.hasShot);
+export const hasUnfiredWeapons = (unit: any) => {
+  const unitWeapons = getWeaponsForUnit(unit);
+  return unitWeapons.some((w: any) => !w.hasShot);
 };
 
 // Helper function to get weapons for a unit
-export const getUnitWeapons = (weapons: any[], models: any[], unitId: string) => {
-  const unitModels = getModelsForUnit(models, unitId);
-  const modelIds = unitModels.map(model => model.id);
-  return weapons.filter(w => modelIds.includes(w.modelId));
+export const getUnitWeapons = (unit: any) => {
+  return getWeaponsForUnit(unit);
 };
 
 // Helper function to get total weapon count for a unit (each weapon row represents one weapon type)
-export const getUnitWeaponCount = (weapons: any[], models: any[], unitId: string) => {
-  const unitWeapons = getUnitWeapons(weapons, models, unitId);
+export const getUnitWeaponCount = (unit: any) => {
+  const unitWeapons = getUnitWeapons(unit);
   return unitWeapons.length;
 };
 
 // Helper function to get firing status for a unit
-export const getUnitFiringStatus = (weapons: any[], models: any[], unitId: string) => {
-  const unitWeapons = getUnitWeapons(weapons, models, unitId);
-  const firedWeapons = unitWeapons.filter(w => w.hasShot);
+export const getUnitFiringStatus = (unit: any) => {
+  const unitWeapons = getUnitWeapons(unit);
+  const firedWeapons = unitWeapons.filter((w: any) => w.hasShot);
   
   return {
     totalWeapons: unitWeapons.length,
@@ -110,20 +111,17 @@ export const getUnitFiringStatus = (weapons: any[], models: any[], unitId: strin
 };
 
 // Helper function to calculate weapon count for a specific weapon type
-export const getWeaponCount = (weapon: any, models: any[], weapons: any[], unitId: string) => {
-  // Get all models for this unit
-  const unitModels = getModelsForUnit(models, unitId);
+export const getWeaponCount = (weapon: any, unit: any) => {
+  // Get all weapons for this unit
+  const unitWeapons = getUnitWeapons(unit);
   // Count how many weapon rows exist for this weapon type in this unit
-  const weaponsWithSameName = getUnitWeapons(weapons, models, unitId).filter(w => w.name === weapon.name);
+  const weaponsWithSameName = unitWeapons.filter((w: any) => w.name === weapon.name);
   
   console.log('🔍 getWeaponCount debug:', {
     weaponName: weapon.name,
-    weaponModelId: weapon.modelId,
-    unitId,
-    totalModels: models.length,
-    unitModelsCount: unitModels.length,
+    unitId: unit.id,
+    totalWeapons: unitWeapons.length,
     weaponsWithSameNameCount: weaponsWithSameName.length,
-    unitModelIds: unitModels.map(m => m.id)
   });
   
   return weaponsWithSameName.length;

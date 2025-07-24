@@ -15,7 +15,7 @@ interface ArmyDetailPageProps {
 export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageProps) {
   const { isOpen, rule, showRule, hideRule } = useRulePopup();
 
-  // Query army data
+  // Query army data with all related units, models, and weapons in one query
   const { data: armyData, isLoading: armyLoading } = db.useQuery({
     armies: {
       $: {
@@ -24,51 +24,16 @@ export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageP
           ownerId: user.id,
         },
       },
-    },
-  });
-
-  // Query units for this army
-  const { data: unitData, isLoading: unitsLoading } = db.useQuery({
-    units: {
-      $: {
-        where: {
-          armyId: armyId,
-          ownerId: user.id,
-        },
-      },
-    },
-  });
-
-  // Query models for this army
-  const { data: modelData, isLoading: modelsLoading } = db.useQuery({
-    models: {
-      $: {
-        where: {
-          armyId: armyId,
-          ownerId: user.id,
-        },
-      },
-    },
-  });
-
-  // Query weapons for this army
-  const { data: weaponData, isLoading: weaponsLoading } = db.useQuery({
-    weapons: {
-      $: {
-        where: {
-          armyId: armyId,
-          ownerId: user.id,
+      units: {
+        models: {
+          weapons: {},
         },
       },
     },
   });
 
   const army = armyData?.armies?.[0];
-  const units = unitData?.units || [];
-  const models = modelData?.models || [];
-  const weapons = weaponData?.weapons || [];
-
-  const isLoading = armyLoading || unitsLoading || modelsLoading || weaponsLoading;
+  const isLoading = armyLoading;
 
   if (isLoading) {
     return (
@@ -87,8 +52,8 @@ export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageP
     return (
       <div className="min-h-screen bg-gray-900 p-4 pt-20">
         <div className="max-w-4xl mx-auto">
-                  <div className="text-center py-12">
-          <h2 className="text-xl font-semibold text-gray-300 mb-2">Army not found</h2>
+          <div className="text-center py-12">
+            <h2 className="text-xl font-semibold text-gray-300 mb-2">Army not found</h2>
             <p className="text-gray-400 mb-4">
               The requested army could not be found or you don't have access to it.
             </p>
@@ -106,11 +71,22 @@ export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageP
     );
   }
 
+  // Extract units from the army data
+  const units = army.units || [];
+  
+  // Flatten all models and weapons from the nested structure
+  const allModels = units.flatMap(unit => unit.models || []);
+  const allWeapons = allModels.flatMap(model => model.weapons || []);
+
   // Organize data by relationships using utilities
-  const unitsWithDetails = units.map(unit => formatUnitForCard(unit, models, weapons));
+  const unitsWithDetails = units.map(unit => {
+    const unitModels = unit.models || [];
+    const unitWeapons = unitModels.flatMap(model => model.weapons || []);
+    return formatUnitForCard(unit, unitModels, unitWeapons);
+  });
 
   // Calculate army statistics using utilities
-  const { totalUnits, totalModels, totalWeapons } = calculateArmyStats(units, models, weapons);
+  const { totalUnits, totalModels, totalWeapons } = calculateArmyStats(units, allModels, allWeapons);
 
   // Army-level keywords (could be extracted from all units)
   const allCategories = getAllCategories(units);
@@ -144,16 +120,16 @@ export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageP
                     <div className="text-white font-medium">{army.faction}</div>
                   </div>
                   <div>
-                    <div className="text-gray-400 text-xs uppercase tracking-wider">Points</div>
-                    <div className="text-white font-medium">{army.totalPoints}/{army.pointsLimit}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-400 text-xs uppercase tracking-wider">Battle Size</div>
-                    <div className="text-white font-medium">{army.battleSize || 'Not set'}</div>
-                  </div>
-                  <div>
                     <div className="text-gray-400 text-xs uppercase tracking-wider">Created</div>
                     <div className="text-white font-medium">{army.createdAt ? formatDate(army.createdAt) : 'Unknown'}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-400 text-xs uppercase tracking-wider">Owner</div>
+                    <div className="text-white font-medium">{army.ownerId}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-400 text-xs uppercase tracking-wider">ID</div>
+                    <div className="text-white font-medium text-xs">{army.id}</div>
                   </div>
                 </div>
               </div>
@@ -175,15 +151,8 @@ export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageP
               </div>
             </div>
 
-            {/* Detachment and Faction Keywords */}
+            {/* Faction Keywords */}
             <div className="mt-4 space-y-2">
-              {army.detachment && (
-                <div>
-                  <span className="text-gray-400 text-sm">Detachment: </span>
-                  <span className="text-white font-medium">{army.detachment}</span>
-                </div>
-              )}
-              
               {factionKeywords.length > 0 && (
                 <div>
                   <span className="text-gray-400 text-sm mr-2">Factions: </span>

@@ -18,22 +18,42 @@ vi.mock('../lib/db', () => {
     tx: {
       armies: new Proxy({}, {
         get: (target, prop) => ({
-          update: (data: any) => ({ type: 'army-update', id: prop, data })
+          update: (data: any) => ({
+            type: 'army-update', 
+            id: prop, 
+            data,
+            link: (links: any) => ({ type: 'army-update', id: prop, data, links })
+          })
         })
       }),
       units: new Proxy({}, {
         get: (target, prop) => ({
-          update: (data: any) => ({ type: 'unit-update', id: prop, data })
+          update: (data: any) => ({
+            type: 'unit-update', 
+            id: prop, 
+            data,
+            link: (links: any) => ({ type: 'unit-update', id: prop, data, links })
+          })
         })
       }),
       models: new Proxy({}, {
         get: (target, prop) => ({
-          update: (data: any) => ({ type: 'model-update', id: prop, data })
+          update: (data: any) => ({
+            type: 'model-update', 
+            id: prop, 
+            data,
+            link: (links: any) => ({ type: 'model-update', id: prop, data, links })
+          })
         })
       }),
       weapons: new Proxy({}, {
         get: (target, prop) => ({
-          update: (data: any) => ({ type: 'weapon-update', id: prop, data })
+          update: (data: any) => ({
+            type: 'weapon-update', 
+            id: prop, 
+            data,
+            link: (links: any) => ({ type: 'weapon-update', id: prop, data, links })
+          })
         })
       })
     }
