@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 
 import { KeywordList, extractFactionKeywords, extractGeneralKeywords } from './KeywordBadge';
 import { COMMON_RULES, parseRuleDescription } from './RulePopup';
+import RuleTip from './RuleTip';
 import { getWeaponCount, getModelsForUnit, getWeaponsForUnit } from '../../lib/unit-utils';
 
 interface UnitCardProps {
@@ -445,25 +446,23 @@ export default function UnitCard({
             <div>
               <h4 className="text-sm font-semibold text-gray-300 mb-2">Abilities</h4>
               <div className="space-y-2">
-                {unit.abilities.map((ability) => (
-                  <div key={ability.id} className="bg-gray-700 rounded-lg p-2">
-                    <div className="text-xs font-medium text-white mb-1">{ability.name}</div>
-                    {ability.description && (
-                      <div className="text-xs text-gray-300">
-                        {ability.description}
-                      </div>
-                    )}
-                    {ability.characteristics && ability.characteristics.length > 0 && (
-                      <div className="text-xs text-gray-300">
-                        {ability.characteristics.map((char, i) => (
-                          <div key={i}>
-                            {char.name === 'Description' ? char.value : `${char.name}: ${char.value}`}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {unit.abilities.map((ability) => {
+                  const description = ability.description || 
+                    (ability.characteristics && ability.characteristics.length > 0 
+                      ? ability.characteristics.map(char => 
+                          char.name === 'Description' ? char.value : `${char.name}: ${char.value}`
+                        ).join('\n')
+                      : undefined
+                    );
+                  
+                  return (
+                    <RuleTip
+                      key={ability.id}
+                      title={ability.name}
+                      description={description}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
@@ -474,10 +473,11 @@ export default function UnitCard({
               <h4 className="text-sm font-semibold text-gray-300 mb-2">Rules</h4>
               <div className="space-y-2">
                 {unit.rules.map((rule) => (
-                  <div key={rule.id} className="bg-gray-700 rounded-lg p-2">
-                    <div className="text-xs font-medium text-white mb-1">{rule.name}</div>
-                    <div className="text-xs text-gray-300">{rule.description}</div>
-                  </div>
+                  <RuleTip
+                    key={rule.id}
+                    title={rule.name}
+                    description={rule.description}
+                  />
                 ))}
               </div>
             </div>
