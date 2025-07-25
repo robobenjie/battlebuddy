@@ -7,6 +7,29 @@ const _schema = i.schema({
       email: i.string().unique().indexed().optional(),
     }),
 
+    
+    // Game entities
+    games: i.entity({
+      name: i.string(),
+      code: i.string().unique().indexed(), // 5-digit game code
+      hostId: i.string().indexed(), // user ID of the host
+      createdAt: i.number().indexed(),
+      status: i.string(), // "waiting", "setup", "active", "completed", "archived"
+      currentTurn: i.number(),
+      currentPhase: i.string(), // "command", "move", "shoot", "charge", "fight"
+      activePlayerId: i.string().optional(),
+      playerIds: i.json(), // array of player IDs
+      phaseHistory: i.json(), // track phase progression for undo functionality
+    }),
+
+    players: i.entity({
+      name: i.string(),
+      userId: i.string().indexed(),
+      gameId: i.string().indexed(),
+      armyId: i.string().optional(),
+      isHost: i.boolean(),
+    }),
+
     // Core army entity
     armies: i.entity({
       id: i.string().unique().indexed(),
@@ -15,6 +38,7 @@ const _schema = i.schema({
       name: i.string(),
       ownerId: i.string().indexed(),
       sourceData: i.string(), // raw json
+      gameId: i.string().optional().indexed(), // optional link to game for game-specific army copies
     }),
 
     // Core unit entity
@@ -103,6 +127,12 @@ const _schema = i.schema({
     weaponModel: {
       forward: { on: "weapons", has: "one", label: "model", required: true, onDelete: "cascade" },
       reverse: { on: "models", has: "many", label: "weapons" },
+    },
+
+    // Game-Army relationships
+    gameArmies: {
+      forward: { on: "armies", has: "one", label: "game", required: false, onDelete: "cascade" },
+      reverse: { on: "games", has: "many", label: "armies" },
     },
   },
 });

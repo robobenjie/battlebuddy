@@ -17,9 +17,20 @@ interface CurrentGamesProps {
 export function CurrentGames({ user, embedded }: CurrentGamesProps) {
   const [deleteGameId, setDeleteGameId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { data, isLoading } = db.useQuery({ games: {}, players: {} });
+  const { data, isLoading } = db.useQuery({ 
+    games: {}, 
+    players: {}, 
+    armies: {}, 
+    units: {}, 
+    models: {}, 
+    weapons: {} 
+  });
   const allGames = data?.games || [];
   const allPlayers = data?.players || [];
+  const allArmies = data?.armies || [];
+  const allUnits = data?.units || [];
+  const allModels = data?.models || [];
+  const allWeapons = data?.weapons || [];
   const userGames = allGames.filter((game: any) => {
     const gameStatus = game.status === 'waiting' || game.status === 'active';
     const isUserInGame = allPlayers.some((player: any) => player.gameId === game.id && player.userId === user.id);
@@ -42,8 +53,13 @@ export function CurrentGames({ user, embedded }: CurrentGamesProps) {
     try {
       const gamePlayers = allPlayers.filter((p: any) => p.gameId === gameId);
       const transactions = [];
+      
+      // Delete players
       gamePlayers.forEach(player => transactions.push(db.tx.players[player.id].delete()));
+      
+      // Delete the game (armies will be cascade deleted via schema)
       transactions.push(db.tx.games[gameId].delete());
+      
       await db.transact(transactions);
       setDeleteGameId(null);
     } catch (error) {

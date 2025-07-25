@@ -69,8 +69,9 @@ export default function AuthenticatedApp({ user }: AuthenticatedAppProps) {
     try {
       const code = generateGameCode();
       const gameId = crypto.randomUUID();
+      const playerId = crypto.randomUUID();
       
-      // Create the game
+      // Create the game with all required fields
       await db.transact([
         db.tx.games[gameId].update({
           code,
@@ -78,15 +79,20 @@ export default function AuthenticatedApp({ user }: AuthenticatedAppProps) {
           status: 'waiting',
           createdAt: Date.now(),
           hostId: user.id,
+          currentTurn: 0, // Will be set to 1 when game starts
+          currentPhase: 'waiting', // Will be set to 'command' when game starts
+          playerIds: [playerId], // Array of player IDs
+          phaseHistory: [], // Empty array initially
         })
       ]);
 
       // Add the host as a player
       await db.transact([
-        db.tx.players[crypto.randomUUID()].update({
+        db.tx.players[playerId].update({
           userId: user.id,
           name: user.email || 'Anonymous',
           gameId: gameId,
+          isHost: true,
         })
       ]);
 
@@ -138,6 +144,7 @@ export default function AuthenticatedApp({ user }: AuthenticatedAppProps) {
           userId: user.id,
           name: user.email || 'Anonymous',
           gameId: targetGame.id,
+          isHost: false, // Player joining is not the host
         })
       ]);
 

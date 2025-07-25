@@ -1109,3 +1109,37 @@ describe('Army Import - Integration Test with Simple Data', () => {
     });
   });
 }); 
+
+describe('Weapon-to-Model Linking Integrity', () => {
+  it('should only link each Terminator model to its correct weapons', () => {
+    const userId = 'test-user-terminator';
+    const armyId = 'test-army-terminator';
+    const jsonData = testData as NewRecruitRoster;
+    const units = extractUnits(jsonData, armyId, userId);
+    // Find the Terminator unit (name may need to be adjusted to match test data)
+    const terminatorUnit = units.find(u => u.name.toLowerCase().includes('terminator'));
+    expect(terminatorUnit).toBeDefined();
+    if (!terminatorUnit) return;
+    const models = extractModels(terminatorUnit);
+    const weapons = extractWeapons(terminatorUnit, models);
+
+    // Group weapons by modelId
+    const weaponsByModel: Record<string, string[]> = {};
+    for (const weapon of weapons) {
+      if (!weaponsByModel[weapon.modelId]) weaponsByModel[weapon.modelId] = [];
+      weaponsByModel[weapon.modelId].push(weapon.name);
+    }
+
+    // Find all unique weapon sets
+    const weaponSets = (Object.values(weaponsByModel) as string[][]).map(names => names.sort().join(','));
+    const uniqueWeaponSets = Array.from(new Set(weaponSets));
+
+    // There should be 2 unique weapon sets (for 2 configs: regular/sergeant and heavy weapon)
+    expect(uniqueWeaponSets.length).toBe(2);
+
+    // Each model should only have 2 weapons (not all 6)
+    for (const weaponList of Object.values(weaponsByModel) as string[][]) {
+      expect(weaponList.length).toBe(2);
+    }
+  });
+}); 

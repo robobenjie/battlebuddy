@@ -326,7 +326,7 @@ export function extractModels(unit: UnitData): ModelData[] {
     for (let i = 0; i < statline.count; i++) {
       models.push({
         id: id(),
-        name: statline.modelName,
+        name: statline.modelName, // This already uses extractModelNameFromSelection in getUnitStatlines
         unitId: unit.id,
         M: statline.M,
         T: statline.T,
@@ -420,31 +420,18 @@ function extractStatlinesFromSelections(
     if (selection.profiles && selection.profiles.length > 0) {
       for (const profile of selection.profiles) {
         if (profile.typeName === 'Unit') {
-          // Use selection name if it's different from profile name (more specific)
-          // Otherwise use profile name for backward compatibility
-          let modelName = selection.name !== profile.name ? selection.name : profile.name;
-          
-          // If this is a model selection, enhance with weapon configuration
-          if (selection.type === 'model' && selection.selections && selection.selections.length > 0) {
-            const weapons = selection.selections
-              .filter((sel: any) => {
-                if (sel.type === 'upgrade') return true;
-                return sel.categories?.some((cat: any) => 
-                  cat.toLowerCase().includes('weapon')
-                );
-              })
-              .map((sel: any) => sel.name)
-              .filter((name: string) => name && name.trim().length > 0);
-            
-            if (weapons.length > 0) {
-              modelName += ` w/ ${weapons.join(' and ')}`;
-            }
+          // Always use extractModelNameFromSelection for model selections
+          let modelName: string;
+          if (selection.type === 'model') {
+            modelName = extractModelNameFromSelection(selection) || selection.name;
+          } else {
+            modelName = selection.name !== profile.name ? selection.name : profile.name;
           }
-          
+
           const modelCount = selection.number || 1;
           const characteristics = profile.characteristics || [];
           const stats = parseCharacteristicsToStats(characteristics);
-          
+
           if (statlineMap.has(modelName)) {
             // Add to existing model count
             const existing = statlineMap.get(modelName)!;
@@ -464,7 +451,7 @@ function extractStatlinesFromSelections(
       const modelName = extractModelNameFromSelection(selection);
       if (modelName) {
         const modelCount = selection.number;
-        
+
         if (statlineMap.has(modelName)) {
           // Add to existing model count
           const existing = statlineMap.get(modelName)!;
@@ -669,28 +656,26 @@ export function extractWeapons(unit: UnitData, models: ModelData[]): WeaponData[
  */
 function extractWeaponsForModel(unit: UnitData, model: ModelData): WeaponData[] {
   const weapons: WeaponData[] = [];
-  
+
   if (!unit.sourceData?.selections) {
     return weapons;
   }
-  
-  // First, try to find weapons directly in the unit's selections (for units like Psychophage)
-  const directWeapons = extractWeaponsFromUnitSelections(unit.sourceData.selections, model, unit);
-  weapons.push(...directWeapons);
-  
-  // If no weapons found directly, try to find them in model selections
-  if (weapons.length === 0) {
-    const modelSelection = findModelSelectionForModel(unit.sourceData.selections, model);
-    
-    if (modelSelection) {
-      // Extract weapons from this specific model selection
-      const rangedWeapons = extractWeaponsFromModelSelection(modelSelection, model, unit, 'Ranged Weapons');
-      const meleeWeapons = extractWeaponsFromModelSelection(modelSelection, model, unit, 'Melee Weapons');
-      
-      weapons.push(...rangedWeapons, ...meleeWeapons);
-    }
+
+  // Find the most specific model selection for this model
+  const modelSelection = findModelSelectionForModel(unit.sourceData.selections, model);
+  if (modelSelection) {
+    // Only extract weapons from this model's own selections
+    const rangedWeapons = extractWeaponsFromModelSelection(modelSelection, model, unit, 'Ranged Weapons');
+    const meleeWeapons = extractWeaponsFromModelSelection(modelSelection, model, unit, 'Melee Weapons');
+    weapons.push(...rangedWeapons, ...meleeWeapons);
   }
-  
+
+  // Fallback: If no weapons found, try extracting directly from unit selections (for units like Psychophage)
+  if (weapons.length === 0) {
+    const directWeapons = extractWeaponsFromUnitSelections(unit.sourceData.selections, model, unit);
+    weapons.push(...directWeapons);
+  }
+
   return weapons;
 }
 
@@ -742,24 +727,22 @@ function findModelSelectionForModel(selections: any[], model: ModelData): any | 
     // Check if this is a model selection
     const isModelSelection = selection.type === 'model' || 
       (selection.profiles && selection.profiles.some((p: any) => p.typeName === 'Unit'));
-    
+
     if (isModelSelection) {
-      // Check if this selection matches our model
+      // Use strict matching: require exact model name (with config) match
       const selectionModelName = extractModelNameFromSelection(selection) || selection.name;
-      if (model.name === selectionModelName || 
-          model.name.includes(selectionModelName) ||
-          selectionModelName.includes(model.name)) {
+      if (model.name === selectionModelName) {
         return selection;
       }
     }
-    
+
     // Recursively search nested selections
     if (selection.selections) {
       const found = findModelSelectionForModel(selection.selections, model);
       if (found) return found;
     }
   }
-  
+
   return null;
 }
 
@@ -781,50 +764,54 @@ function extractWeaponsFromModelSelection(
       if (selection.profiles) {
         for (const profile of selection.profiles) {
           if (profile.typeName === weaponType) {
-            const weaponStats = parseWeaponCharacteristics(profile.characteristics || []);
-            
-            weapons.push({
-              id: id(),
-              name: profile.name,
-              range: weaponStats.range,
-              A: weaponStats.A,
-              WS: weaponStats.WS,
-              S: weaponStats.S,
-              AP: weaponStats.AP,
-              D: weaponStats.D,
-              keywords: weaponStats.keywords,
-              turnsFired: [],
-              modelId: model.id
-            });
+            // Only add if not already present (by name and type)
+            if (!weapons.some(w => w.name === profile.name && w.range === parseWeaponCharacteristics(profile.characteristics || []).range)) {
+              const weaponStats = parseWeaponCharacteristics(profile.characteristics || []);
+              weapons.push({
+                id: id(),
+                name: profile.name,
+                range: weaponStats.range,
+                A: weaponStats.A,
+                WS: weaponStats.WS,
+                S: weaponStats.S,
+                AP: weaponStats.AP,
+                D: weaponStats.D,
+                keywords: weaponStats.keywords,
+                turnsFired: [],
+                modelId: model.id
+              });
+            }
           }
         }
       }
-      
       // Also check if this selection is a weapon upgrade (type: "upgrade")
       // and has weapon profiles in its own profiles
       if (selection.type === 'upgrade' && selection.profiles) {
         for (const profile of selection.profiles) {
           if (profile.typeName === weaponType) {
-            const weaponStats = parseWeaponCharacteristics(profile.characteristics || []);
-            
-            weapons.push({
-              id: id(),
-              name: profile.name,
-              range: weaponStats.range,
-              A: weaponStats.A,
-              WS: weaponStats.WS,
-              S: weaponStats.S,
-              AP: weaponStats.AP,
-              D: weaponStats.D,
-              keywords: weaponStats.keywords,
-              turnsFired: [],
-              modelId: model.id
-            });
+            // Only add if not already present (by name and type)
+            if (!weapons.some(w => w.name === profile.name && w.range === parseWeaponCharacteristics(profile.characteristics || []).range)) {
+              const weaponStats = parseWeaponCharacteristics(profile.characteristics || []);
+              weapons.push({
+                id: id(),
+                name: profile.name,
+                range: weaponStats.range,
+                A: weaponStats.A,
+                WS: weaponStats.WS,
+                S: weaponStats.S,
+                AP: weaponStats.AP,
+                D: weaponStats.D,
+                keywords: weaponStats.keywords,
+                turnsFired: [],
+                modelId: model.id
+              });
+            }
           }
         }
+        // Do NOT recurse into upgrade selections, to avoid double-adding
+        continue;
       }
-      
-      // Recursively search nested selections
+      // Recursively search nested selections (only if not an upgrade)
       if (selection.selections) {
         findWeaponsRecursively(selection.selections);
       }
@@ -1042,6 +1029,101 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
   modelIds: string[]; 
   weaponIds: string[] 
 }> {
-  // Use the same import logic as complete army
-  return importCompleteArmy(jsonData, userId);
+  // Extract army metadata for game context
+  const armyMetadata = extractArmyMetadata(jsonData, userId);
+  
+  // Generate new IDs for game-specific copies
+  const gameArmyId = id();
+  
+  // Extract units, models, and weapons
+  const units = extractUnits(jsonData, gameArmyId, userId);
+  const allModels: ModelData[] = [];
+  for (const unit of units) {
+    const unitModels = extractModels(unit);
+    allModels.push(...unitModels);
+  }
+  
+  const allWeapons: WeaponData[] = [];
+  for (const unit of units) {
+    const unitModels = allModels.filter(model => model.unitId === unit.id);
+    const unitWeapons = extractWeapons(unit, unitModels);
+    allWeapons.push(...unitWeapons);
+  }
+  
+  try {
+    const transactions = [];
+    
+    // Add army transaction for game context
+    transactions.push(
+      db.tx.armies[gameArmyId].update({
+        name: armyMetadata.name,
+        faction: armyMetadata.faction,
+        ownerId: userId,
+        sourceData: armyMetadata.sourceData,
+        createdAt: armyMetadata.createdAt,
+        gameId: gameId
+      }).link({ owner: userId, game: gameId })
+    );
+    
+    // Add unit transactions
+    for (const unit of units) {
+      transactions.push(
+        db.tx.units[unit.id].update({
+          name: unit.name,
+          categories: unit.categories,
+          rules: unit.rules,
+          abilities: unit.abilities,
+          armyId: unit.armyId
+        }).link({ army: unit.armyId })
+      );
+    }
+    
+    // Add model transactions
+    for (const model of allModels) {
+      transactions.push(
+        db.tx.models[model.id].update({
+          name: model.name,
+          unitId: model.unitId,
+          M: model.M,
+          T: model.T,
+          SV: model.SV,
+          W: model.W,
+          LD: model.LD,
+          OC: model.OC,
+          woundsTaken: model.woundsTaken
+        }).link({ unit: model.unitId })
+      );
+    }
+    
+    // Add weapon transactions
+    for (const weapon of allWeapons) {
+      transactions.push(
+        db.tx.weapons[weapon.id].update({
+          name: weapon.name,
+          range: weapon.range,
+          A: weapon.A,
+          WS: weapon.WS ?? undefined,
+          S: weapon.S,
+          AP: weapon.AP,
+          D: weapon.D,
+          keywords: weapon.keywords,
+          turnsFired: weapon.turnsFired,
+          modelId: weapon.modelId
+        }).link({ model: weapon.modelId })
+      );
+    }
+    
+    // Execute all transactions
+    await db.transact(transactions);
+    
+    return {
+      armyId: gameArmyId,
+      unitIds: units.map(u => u.id),
+      modelIds: allModels.map(m => m.id),
+      weaponIds: allWeapons.map(w => w.id)
+    };
+  } catch (error) {
+    console.error('Failed to import army for game:', error);
+    throw new Error(`Game army import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 } 
