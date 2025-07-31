@@ -80,13 +80,11 @@ export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageP
 
   // Organize data by relationships using utilities
   const unitsWithDetails = units.map(unit => {
-    const unitModels = unit.models || [];
-    const unitWeapons = unitModels.flatMap(model => model.weapons || []);
-    return formatUnitForCard(unit, unitModels, unitWeapons);
+    return formatUnitForCard(unit);
   });
 
   // Calculate army statistics using utilities
-  const { totalUnits, totalModels, totalWeapons } = calculateArmyStats(units, allModels, allWeapons);
+  const { totalUnits, totalModels, totalWeapons } = calculateArmyStats(units);
 
   // Army-level keywords (could be extracted from all units)
   const allCategories = getAllCategories(units);
@@ -176,7 +174,6 @@ export default function ArmyDetailPage({ armyId, user, onBack }: ArmyDetailPageP
           {unitsWithDetails.length > 0 ? (
             <UnitList
               units={unitsWithDetails}
-              onKeywordClick={showRule}
               groupByType={true}
               expandable={true}
             />

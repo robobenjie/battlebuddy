@@ -11,7 +11,7 @@ interface MovementPhaseProps {
   army: {
     id: string;
     name: string;
-    unitIds: string[];
+    unitIds?: string[];
   };
   currentPlayer: {
     id: string;
@@ -44,8 +44,6 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
       }
     },
   });
-
-  console.log(unitsData, army.id);
 
   const units = unitsData?.armies[0].units  || [];
 

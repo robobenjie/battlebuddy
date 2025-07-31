@@ -11,7 +11,7 @@ interface ShootPhaseProps {
   army: {
     id: string;
     name: string;
-    unitIds: string[];
+    unitIds?: string[];
   };
   currentPlayer: {
     id: string;
@@ -31,75 +31,49 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
 
   // Query units for this army in the game
   const { data: unitsData } = db.useQuery({
-    units: {
+    armies: {
+      units: {
+        models: {
+          weapons: {}
+        },
+        statuses: {},
+      },
       $: {
         where: {
-          armyId: army.id,
-          gameId: gameId,
+          id: army.id
         }
       }
-    }
+    },
   });
 
-  // Query models for these units
-  const { data: modelsData } = db.useQuery({
-    models: {
-      $: {
-        where: {
-          gameId: gameId,
-        }
-      }
-    }
-  });
-
-  // Query weapons for these models
-  const { data: weaponsData } = db.useQuery({
-    weapons: {
-      $: {
-        where: {
-          gameId: gameId,
-        }
-      }
-    }
-  });
-
-  const units = unitsData?.units || [];
-  const models = modelsData?.models || [];
-  const weapons = weaponsData?.weapons || [];
+  const units = unitsData?.armies[0].units  || [];
+  const models = unitsData?.armies[0].units.flatMap(u => u.models) || [];
+  const weapons = unitsData?.armies[0].units.flatMap(u => u.models.flatMap(m => m.weapons)) || [];
 
   // Check if current user is the active player
   const isActivePlayer = currentUser?.id === currentPlayer.userId;
 
-
-
   // Helper function to record a shooting action for weapons
   const recordWeaponShooting = async (unitId: string) => {
-    const unitWeapons = getUnitWeapons(weapons, models, unitId);
-    const unfiredWeapons = unitWeapons.filter(w => !w.hasShot);
+    const unitWeapons = weapons.filter(w => {
+      const model = models.find(m => m.id === w.modelId);
+      return model && model.unitId === unitId;
+    });
+    
+    const unfiredWeapons = unitWeapons.filter(w => !w.turnsFired.includes(game.currentTurn));
     
     if (unfiredWeapons.length === 0) return;
-
-    const actionRecord = {
-      turn: game.currentTurn,
-      phase: game.currentPhase,
-      action: 'shot',
-      timestamp: Date.now()
-    };
 
     // Update all unfired weapons in this unit
     // Note: Each weapon row represents a weapon type, not individual weapons
     const updates = unfiredWeapons.map(weapon => ({
       id: weapon.id,
-      hasShot: true,
-      lastShotTurn: game.currentTurn,
-      shotHistory: [...(weapon.shotHistory || []), actionRecord]
+      turnsFired: [...(weapon.turnsFired || []), game.currentTurn]
     }));
 
     await db.transact(updates.map(update => 
       db.tx.weapons[update.id].update({
-        hasShot: update.hasShot,
-        lastShotTurn: update.lastShotTurn,
-        shotHistory: update.shotHistory
+        turnsFired: update.turnsFired
       })
     ));
   };
@@ -120,50 +94,27 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
   const handleUndo = async (unitId: string) => {
     setIsProcessing(true);
     try {
-      const unitWeapons = getUnitWeapons(weapons, models, unitId);
-      
-      // Find weapons that shot this turn/phase
-      const weaponsThatShot = unitWeapons.filter(weapon => {
-        if (!weapon.shotHistory) return false;
-        return weapon.shotHistory.some(
-          (action: any) => action.turn === game.currentTurn && action.phase === game.currentPhase
-        );
+      const unitWeapons = weapons.filter(w => {
+        const model = models.find(m => m.id === w.modelId);
+        return model && model.unitId === unitId;
       });
+      
+      // Find weapons that shot this turn
+      const weaponsThatShot = unitWeapons.filter(weapon => 
+        weapon.turnsFired && weapon.turnsFired.includes(game.currentTurn)
+      );
 
       if (weaponsThatShot.length === 0) return;
 
-      // Remove the last action from each weapon that shot
-      const updates = weaponsThatShot.map(weapon => {
-        const currentTurnActions = weapon.shotHistory.filter(
-          (action: any) => action.turn === game.currentTurn && action.phase === game.currentPhase
-        );
-
-        const updatedHistory = weapon.shotHistory.filter(
-          (action: any) => !(action.turn === game.currentTurn && 
-                            action.phase === game.currentPhase && 
-                            action.timestamp === currentTurnActions[currentTurnActions.length - 1].timestamp)
-        );
-
-        const remainingActions = updatedHistory.filter(
-          (action: any) => action.turn === game.currentTurn && action.phase === game.currentPhase
-        );
-
-        const hasShot = remainingActions.length > 0;
-        const lastShotTurn = remainingActions.length > 0 ? game.currentTurn : null;
-
-        return {
-          id: weapon.id,
-          hasShot: hasShot,
-          lastShotTurn: lastShotTurn,
-          shotHistory: updatedHistory
-        };
-      });
+      // Remove the current turn from each weapon that shot
+      const updates = weaponsThatShot.map(weapon => ({
+        id: weapon.id,
+        turnsFired: weapon.turnsFired.filter((turn: number) => turn !== game.currentTurn)
+      }));
 
       await db.transact(updates.map(update => 
         db.tx.weapons[update.id].update({
-          hasShot: update.hasShot,
-          lastShotTurn: update.lastShotTurn,
-          shotHistory: update.shotHistory
+          turnsFired: update.turnsFired
         })
       ));
     } catch (error) {
@@ -178,15 +129,44 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
     router.push(`/game/${gameId}/combat-calculator?gameId=${gameId}&unitId=${unitId}`);
   };
 
-  // Check if unit has any shooting actions this turn/phase
+  // Check if unit has any shooting actions this turn
   const hasShootingActionsThisTurn = (unitId: string) => {
-    const unitWeapons = getUnitWeapons(weapons, models, unitId);
-    return unitWeapons.some(weapon => {
-      if (!weapon.shotHistory) return false;
-      return weapon.shotHistory.some(
-        (action: any) => action.turn === game.currentTurn && action.phase === game.currentPhase
-      );
+    const unitWeapons = weapons.filter(w => {
+      const model = models.find(m => m.id === w.modelId);
+      return model && model.unitId === unitId;
     });
+    
+    return unitWeapons.some(weapon => 
+      weapon.turnsFired && weapon.turnsFired.includes(game.currentTurn)
+    );
+  };
+
+  // Helper function to get weapons for a specific unit
+  const getUnitWeaponsForUnit = (unitId: string) => {
+    return weapons.filter(w => {
+      const model = models.find(m => m.id === w.modelId);
+      return model && model.unitId === unitId;
+    });
+  };
+
+  // Helper function to check if unit has unfired weapons
+  const hasUnfiredWeaponsForUnit = (unitId: string) => {
+    const unitWeapons = getUnitWeaponsForUnit(unitId);
+    return unitWeapons.some(w => !w.turnsFired.includes(game.currentTurn));
+  };
+
+  // Helper function to get firing status for a unit
+  const getUnitFiringStatusForUnit = (unitId: string) => {
+    const unitWeapons = getUnitWeaponsForUnit(unitId);
+    const firedWeapons = unitWeapons.filter(w => w.turnsFired && w.turnsFired.includes(game.currentTurn));
+    
+    return {
+      totalWeapons: unitWeapons.length,
+      firedWeapons: firedWeapons.length,
+      unfiredWeapons: unitWeapons.length - firedWeapons.length,
+      hasUnfired: firedWeapons.length < unitWeapons.length,
+      allFired: firedWeapons.length === unitWeapons.length
+    };
   };
 
   if (units.length === 0) {
@@ -208,11 +188,11 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
 
       <div className="space-y-4">
         {units.map(unit => {
-          const unitData = formatUnitForCard(unit, models, weapons);
-          const hasUnfired = hasUnfiredWeapons(weapons, models, unit.id);
+          const unitData = formatUnitForCard(unit);
+          const hasUnfired = hasUnfiredWeaponsForUnit(unit.id);
           const hasActions = hasShootingActionsThisTurn(unit.id);
-          const unitWeapons = getUnitWeapons(weapons, models, unit.id);
-          const firedWeapons = unitWeapons.filter(w => w.hasShot);
+          const unitWeapons = getUnitWeaponsForUnit(unit.id);
+          const firedWeapons = unitWeapons.filter(w => w.turnsFired && w.turnsFired.includes(game.currentTurn));
           
           // Calculate total weapon count (each weapon row represents one weapon type)
           const totalWeaponCount = unitWeapons.length;
@@ -222,8 +202,6 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
             <div key={unit.id} className={`bg-gray-800 rounded-lg overflow-hidden ${!isActivePlayer ? 'opacity-60' : ''}`}>
               <UnitCard
                 unit={unitData.unit}
-                models={unitData.models}
-                weapons={unitData.weapons}
                 expandable={true}
                 defaultExpanded={false}
                 className="border-0"
@@ -240,17 +218,12 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
                           {firedWeaponCount === totalWeaponCount ? 'All Weapons Fired' : `${firedWeaponCount}/${totalWeaponCount} Weapons Fired`}
                         </span>
                       )}
-                      {unit.isDestroyed && (
-                        <span className="bg-red-600 text-red-100 px-2 py-1 rounded text-xs">
-                          Destroyed
-                        </span>
-                      )}
                     </div>
                   </div>
 
                   <div className="flex items-center space-x-3">
                     {/* Shooting buttons */}
-                    {!unit.isDestroyed && hasUnfired && (
+                    {hasUnfired && (
                       <>
                         <button
                           onClick={() => handleShoot(unit.id)}
@@ -271,7 +244,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
                     )}
 
                     {/* Undo button */}
-                    {hasActions && !unit.isDestroyed && (
+                    {hasActions && (
                       <button
                         onClick={() => handleUndo(unit.id)}
                         disabled={!isActivePlayer || isProcessing}

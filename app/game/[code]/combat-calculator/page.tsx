@@ -71,7 +71,7 @@ export default function CombatCalculatorPage() {
     );
   }
 
-  const unitDataForCard = formatUnitForCard(unit, models, weapons);
+  const unitDataForCard = formatUnitForCard(unit);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -91,8 +91,6 @@ export default function CombatCalculatorPage() {
         <div className="max-w-2xl mx-auto">
           <UnitCard
             unit={unitDataForCard.unit}
-            models={unitDataForCard.models}
-            weapons={unitDataForCard.weapons}
             expandable={true}
             defaultExpanded={true}
             className="border-0"

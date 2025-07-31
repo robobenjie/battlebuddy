@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 
 import { KeywordList, extractFactionKeywords, extractGeneralKeywords } from './KeywordBadge';
 import { COMMON_RULES, parseRuleDescription } from './RulePopup';
+import RulePopup, { useRulePopup } from './RulePopup';
 import RuleTip from './RuleTip';
 import { getWeaponCount, getModelsForUnit, getWeaponsForUnit } from '../../lib/unit-utils';
 
@@ -60,7 +61,6 @@ interface UnitCardProps {
       }>;
     }>;
   };
-  onKeywordClick?: (name: string, description?: string) => void;
   className?: string;
   expandable?: boolean;
   defaultExpanded?: boolean;
@@ -68,12 +68,12 @@ interface UnitCardProps {
 
 export default function UnitCard({ 
   unit, 
-  onKeywordClick, 
   className = '',
   expandable = true,
   defaultExpanded = false
 }: UnitCardProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const { isOpen, rule, showRule, hideRule } = useRulePopup();
 
   // Get models and weapons from the unit
   const models = getModelsForUnit(unit);
@@ -130,371 +130,380 @@ export default function UnitCard({
   const groupedMeleeWeapons = groupWeapons(weapons.filter((w: any) => w.range === 0));
 
   return (
-    <div className={`bg-gray-800 rounded-lg border border-gray-700 overflow-hidden ${className}`}>
-      {/* Header */}
-      <div 
-        className={`bg-gray-750 px-4 py-3 border-b border-gray-700 ${expandable ? 'cursor-pointer hover:bg-gray-700' : ''}`}
-        onClick={toggleExpanded}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <h3 className="font-medium text-white text-sm">
-              {totalModels > 1 ? `${totalModels} ` : ''}{unit.name}
-            </h3>
-            {/* Model configurations when collapsed */}
-            {!isExpanded && models.length > 0 && (
-              <div className="mt-1 space-y-0.5">
-                {getModelConfigurations().map((config, index) => (
-                  <div key={index} className="text-xs text-gray-400 leading-tight">
-                    • {config.count}x {config.name}
-                  </div>
-                ))}
-              </div>
+    <>
+      <div className={`bg-gray-800 rounded-lg border border-gray-700 overflow-hidden ${className}`}>
+        {/* Header */}
+        <div 
+          className={`bg-gray-750 px-4 py-3 border-b border-gray-700 ${expandable ? 'cursor-pointer hover:bg-gray-700' : ''}`}
+          onClick={toggleExpanded}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="font-medium text-white text-sm">
+                {totalModels > 1 ? `${totalModels} ` : ''}{unit.name}
+              </h3>
+              {/* Model configurations when collapsed */}
+              {!isExpanded && models.length > 0 && (
+                <div className="mt-1 space-y-0.5">
+                  {getModelConfigurations().map((config, index) => (
+                    <div key={index} className="text-xs text-gray-400 leading-tight">
+                      • {config.count}x {config.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {expandable && (
+              <span className={`text-gray-400 transition-transform ml-2 ${isExpanded ? 'rotate-180' : ''}`}>
+                ▼
+              </span>
             )}
           </div>
-          
-          {expandable && (
-            <span className={`text-gray-400 transition-transform ml-2 ${isExpanded ? 'rotate-180' : ''}`}>
-              ▼
-            </span>
-          )}
         </div>
-      </div>
 
-      {/* Expanded Content */}
-      {(isExpanded || !expandable) && (
-        <div className="p-4 space-y-4">
-          {/* Unit Stats Table */}
-          {models.length > 0 && (
-            <div>
-              <div className="bg-gray-700 rounded-lg overflow-hidden">
-                <div className="grid gap-0" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 1fr' }}>
-                  {/* Headers */}
-                  <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                    <div className="text-xs font-semibold text-gray-200 uppercase">Unit</div>
-                  </div>
-                  <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                    <div className="text-xs font-semibold text-gray-200 uppercase">M</div>
-                  </div>
-                  <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                    <div className="text-xs font-semibold text-gray-200 uppercase">T</div>
-                  </div>
-                  <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                    <div className="text-xs font-semibold text-gray-200 uppercase">SV</div>
-                  </div>
-                  <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                    <div className="text-xs font-semibold text-gray-200 uppercase">W</div>
-                  </div>
-                  <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                    <div className="text-xs font-semibold text-gray-200 uppercase">LD</div>
-                  </div>
-                  <div className="bg-gray-600 px-1 py-1 text-center">
-                    <div className="text-xs font-semibold text-gray-200 uppercase">OC</div>
-                  </div>
-                  
-                  {/* Values - Use first model's stats as representative */}
-                  {models[0] && (
-                    <>
-                      <div className="bg-gray-700 px-1 py-1 text-left border-r border-gray-600">
-                        <div className="text-xs font-mono text-white truncate">{unit.name}</div>
-                      </div>
-                      <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                        <div className="text-xs font-mono text-white">
-                          {models[0].M ? `${models[0].M}"` : '-'}
+        {/* Expanded Content */}
+        {(isExpanded || !expandable) && (
+          <div className="p-4 space-y-4">
+            {/* Unit Stats Table */}
+            {models.length > 0 && (
+              <div>
+                <div className="bg-gray-700 rounded-lg overflow-hidden">
+                  <div className="grid gap-0" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 1fr' }}>
+                    {/* Headers */}
+                    <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                      <div className="text-xs font-semibold text-gray-200 uppercase">Unit</div>
+                    </div>
+                    <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                      <div className="text-xs font-semibold text-gray-200 uppercase">M</div>
+                    </div>
+                    <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                      <div className="text-xs font-semibold text-gray-200 uppercase">T</div>
+                    </div>
+                    <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                      <div className="text-xs font-semibold text-gray-200 uppercase">SV</div>
+                    </div>
+                    <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                      <div className="text-xs font-semibold text-gray-200 uppercase">W</div>
+                    </div>
+                    <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                      <div className="text-xs font-semibold text-gray-200 uppercase">LD</div>
+                    </div>
+                    <div className="bg-gray-600 px-1 py-1 text-center">
+                      <div className="text-xs font-semibold text-gray-200 uppercase">OC</div>
+                    </div>
+                    
+                    {/* Values - Use first model's stats as representative */}
+                    {models[0] && (
+                      <>
+                        <div className="bg-gray-700 px-1 py-1 text-left border-r border-gray-600">
+                          <div className="text-xs font-mono text-white truncate">{unit.name}</div>
                         </div>
-                      </div>
-                      <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                        <div className="text-xs font-mono text-white">
-                          {models[0].T || '-'}
+                        <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                          <div className="text-xs font-mono text-white">
+                            {models[0].M ? `${models[0].M}"` : '-'}
+                          </div>
                         </div>
-                      </div>
-                      <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                        <div className="text-xs font-mono text-white">
-                          {models[0].SV ? `${models[0].SV}+` : '-'}
+                        <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                          <div className="text-xs font-mono text-white">
+                            {models[0].T || '-'}
+                          </div>
                         </div>
-                      </div>
-                      <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                        <div className="text-xs font-mono text-white">
-                          {models[0].W || '-'}
+                        <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                          <div className="text-xs font-mono text-white">
+                            {models[0].SV ? `${models[0].SV}+` : '-'}
+                          </div>
                         </div>
-                      </div>
-                      <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                        <div className="text-xs font-mono text-white">
-                          {models[0].LD ? `${models[0].LD}+` : '-'}
+                        <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                          <div className="text-xs font-mono text-white">
+                            {models[0].W || '-'}
+                          </div>
                         </div>
-                      </div>
-                      <div className="bg-gray-700 px-1 py-1 text-center">
-                        <div className="text-xs font-mono text-white">
-                          {models[0].OC || '-'}
+                        <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                          <div className="text-xs font-mono text-white">
+                            {models[0].LD ? `${models[0].LD}+` : '-'}
+                          </div>
                         </div>
-                      </div>
-                    </>
-                  )}
+                        <div className="bg-gray-700 px-1 py-1 text-center">
+                          <div className="text-xs font-mono text-white">
+                            {models[0].OC || '-'}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Ranged Weapons */}
-          {groupedRangedWeapons.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-300 mb-2">Ranged Weapons</h4>
-              <div className="space-y-3">
-                {groupedRangedWeapons.map(({ weapon, count }) => {
-                  const keywords = weapon.keywords || [];
-                  return (
-                    <div key={weapon.name + weapon.range} className="bg-gray-700 rounded-lg overflow-hidden">
-                      {/* Weapon Name Header */}
-                      <div className="bg-gray-600 px-2 py-1">
-                        <div className="text-xs font-medium text-white">
-                          {weapon.name}{count > 1 ? ` (x${count})` : ''}
+            {/* Ranged Weapons */}
+            {groupedRangedWeapons.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-300 mb-2">Ranged Weapons</h4>
+                <div className="space-y-3">
+                  {groupedRangedWeapons.map(({ weapon, count }) => {
+                    const keywords = weapon.keywords || [];
+                    return (
+                      <div key={weapon.name + weapon.range} className="bg-gray-700 rounded-lg overflow-hidden">
+                        {/* Weapon Name Header */}
+                        <div className="bg-gray-600 px-2 py-1">
+                          <div className="text-xs font-medium text-white">
+                            {weapon.name}{count > 1 ? ` (x${count})` : ''}
+                          </div>
                         </div>
-                      </div>
-                      {/* Weapon Stats Table */}
-                      <div className="bg-gray-700">
-                        <div className="grid grid-cols-7 gap-0">
-                          {/* Headers */}
-                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">Range</div>
-                          </div>
-                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">A</div>
-                          </div>
-                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">BS</div>
-                          </div>
-                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">S</div>
-                          </div>
-                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">AP</div>
-                          </div>
-                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">D</div>
-                          </div>
-                          <div className="bg-gray-600 px-1 py-1 text-center">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">Keywords</div>
-                          </div>
-                          {/* Values */}
-                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                            <div className="text-xs font-mono text-white">
-                              {weapon.range ? `${weapon.range}"` : '-'}
+                        {/* Weapon Stats Table */}
+                        <div className="bg-gray-700">
+                          <div className="grid grid-cols-7 gap-0">
+                            {/* Headers */}
+                            <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">Range</div>
                             </div>
-                          </div>
-                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                            <div className="text-xs font-mono text-white">
-                              {weapon.A || '-'}
+                            <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">A</div>
                             </div>
-                          </div>
-                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                            <div className="text-xs font-mono text-white">
-                              {weapon.WS ? `${weapon.WS}+` : '-'}
+                            <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">BS</div>
                             </div>
-                          </div>
-                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                            <div className="text-xs font-mono text-white">
-                              {weapon.S || '-'}
+                            <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">S</div>
                             </div>
-                          </div>
-                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                            <div className="text-xs font-mono text-white">
-                              {weapon.AP || '-'}
+                            <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">AP</div>
                             </div>
-                          </div>
-                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                            <div className="text-xs font-mono text-white">
-                              {weapon.D || '-'}
+                            <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">D</div>
                             </div>
-                          </div>
-                          <div className="bg-gray-700 px-1 py-1 text-left">
-                            <div className="text-xs">
-                              {keywords.length > 0 ? (
-                                keywords.map((keyword: string, index: number) => {
-                                  const hasRule = COMMON_RULES[keyword] || parseRuleDescription(keyword);
-                                  return (
-                                    <span key={index}>
-                                      {index > 0 && ', '}
-                                      <span
-                                        className={hasRule ? 'text-blue-400 cursor-pointer hover:text-blue-300 underline' : 'text-blue-400'}
-                                        onClick={hasRule && onKeywordClick ? () => onKeywordClick(keyword) : undefined}
-                                        title={hasRule ? 'Click for details' : undefined}
-                                      >
-                                        {keyword}
+                            <div className="bg-gray-600 px-1 py-1 text-center">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">Keywords</div>
+                            </div>
+                            {/* Values */}
+                            <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                              <div className="text-xs font-mono text-white">
+                                {weapon.range ? `${weapon.range}"` : '-'}
+                              </div>
+                            </div>
+                            <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                              <div className="text-xs font-mono text-white">
+                                {weapon.A || '-'}
+                              </div>
+                            </div>
+                            <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                              <div className="text-xs font-mono text-white">
+                                {weapon.WS ? `${weapon.WS}+` : '-'}
+                              </div>
+                            </div>
+                            <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                              <div className="text-xs font-mono text-white">
+                                {weapon.S || '-'}
+                              </div>
+                            </div>
+                            <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                              <div className="text-xs font-mono text-white">
+                                {weapon.AP || '-'}
+                              </div>
+                            </div>
+                            <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                              <div className="text-xs font-mono text-white">
+                                {weapon.D || '-'}
+                              </div>
+                            </div>
+                            <div className="bg-gray-700 px-1 py-1 text-left">
+                              <div className="text-xs">
+                                {keywords.length > 0 ? (
+                                  keywords.map((keyword: string, index: number) => {
+                                    const hasRule = COMMON_RULES[keyword] || parseRuleDescription(keyword);
+                                    return (
+                                      <span key={index}>
+                                        {index > 0 && ', '}
+                                        <span
+                                          className={hasRule ? 'text-blue-400 cursor-pointer hover:text-blue-300 underline' : 'text-blue-400'}
+                                          onClick={hasRule ? () => showRule(keyword) : undefined}
+                                          title={hasRule ? 'Click for details' : undefined}
+                                        >
+                                          {keyword}
+                                        </span>
                                       </span>
-                                    </span>
-                                  );
-                                })
-                              ) : (
-                                <span className="text-blue-400">-</span>
-                              )}
+                                    );
+                                  })
+                                ) : (
+                                  <span className="text-blue-400">-</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Melee Weapons */}
-          {groupedMeleeWeapons.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-300 mb-2">Melee Weapons</h4>
-              <div className="space-y-3">
-                {groupedMeleeWeapons.map(({ weapon, count }) => {
-                  const keywords = weapon.keywords || [];
-                  return (
-                    <div key={weapon.name + weapon.range} className="bg-gray-700 rounded-lg overflow-hidden">
-                      {/* Weapon Name Header */}
-                      <div className="bg-gray-600 px-2 py-1">
-                        <div className="text-xs font-medium text-white">
-                          {weapon.name}{count > 1 ? ` (x${count})` : ''}
-                        </div>
-                      </div>
-                      {/* Weapon Stats Table */}
-                      <div className="bg-gray-700">
-                        <div className="grid grid-cols-7 gap-0">
-                          {/* Headers */}
-                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">Range</div>
-                          </div>
-                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">A</div>
-                          </div>
-                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">WS</div>
-                          </div>
-                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">S</div>
-                          </div>
-                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">AP</div>
-                          </div>
-                          <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">D</div>
-                          </div>
-                          <div className="bg-gray-600 px-1 py-1 text-center">
-                            <div className="text-xs font-semibold text-gray-200 uppercase">Keywords</div>
-                          </div>
-                          {/* Values */}
-                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                            <div className="text-xs font-mono text-white">
-                              {weapon.range ? `${weapon.range}"` : '-'}
-                            </div>
-                          </div>
-                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                            <div className="text-xs font-mono text-white">
-                              {weapon.A || '-'}
-                            </div>
-                          </div>
-                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                            <div className="text-xs font-mono text-white">
-                              {weapon.WS ? `${weapon.WS}+` : '-'}
-                            </div>
-                          </div>
-                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                            <div className="text-xs font-mono text-white">
-                              {weapon.S || '-'}
-                            </div>
-                          </div>
-                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                            <div className="text-xs font-mono text-white">
-                              {weapon.AP || '-'}
-                            </div>
-                          </div>
-                          <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
-                            <div className="text-xs font-mono text-white">
-                              {weapon.D || '-'}
-                            </div>
-                          </div>
-                          <div className="bg-gray-700 px-1 py-1 text-left">
-                            <div className="text-xs">
-                              {keywords.length > 0 ? (
-                                keywords.map((keyword: string, index: number) => {
-                                  const hasRule = COMMON_RULES[keyword] || parseRuleDescription(keyword);
-                                  return (
-                                    <span key={index}>
-                                      {index > 0 && ', '}
-                                      <span
-                                        className={hasRule ? 'text-blue-400 cursor-pointer hover:text-blue-300 underline' : 'text-blue-400'}
-                                        onClick={hasRule && onKeywordClick ? () => onKeywordClick(keyword) : undefined}
-                                        title={hasRule ? 'Click for details' : undefined}
-                                      >
-                                        {keyword}
-                                      </span>
-                                    </span>
-                                  );
-                                })
-                              ) : (
-                                <span className="text-blue-400">-</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Abilities */}
-          {unit.abilities && unit.abilities.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-300 mb-2">Abilities</h4>
-              <div className="space-y-2">
-                {unit.abilities.map((ability) => {
-                  const description = ability.description || 
-                    (ability.characteristics && ability.characteristics.length > 0 
-                      ? ability.characteristics.map(char => 
-                          char.name === 'Description' ? char.value : `${char.name}: ${char.value}`
-                        ).join('\n')
-                      : undefined
                     );
-                  
-                  return (
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Melee Weapons */}
+            {groupedMeleeWeapons.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-300 mb-2">Melee Weapons</h4>
+                <div className="space-y-3">
+                  {groupedMeleeWeapons.map(({ weapon, count }) => {
+                    const keywords = weapon.keywords || [];
+                    return (
+                      <div key={weapon.name + weapon.range} className="bg-gray-700 rounded-lg overflow-hidden">
+                        {/* Weapon Name Header */}
+                        <div className="bg-gray-600 px-2 py-1">
+                          <div className="text-xs font-medium text-white">
+                            {weapon.name}{count > 1 ? ` (x${count})` : ''}
+                          </div>
+                        </div>
+                        {/* Weapon Stats Table */}
+                        <div className="bg-gray-700">
+                          <div className="grid grid-cols-7 gap-0">
+                            {/* Headers */}
+                            <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">Range</div>
+                            </div>
+                            <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">A</div>
+                            </div>
+                            <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">WS</div>
+                            </div>
+                            <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">S</div>
+                            </div>
+                            <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">AP</div>
+                            </div>
+                            <div className="bg-gray-600 px-1 py-1 text-center border-r border-gray-500">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">D</div>
+                            </div>
+                            <div className="bg-gray-600 px-1 py-1 text-center">
+                              <div className="text-xs font-semibold text-gray-200 uppercase">Keywords</div>
+                            </div>
+                            {/* Values */}
+                            <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                              <div className="text-xs font-mono text-white">
+                                {weapon.range ? `${weapon.range}"` : '-'}
+                              </div>
+                            </div>
+                            <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                              <div className="text-xs font-mono text-white">
+                                {weapon.A || '-'}
+                              </div>
+                            </div>
+                            <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                              <div className="text-xs font-mono text-white">
+                                {weapon.WS ? `${weapon.WS}+` : '-'}
+                              </div>
+                            </div>
+                            <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                              <div className="text-xs font-mono text-white">
+                                {weapon.S || '-'}
+                              </div>
+                            </div>
+                            <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                              <div className="text-xs font-mono text-white">
+                                {weapon.AP || '-'}
+                              </div>
+                            </div>
+                            <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
+                              <div className="text-xs font-mono text-white">
+                                {weapon.D || '-'}
+                              </div>
+                            </div>
+                            <div className="bg-gray-700 px-1 py-1 text-left">
+                              <div className="text-xs">
+                                {keywords.length > 0 ? (
+                                  keywords.map((keyword: string, index: number) => {
+                                    const hasRule = COMMON_RULES[keyword] || parseRuleDescription(keyword);
+                                    return (
+                                      <span key={index}>
+                                        {index > 0 && ', '}
+                                        <span
+                                          className={hasRule ? 'text-blue-400 cursor-pointer hover:text-blue-300 underline' : 'text-blue-400'}
+                                          onClick={hasRule ? () => showRule(keyword) : undefined}
+                                          title={hasRule ? 'Click for details' : undefined}
+                                        >
+                                          {keyword}
+                                        </span>
+                                      </span>
+                                    );
+                                  })
+                                ) : (
+                                  <span className="text-blue-400">-</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Abilities */}
+            {unit.abilities && unit.abilities.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-300 mb-2">Abilities</h4>
+                <div className="space-y-2">
+                  {unit.abilities.map((ability) => {
+                    const description = ability.description || 
+                      (ability.characteristics && ability.characteristics.length > 0 
+                        ? ability.characteristics.map(char => 
+                            char.name === 'Description' ? char.value : `${char.name}: ${char.value}`
+                          ).join('\n')
+                        : undefined
+                      );
+                    
+                    return (
+                      <RuleTip
+                        key={ability.id}
+                        title={ability.name}
+                        description={description}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Rules */}
+            {unit.rules && unit.rules.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-300 mb-2">Rules</h4>
+                <div className="space-y-2">
+                  {unit.rules.map((rule) => (
                     <RuleTip
-                      key={ability.id}
-                      title={ability.name}
-                      description={description}
+                      key={rule.id}
+                      title={rule.name}
+                      description={rule.description}
                     />
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Rules */}
-          {unit.rules && unit.rules.length > 0 && (
+            {/* Keywords */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-300 mb-2">Rules</h4>
-              <div className="space-y-2">
-                {unit.rules.map((rule) => (
-                  <RuleTip
-                    key={rule.id}
-                    title={rule.name}
-                    description={rule.description}
-                  />
-                ))}
-              </div>
+              <h4 className="text-sm font-semibold text-gray-300 mb-2">Keywords</h4>
+              <KeywordList
+                keywords={[...factionKeywords, ...generalKeywords]}
+                onKeywordClick={showRule}
+                variant="keyword"
+              />
             </div>
-          )}
-
-          {/* Keywords */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-300 mb-2">Keywords</h4>
-            <KeywordList
-              keywords={[...factionKeywords, ...generalKeywords]}
-              onKeywordClick={onKeywordClick}
-              variant="keyword"
-            />
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+
+      {/* Rule Popup */}
+      <RulePopup
+        isOpen={isOpen}
+        onClose={hideRule}
+        rule={rule}
+      />
+    </>
   );
 }
 
@@ -503,7 +512,6 @@ interface UnitListProps {
   units: Array<{
     unit: UnitCardProps['unit'];
   }>;
-  onKeywordClick?: (name: string, description?: string) => void;
   className?: string;
   expandable?: boolean;
   groupByType?: boolean;
@@ -511,7 +519,6 @@ interface UnitListProps {
 
 export function UnitList({ 
   units, 
-  onKeywordClick, 
   className = '',
   expandable = true,
   groupByType = false 
@@ -556,7 +563,6 @@ export function UnitList({
                   <UnitCard
                     key={unitData.unit.id || index}
                     unit={unitData.unit}
-                    onKeywordClick={onKeywordClick}
                     expandable={expandable}
                   />
                 ))}
@@ -574,7 +580,6 @@ export function UnitList({
         <UnitCard
           key={unitData.unit.id || index}
           unit={unitData.unit}
-          onKeywordClick={onKeywordClick}
           expandable={expandable}
         />
       ))}

@@ -5,7 +5,7 @@ interface ChargePhaseProps {
   army: {
     id: string;
     name: string;
-    unitIds: string[];
+    unitIds?: string[];
   };
   currentPlayer: {
     id: string;
