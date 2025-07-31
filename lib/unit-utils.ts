@@ -29,7 +29,7 @@ export const getUnitMovement = (unit: any) => {
     return stats.M || stats.Movement || stats.Move || '-';
   });
 
-  const uniqueMovements = [...new Set(movements)].filter(m => m !== '-' && m !== undefined);
+  const uniqueMovements = Array.from(new Set(movements)).filter(m => m !== '-' && m !== undefined);
   if (uniqueMovements.length === 0) return null;
   return uniqueMovements.length === 1 ? uniqueMovements[0] : null;
 };

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { db } from '../../lib/db';
 import UnitCard from '../ui/UnitCard';
-import { getModelsForUnit, getWeaponsForUnit, formatUnitForCard, getUnitMovement } from '../../lib/unit-utils';
+import { formatUnitForCard, getUnitMovement } from '../../lib/unit-utils';
 
 interface MovementPhaseProps {
   gameId: string;
@@ -29,78 +29,81 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
 
   // Query units for this army in the game
   const { data: unitsData } = db.useQuery({
-    units: {
+    armies: {
+      units: {
+        models: {
+          weapons: {}
+        },
+        statuses: {},
+      },
       $: {
         where: {
-          armyId: army.id,
-          gameId: gameId,
+          id: army.id
         }
       }
-    }
+    },
   });
 
-  // Query models for these units
-  const { data: modelsData } = db.useQuery({
-    models: {
-      $: {
-        where: {
-          gameId: gameId,
-        }
-      }
-    }
-  });
+  console.log(unitsData, army.id);
 
-  // Query weapons for these models
-  const { data: weaponsData } = db.useQuery({
-    weapons: {
-      $: {
-        where: {
-          gameId: gameId,
-        }
-      }
-    }
-  });
-
-  const units = unitsData?.units || [];
-  const models = modelsData?.models || [];
-  const weapons = weaponsData?.weapons || [];
+  const units = unitsData?.armies[0].units  || [];
 
   // Check if current user is the active player
   const isActivePlayer = currentUser?.id === currentPlayer.userId;
 
-  // Helper function to record an action in turn history
-  const recordAction = async (unitId: string, action: string) => {
+  // Helper function to get unit status
+  const getUnitStatus = (unitId: string, statusName: string) => {
     const unit = units.find(u => u.id === unitId);
-    if (!unit) return;
+    if (!unit || !unit.statuses) return null;
+    return unit.statuses.find((status: any) => status.name === statusName);
+  };
 
-    const actionRecord = {
-      turn: game.currentTurn,
-      phase: game.currentPhase,
-      action: action,
-      timestamp: Date.now()
-    };
+  // Helper function to check if unit has moved this turn
+  const hasMovedThisTurn = (unitId: string) => {
+    const movedStatus = getUnitStatus(unitId, 'moved');
+    return movedStatus && movedStatus.turns && movedStatus.turns.includes(game.currentTurn);
+  };
 
-    const updatedHistory = [...(unit.turnHistory || []), actionRecord];
+  // Helper function to check if unit has advanced this turn
+  const hasAdvancedThisTurn = (unitId: string) => {
+    const advancedStatus = getUnitStatus(unitId, 'advanced');
+    return advancedStatus && advancedStatus.turns && advancedStatus.turns.includes(game.currentTurn);
+  };
 
-    await db.transact([
-      db.tx.units[unitId].update({
-        turnHistory: updatedHistory,
-        lastActionTurn: game.currentTurn
-      })
-    ]);
+  // Helper function to create or update unit status
+  const updateUnitStatus = async (unitId: string, statusName: string, addTurn: boolean = true) => {
+    const existingStatus = getUnitStatus(unitId, statusName);
+    
+    if (existingStatus) {
+      // Update existing status
+      const updatedTurns = addTurn 
+        ? [...existingStatus.turns, game.currentTurn]
+        : existingStatus.turns.filter((turn: number) => turn !== game.currentTurn);
+      
+      await db.transact([
+        db.tx.unitStatuses[existingStatus.id].update({
+          turns: updatedTurns
+        })
+      ]);
+    } else if (addTurn) {
+      // Create new status
+      const statusId = crypto.randomUUID();
+      await db.transact([
+        db.tx.unitStatuses[statusId].update({
+          unitId: unitId,
+          name: statusName,
+          turns: [game.currentTurn],
+          rules: []
+        }).link({ unit: unitId })
+      ]);
+    }
   };
 
   // Handle movement action
   const handleMove = async (unitId: string) => {
     setIsProcessing(true);
     try {
-      await db.transact([
-        db.tx.units[unitId].update({
-          hasMoved: true
-        })
-      ]);
-      
-      await recordAction(unitId, 'moved');
+      await updateUnitStatus(unitId, 'moved', true);
     } catch (error) {
       console.error('Error recording move:', error);
     } finally {
@@ -112,14 +115,9 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
   const handleAdvance = async (unitId: string) => {
     setIsProcessing(true);
     try {
-      await db.transact([
-        db.tx.units[unitId].update({
-          hasMoved: true,
-          hasAdvanced: true
-        })
-      ]);
-      
-      await recordAction(unitId, 'advanced');
+      // Advance includes both moved and advanced status
+      await updateUnitStatus(unitId, 'moved', true);
+      await updateUnitStatus(unitId, 'advanced', true);
     } catch (error) {
       console.error('Error recording advance:', error);
     } finally {
@@ -131,39 +129,16 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
   const handleUndo = async (unitId: string) => {
     setIsProcessing(true);
     try {
-      const unit = units.find(u => u.id === unitId);
-      if (!unit || !unit.turnHistory) return;
-
-      // Find the last action for this turn
-      const currentTurnActions = unit.turnHistory.filter(
-        (action: any) => action.turn === game.currentTurn && action.phase === game.currentPhase
-      );
-
-      if (currentTurnActions.length === 0) return;
-
-      // Remove the last action
-      const updatedHistory = unit.turnHistory.filter(
-        (action: any) => !(action.turn === game.currentTurn && 
-                          action.phase === game.currentPhase && 
-                          action.timestamp === currentTurnActions[currentTurnActions.length - 1].timestamp)
-      );
-
-      // Reset movement flags based on remaining actions
-      const remainingActions = updatedHistory.filter(
-        (action: any) => action.turn === game.currentTurn && action.phase === game.currentPhase
-      );
-
-      const hasMoved = remainingActions.some((action: any) => action.action === 'moved' || action.action === 'advanced');
-      const hasAdvanced = remainingActions.some((action: any) => action.action === 'advanced');
-
-      await db.transact([
-        db.tx.units[unitId].update({
-          hasMoved: hasMoved,
-          hasAdvanced: hasAdvanced,
-          turnHistory: updatedHistory,
-          lastActionTurn: remainingActions.length > 0 ? game.currentTurn : null
-        })
-      ]);
+      const movedStatus = getUnitStatus(unitId, 'moved');
+      const advancedStatus = getUnitStatus(unitId, 'advanced');
+      
+      // Remove the current turn from both statuses
+      if (movedStatus) {
+        await updateUnitStatus(unitId, 'moved', false);
+      }
+      if (advancedStatus) {
+        await updateUnitStatus(unitId, 'advanced', false);
+      }
     } catch (error) {
       console.error('Error undoing action:', error);
     } finally {
@@ -172,11 +147,8 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
   };
 
   // Check if unit has any actions this turn/phase
-  const hasActionsThisTurn = (unit: any) => {
-    if (!unit.turnHistory) return false;
-    return unit.turnHistory.some(
-      (action: any) => action.turn === game.currentTurn && action.phase === game.currentPhase
-    );
+  const hasActionsThisTurn = (unitId: string) => {
+    return hasMovedThisTurn(unitId) || hasAdvancedThisTurn(unitId);
   };
 
   if (units.length === 0) {
@@ -198,16 +170,16 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
 
       <div className="space-y-4">
         {units.map(unit => {
-          const unitData = formatUnitForCard(unit, models, weapons);
-          const movement = getUnitMovement(models, unit.id);
-          const hasActions = hasActionsThisTurn(unit);
+          const unitData = formatUnitForCard(unit);
+          const movement = getUnitMovement(unit);
+          const hasMoved = hasMovedThisTurn(unit.id);
+          const hasAdvanced = hasAdvancedThisTurn(unit.id);
+          const hasActions = hasActionsThisTurn(unit.id);
           
           return (
             <div key={unit.id} className={`bg-gray-800 rounded-lg overflow-hidden ${!isActivePlayer ? 'opacity-60' : ''}`}>
               <UnitCard
                 unit={unitData.unit}
-                models={unitData.models}
-                weapons={unitData.weapons}
                 expandable={true}
                 defaultExpanded={false}
                 className="border-0"
@@ -219,18 +191,13 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
                   <div className="flex items-center space-x-4">
                     {/* Status indicators */}
                     <div className="flex items-center space-x-2 text-sm">
-                      {unit.hasMoved && (
+                      {hasMoved && (
                         <span className={`px-2 py-1 rounded text-xs ${
-                          unit.hasAdvanced 
+                          hasAdvanced 
                             ? 'bg-orange-600 text-orange-100'  // Match advance button color
                             : 'bg-blue-600 text-blue-100'     // Match move button color
                         }`}>
-                          {unit.hasAdvanced ? 'Advanced' : 'Moved'}
-                        </span>
-                      )}
-                      {unit.isDestroyed && (
-                        <span className="bg-red-600 text-red-100 px-2 py-1 rounded text-xs">
-                          Destroyed
+                          {hasAdvanced ? 'Advanced' : 'Moved'}
                         </span>
                       )}
                     </div>
@@ -238,25 +205,21 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
 
                   <div className="flex items-center space-x-3">
                     {/* Movement buttons */}
-                    {!unit.isDestroyed && (
-                      <>
-                        <button
-                          onClick={() => handleMove(unit.id)}
-                          disabled={!isActivePlayer || isProcessing || unit.hasMoved}
-                          className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:cursor-not-allowed"
-                        >
-                          {movement ? `Move ${movement}"` : 'Move'}
-                        </button>
-                        
-                        <button
-                          onClick={() => handleAdvance(unit.id)}
-                          disabled={!isActivePlayer || isProcessing || unit.hasMoved}
-                          className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:cursor-not-allowed"
-                        >
-                          Advance
-                        </button>
-                      </>
-                    )}
+                    <button
+                      onClick={() => handleMove(unit.id)}
+                      disabled={!isActivePlayer || isProcessing || hasMoved}
+                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:cursor-not-allowed"
+                    >
+                      {movement ? `Move ${movement}"` : 'Move'}
+                    </button>
+                    
+                    <button
+                      onClick={() => handleAdvance(unit.id)}
+                      disabled={!isActivePlayer || isProcessing || hasMoved}
+                      className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:cursor-not-allowed"
+                    >
+                      Advance
+                    </button>
                   </div>
                 </div>
 
