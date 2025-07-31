@@ -1,7 +1,7 @@
 'use client';
 
 import { db } from '../../../lib/db';
-import { importArmyForGame } from '../../../lib/army-import';
+import { duplicateArmyForGame } from '../../../lib/army-import';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import GamePhases from '../../../components/GamePhases';
@@ -17,7 +17,13 @@ export default function GamePage() {
   const { data, isLoading, error } = db.useQuery({
     games: {},
     players: {},
-    armies: {}, // Include armies to check for user armies and game armies
+    armies: {
+      units: {
+        models: {
+          weapons: {}
+        }
+      },
+    }, // Include armies to check for user armies and game armies
     units: {},
     models: {},
     weapons: {}
@@ -40,21 +46,25 @@ export default function GamePage() {
   // Get current user's armies for the army selection UI
   const currentUserArmies = allArmies.filter((a: any) => a.ownerId === user?.id && !a.gameId);
 
-  // Function to copy an army using the original JSON and import logic
+  // Function to copy an army using the proper query structure
   const copyArmyToGame = async (armyId: string, playerId: string) => {
     
     const army = userArmies.find(a => a.id === armyId);
     
-    if (!army || !army.sourceData || !game?.id) {
+    if (!army || !game?.id) {
       return null;
     }
 
     try {
-      // Parse the original JSON data
-      const originalJsonData = JSON.parse(army.sourceData);
+      // Get the full army data with units, models, and weapons from the existing query
+      const armyWithDetails = data?.armies?.find(a => a.id === armyId);
+      if (!armyWithDetails) {
+        console.error('❌ Army with details not found');
+        return null;
+      }
       
-      // Import the army with a new function that creates game copies
-      const result = await importArmyForGame(originalJsonData, army.ownerId, game.id);
+      // Duplicate the army using the new function
+      const result = await duplicateArmyForGame(armyWithDetails, game.id);
       
       if (result?.armyId) {
         // Update player with the new army reference
@@ -117,15 +127,23 @@ export default function GamePage() {
     setIsStartingGame(true);
     try {
       
-      // Copy armies for all players who have selected them
-      for (const player of players) {
+      // Only copy the current user's army - other players will copy their own
+      const currentPlayer = players.find(p => p.userId === user?.id);
+      
+      if (currentPlayer && currentPlayer.armyId) {
+        // Check if this player already has a game army
+        const existingGameArmy = allArmies.find(a => a.gameId === game?.id && a.ownerId === currentPlayer.userId);
         
-        if (player.armyId && !allArmies.find(a => a.id === player.armyId && a.gameId === game?.id)) {
-          
+        if (!existingGameArmy) {
           // This player has selected an army template but it's not copied to the game yet
-          const newArmyId = await copyArmyToGame(player.armyId, player.id);
+          console.log(`Copying army for current player ${currentPlayer.name} (${currentPlayer.userId})`);
+          const newArmyId = await copyArmyToGame(currentPlayer.armyId, currentPlayer.id);
+          console.log(`Created game army ${newArmyId} for player ${currentPlayer.name}`);
         } else {
+          console.log(`Current player ${currentPlayer.name} already has game army ${existingGameArmy.id}`);
         }
+      } else if (currentPlayer) {
+        console.log(`Current player ${currentPlayer.name} has no army selected`);
       }
 
       // Start the game with first player and command phase
@@ -155,6 +173,10 @@ export default function GamePage() {
           armyId: armyId
         })
       ]);
+      
+      // Also copy the army to the game immediately
+      console.log(`Player ${currentPlayer.name} selected army ${armyId}, copying to game...`);
+      await copyArmyToGame(armyId, currentPlayer.id);
     } catch (error) {
       console.error('Error selecting army:', error);
     }
@@ -258,7 +280,7 @@ export default function GamePage() {
                 >
                   <div>
                     <h3 className="font-medium text-white">{army.name}</h3>
-                    <p className="text-sm text-gray-400">{army.faction} • {army.pointsValue} pts</p>
+                    <p className="text-sm text-gray-400">{army.faction}</p>
                   </div>
                   <button
                     onClick={() => selectArmy(army.id)}

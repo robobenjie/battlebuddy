@@ -1127,3 +1127,112 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
     throw new Error(`Game army import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 } 
+
+/**
+ * Duplicate an existing army for a game using the proper query structure
+ * This function expects the army data to be passed in from the React component
+ */
+export async function duplicateArmyForGame(armyData: any, gameId: string): Promise<{ 
+  armyId: string; 
+  unitIds: string[]; 
+  modelIds: string[]; 
+  weaponIds: string[] 
+}> {
+  try {
+    if (!armyData) {
+      throw new Error('Army data not provided');
+    }
+    console.log("Duplicating army for game", gameId);
+
+    // Generate new IDs for game-specific copies
+    const gameArmyId = id();
+    const newUnitIds: string[] = [];
+    const newModelIds: string[] = [];
+    const newWeaponIds: string[] = [];
+
+    const transactions = [];
+
+    // Helper function to create a copy of an object with specific overrides
+    const createCopy = (original: any, overrides: any = {}) => {
+      const copy = { ...original, ...overrides };
+      // Remove ID fields to let InstantDB generate new ones
+      delete copy.id;
+      return copy;
+    };
+
+    // Create the game army
+    const armyCopy = createCopy(armyData, {
+      createdAt: Date.now(),
+      gameId: gameId
+    });
+
+    delete armyCopy.units;
+    
+    transactions.push(
+      db.tx.armies[gameArmyId].update(armyCopy).link({ 
+        owner: armyData.ownerId, 
+        game: gameId 
+      })
+    );
+
+    // Duplicate units
+    for (const unit of armyData.units || []) {
+      const newUnitId = id();
+      newUnitIds.push(newUnitId);
+      
+      const unitCopy = createCopy(unit, {
+        armyId: gameArmyId
+      });
+      
+      delete unitCopy.armyId;
+      delete unitCopy.models;
+      transactions.push(
+        db.tx.units[newUnitId].update(unitCopy).link({ army: gameArmyId })
+      );
+
+      // Duplicate models for this unit
+      for (const model of unit.models || []) {
+        const newModelId = id();
+        newModelIds.push(newModelId);
+        
+        const modelCopy = createCopy(model, {
+          unitId: newUnitId,
+          woundsTaken: 0 // Reset for game
+        });
+        delete modelCopy.unitId;
+        delete modelCopy.weapons;
+        transactions.push(
+          db.tx.models[newModelId].update(modelCopy).link({ unit: newUnitId })
+        );
+
+        // Duplicate weapons for this model
+        for (const weapon of model.weapons || []) {
+          const newWeaponId = id();
+          newWeaponIds.push(newWeaponId);
+          
+          const weaponCopy = createCopy(weapon, {
+            modelId: newModelId,
+            turnsFired: [] // Reset for game
+          });
+          delete weaponCopy.model;
+          transactions.push(
+            db.tx.weapons[newWeaponId].update(weaponCopy).link({ model: newModelId })
+          );
+        }
+      }
+    }
+
+    // Execute all transactions
+    await db.transact(transactions);
+
+    return {
+      armyId: gameArmyId,
+      unitIds: newUnitIds,
+      modelIds: newModelIds,
+      weaponIds: newWeaponIds
+    };
+  } catch (error) {
+    console.error('Failed to duplicate army for game:', error);
+    throw new Error(`Game army duplication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+} 

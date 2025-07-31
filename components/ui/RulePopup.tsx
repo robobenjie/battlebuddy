@@ -19,7 +19,7 @@ export function parseRuleDescription(ruleName: string): string | null {
   const antiMatch = ruleName.match(/^Anti-(\w+)\s+(\d+)\+$/);
   if (antiMatch) {
     const [, keyword, threshold] = antiMatch;
-    return `Anti-keyword ${threshold}+ abilities allow models to score Critical Wounds against ${keyword} units on to-wound rolls of ${threshold}+.`;
+    return `Anti-keyword ${threshold}+ abilities allow models to score Critical Wounds (automatic success) against ${keyword} units on to-wound rolls of ${threshold}+.`;
   }
 
   // Handle Rapid Fire X rules
@@ -81,14 +81,14 @@ export const COMMON_RULES: Record<string, string> = {
   'Heavy': 'Units that Remain Stationary get +1 to hit with Heavy Weapons they fire that turn.',
   'Pistol': 'You can fire these weapons while in engagement range of enemy units (but only at units you\'re in engagement range with.)',
   'Blast': 'When shooting a Blast weapon, add one to the attack characteristic for every five models in the target unit.',
-  'Conversion': 'When firing at a target at least 12" away, this weapon inflicts Critical Hits on hit rolls of 4+.',
-  'Devastating Wounds': 'When this weapon scores a Critical Wound, the target cannot take saves or invulnerable saves against that wound.',
+  'Conversion': 'When firing at a target at least 12" away, this weapon inflicts Critical Hits (automatic success) on hit rolls of 4+.',
+  'Devastating Wounds': 'When this weapon scores a Critical Wound (normally an unmodified 6), the target cannot take saves or invulnerable saves against that wound.',
   'Extra Attacks': 'When you declare melee attacks, you can also attack with Extra Attacks weapons.',
   'Hazardous': 'Roll one D6 for each Hazardous weapon used. On a 1, deal 3 mortal wounds to Characters/Vehicles/Monsters or remove 1 model.',
   'Indirect Fire': 'This weapon doesn\'t need line of sight to the target but suffers -1 to hit and target gains Benefit of Cover.',
   'Ignores Cover': 'Weapons with this ability ignore the Benefit of Cover.',
   'Lance': 'On the turn that a unit Charges, weapons with the Lance ability have +1 to wound.',
-  'Lethal Hits': 'Critical Hits with this weapon automatically wound without rolling.',
+  'Lethal Hits': 'Critical Hits (normally unmodified 6s) with this weapon automatically wound without rolling.',
   'Linked Fire': 'This weapon can draw line of sight and measure range from another friendly unit that it can see.',
   'Precision': 'When attacking a unit with an attached Character, you can direct attacks at the Character.',
   'Psychic': 'This weapon has the Psychic ability. Some other abilities respond to Psychic attacks.',
@@ -115,35 +115,37 @@ export default function RulePopup({ isOpen, onClose, rule }: RulePopupProps) {
     'No description available.';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <>
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black bg-opacity-50"
+        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px]"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="relative bg-gray-800 border border-gray-600 rounded-lg max-w-lg w-full max-h-80 overflow-hidden shadow-xl">
-        {/* Header */}
-        <div className="bg-gray-700 px-4 py-2 border-b border-gray-600 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">{rule.name}</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white p-1 rounded transition-colors text-xl leading-none"
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+        <div className="bg-gray-800 border border-gray-600 rounded-lg max-w-lg w-full max-h-80 overflow-hidden shadow-xl pointer-events-auto">
+          {/* Header */}
+          <div className="bg-gray-700 px-4 py-2 border-b border-gray-600 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white">{rule.name}</h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white p-1 rounded transition-colors text-xl leading-none"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
 
-        {/* Content */}
-        <div className="p-4 overflow-y-auto max-h-64">
-          <p className="text-gray-300 leading-relaxed">
-            {description}
-          </p>
+          {/* Content */}
+          <div className="p-4 overflow-y-auto max-h-64">
+            <p className="text-gray-300 leading-relaxed">
+              {description}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
