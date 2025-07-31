@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { db } from '../../lib/db';
+import { id } from '@instantdb/react';
 import UnitCard from '../ui/UnitCard';
 import { formatUnitForCard, getUnitMovement } from '../../lib/unit-utils';
 
@@ -51,51 +52,52 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
   // Check if current user is the active player
   const isActivePlayer = currentUser?.id === currentPlayer.userId;
 
-  // Helper function to get unit status
-  const getUnitStatus = (unitId: string, statusName: string) => {
-    const unit = units.find(u => u.id === unitId);
-    if (!unit || !unit.statuses) return null;
-    return unit.statuses.find((status: any) => status.name === statusName);
-  };
-
   // Helper function to check if unit has moved this turn
   const hasMovedThisTurn = (unitId: string) => {
-    const movedStatus = getUnitStatus(unitId, 'moved');
-    return movedStatus && movedStatus.turns && movedStatus.turns.includes(game.currentTurn);
+    const unit = units.find(u => u.id === unitId);
+    if (!unit || !unit.statuses) return false;
+    return unit.statuses.some((status: any) => 
+      (status.name === 'moved' || status.name === 'advanced') && 
+      status.turns && status.turns.includes(game.currentTurn)
+    );
   };
 
   // Helper function to check if unit has advanced this turn
   const hasAdvancedThisTurn = (unitId: string) => {
-    const advancedStatus = getUnitStatus(unitId, 'advanced');
-    return advancedStatus && advancedStatus.turns && advancedStatus.turns.includes(game.currentTurn);
+    const unit = units.find(u => u.id === unitId);
+    if (!unit || !unit.statuses) return false;
+    return unit.statuses.some((status: any) => 
+      status.name === 'advanced' && status.turns && status.turns.includes(game.currentTurn)
+    );
   };
 
-  // Helper function to create or update unit status
-  const updateUnitStatus = async (unitId: string, statusName: string, addTurn: boolean = true) => {
-    const existingStatus = getUnitStatus(unitId, statusName);
-    
-    if (existingStatus) {
-      // Update existing status
-      const updatedTurns = addTurn 
-        ? [...existingStatus.turns, game.currentTurn]
-        : existingStatus.turns.filter((turn: number) => turn !== game.currentTurn);
-      
-      await db.transact([
-        db.tx.unitStatuses[existingStatus.id].update({
-          turns: updatedTurns
-        })
-      ]);
-    } else if (addTurn) {
-      // Create new status
-      const statusId = crypto.randomUUID();
-      await db.transact([
-        db.tx.unitStatuses[statusId].update({
-          unitId: unitId,
-          name: statusName,
-          turns: [game.currentTurn],
-          rules: []
-        }).link({ unit: unitId })
-      ]);
+  // Helper function to create unit status for current turn
+  const createUnitStatus = async (unitId: string, statusName: string) => {
+    await db.transact([
+      db.tx.unitStatuses[id()].update({
+        unitId: unitId,
+        name: statusName,
+        turns: [game.currentTurn],
+        rules: []
+      }).link({ unit: unitId })
+    ]);
+  };
+
+  // Helper function to delete unit statuses for current turn
+  const deleteUnitStatusesForTurn = async (unitId: string) => {
+    const unit = units.find(u => u.id === unitId);
+    if (!unit || !unit.statuses) return;
+
+    const statusesToDelete = unit.statuses.filter((status: any) => 
+      status.turns && status.turns.includes(game.currentTurn)
+    );
+
+    if (statusesToDelete.length > 0) {
+      await db.transact(
+        statusesToDelete.map((status: any) => 
+          db.tx.unitStatuses[status.id].delete()
+        )
+      );
     }
   };
 
@@ -103,7 +105,7 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
   const handleMove = async (unitId: string) => {
     setIsProcessing(true);
     try {
-      await updateUnitStatus(unitId, 'moved', true);
+      await createUnitStatus(unitId, 'moved');
     } catch (error) {
       console.error('Error recording move:', error);
     } finally {
@@ -115,9 +117,8 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
   const handleAdvance = async (unitId: string) => {
     setIsProcessing(true);
     try {
-      // Advance includes both moved and advanced status
-      await updateUnitStatus(unitId, 'moved', true);
-      await updateUnitStatus(unitId, 'advanced', true);
+      // Advance only creates an 'advanced' status (which implies movement)
+      await createUnitStatus(unitId, 'advanced');
     } catch (error) {
       console.error('Error recording advance:', error);
     } finally {
@@ -129,16 +130,8 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
   const handleUndo = async (unitId: string) => {
     setIsProcessing(true);
     try {
-      const movedStatus = getUnitStatus(unitId, 'moved');
-      const advancedStatus = getUnitStatus(unitId, 'advanced');
-      
-      // Remove the current turn from both statuses
-      if (movedStatus) {
-        await updateUnitStatus(unitId, 'moved', false);
-      }
-      if (advancedStatus) {
-        await updateUnitStatus(unitId, 'advanced', false);
-      }
+      // Delete all statuses for the current turn
+      await deleteUnitStatusesForTurn(unitId);
     } catch (error) {
       console.error('Error undoing action:', error);
     } finally {
@@ -207,7 +200,7 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
                     {/* Movement buttons */}
                     <button
                       onClick={() => handleMove(unit.id)}
-                      disabled={!isActivePlayer || isProcessing || hasMoved}
+                      disabled={!isActivePlayer || hasMoved}
                       className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:cursor-not-allowed"
                     >
                       {movement ? `Move ${movement}"` : 'Move'}
@@ -215,7 +208,7 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
                     
                     <button
                       onClick={() => handleAdvance(unit.id)}
-                      disabled={!isActivePlayer || isProcessing || hasMoved}
+                      disabled={!isActivePlayer || hasAdvanced}
                       className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:cursor-not-allowed"
                     >
                       Advance
