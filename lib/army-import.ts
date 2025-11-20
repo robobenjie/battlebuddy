@@ -334,7 +334,7 @@ export function extractModels(unit: UnitData): ModelData[] {
   for (const statline of statlines) {
     // Create individual model records for each count
     for (let i = 0; i < statline.count; i++) {
-      models.push({
+      const model: any = {
         id: id(),
         name: statline.modelName, // This already uses extractModelNameFromSelection in getUnitStatlines
         unitId: unit.id,
@@ -345,7 +345,14 @@ export function extractModels(unit: UnitData): ModelData[] {
         LD: statline.LD,
         OC: statline.OC,
         woundsTaken: 0
-      });
+      };
+
+      // Add invulnerable save if present
+      if (statline.INV !== undefined) {
+        model.INV = statline.INV;
+      }
+
+      models.push(model);
     }
   }
 
@@ -361,6 +368,7 @@ function getUnitStatlines(unit: UnitData): Array<{
   M: number;
   T: number;
   SV: number;
+  INV?: number;
   W: number;
   LD: number;
   OC: number;
@@ -370,6 +378,7 @@ function getUnitStatlines(unit: UnitData): Array<{
     M: number;
     T: number;
     SV: number;
+    INV?: number;
     W: number;
     LD: number;
     OC: number;
@@ -403,6 +412,7 @@ function getUnitStatlines(unit: UnitData): Array<{
       M: data.M,
       T: data.T,
       SV: data.SV,
+      INV: data.INV,
       W: data.W,
       LD: data.LD,
       OC: data.OC
@@ -414,12 +424,13 @@ function getUnitStatlines(unit: UnitData): Array<{
  * Helper method to extract statlines from selections recursively
  */
 function extractStatlinesFromSelections(
-  selections: any[], 
+  selections: any[],
   statlineMap: Map<string, {
     count: number;
     M: number;
     T: number;
     SV: number;
+    INV?: number;
     W: number;
     LD: number;
     OC: number;
@@ -442,6 +453,9 @@ function extractStatlinesFromSelections(
           const characteristics = profile.characteristics || [];
           const stats = parseCharacteristicsToStats(characteristics);
 
+          // Extract invulnerable save from profiles/abilities if present
+          const inv = extractInvulnerableSave(selection.profiles);
+
           if (statlineMap.has(modelName)) {
             // Add to existing model count
             const existing = statlineMap.get(modelName)!;
@@ -450,7 +464,8 @@ function extractStatlinesFromSelections(
             // Add new model statline
             statlineMap.set(modelName, {
               count: modelCount,
-              ...stats
+              ...stats,
+              INV: inv
             });
           }
         }
@@ -566,6 +581,42 @@ function parseCharacteristicsToStats(characteristics: any[]): {
   }
 
   return stats;
+}
+
+/**
+ * Extract invulnerable save value from model profiles/abilities
+ * Looks for abilities with names like "Invulnerable Save (5+)"
+ * or descriptions containing invulnerable save information
+ */
+function extractInvulnerableSave(profiles: any[]): number | undefined {
+  if (!profiles || profiles.length === 0) return undefined;
+
+  for (const profile of profiles) {
+    // Check if this is an Abilities profile type
+    if (profile.typeName === 'Abilities') {
+      // Look for "Invulnerable Save" in the ability name
+      const nameMatch = profile.name?.match(/Invulnerable Save \((\d+)\+\)/i);
+      if (nameMatch) {
+        return parseInt(nameMatch[1], 10);
+      }
+
+      // Also check the description for invulnerable save mentions
+      if (profile.characteristics) {
+        for (const char of profile.characteristics) {
+          if (char.name === 'Description') {
+            const desc = char.$text || '';
+            // Match patterns like "has a 5+ invulnerable save" or "have a 5+ invulnerable save"
+            const descMatch = desc.match(/(?:has|have) a (\d+)\+ invulnerable save/i);
+            if (descMatch) {
+              return parseInt(descMatch[1], 10);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return undefined;
 }
 
 /**

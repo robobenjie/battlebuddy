@@ -79,6 +79,7 @@ const _schema = i.schema({
       M: i.number(), // movement in inches
       T: i.number(), // toughness
       SV: i.number(), // save value
+      INV: i.number().optional(), // invulnerable save value
       W: i.number(), // wounds
       LD: i.number(), // leadership
       OC: i.number(), // objective control

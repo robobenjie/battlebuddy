@@ -103,6 +103,7 @@ export default function CombatCalculatorPage({
   const targetStats = selectedTarget?.models?.[0] ? {
     T: selectedTarget.models[0].T,
     SV: selectedTarget.models[0].SV,
+    INV: selectedTarget.models[0].INV,
     modelCount: selectedTarget.models?.length || 0
   } : undefined;
 

@@ -17,6 +17,7 @@ interface Weapon {
 interface Target {
   T: number; // toughness
   SV: number; // save value
+  INV?: number; // invulnerable save value
   modelCount?: number; // number of models in target unit
 }
 
@@ -57,13 +58,30 @@ function getWoundRoll(weaponStrength: number, targetToughness: number): string {
   }
 }
 
-// Calculate save roll after AP
-function getSaveRoll(targetSave: number, weaponAP: number): string {
+// Calculate save roll after AP, considering invulnerable save
+function getSaveRoll(targetSave: number, weaponAP: number, invulnerableSave?: number): { value: string; modifier: string } {
   const modifiedSave = targetSave - weaponAP;
-  if (modifiedSave <= 1) {
-    return 'No save';
+
+  // If there's an invulnerable save, compare it to the modified save
+  if (invulnerableSave !== undefined && invulnerableSave !== null) {
+    // Lower number is better in 40k (e.g., 4+ is better than 5+)
+    if (invulnerableSave < modifiedSave || modifiedSave <= 1) {
+      return {
+        value: `${invulnerableSave}+`,
+        modifier: `(${invulnerableSave}+ invulnerable)`
+      };
+    }
   }
-  return `${modifiedSave}+`;
+
+  // Use regular save
+  if (modifiedSave <= 1) {
+    return { value: 'No save', modifier: '' };
+  }
+
+  return {
+    value: `${modifiedSave}+`,
+    modifier: `(${targetSave}+ save, ${Math.abs(weaponAP)} AP)`
+  };
 }
 
 export default function WeaponProfileDisplay({
@@ -136,24 +154,30 @@ export default function WeaponProfileDisplay({
     if (!target) return { stat: 'Wounds on', value: '?', modifier: '' };
 
     const baseWound = getWoundRoll(weapon.S, target.T);
-    let modifier = '';
+    const modifiers: string[] = [];
+
+    // Always show S and T
+    modifiers.push(`(S${weapon.S}, T${target.T})`);
 
     if (hasTwinLinked) {
-      modifier = 'Reroll wounds (twin-linked)';
+      modifiers.push('Reroll wounds (twin-linked)');
     }
 
     return {
       stat: 'Wounds on',
       value: baseWound,
-      modifier
+      modifier: modifiers.join(' ')
     };
   };
 
   const getSaveRow = () => {
+    if (!target) return { stat: 'Save on', value: '?', modifier: '' };
+
+    const saveResult = getSaveRoll(target.SV, weapon.AP, target.INV);
     return {
       stat: 'Save on',
-      value: target ? getSaveRoll(target.SV, weapon.AP) : '?',
-      modifier: ''
+      value: saveResult.value,
+      modifier: saveResult.modifier
     };
   };
 
