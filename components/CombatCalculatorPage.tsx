@@ -63,9 +63,10 @@ export default function CombatCalculatorPage({
   });
   
   
-  const enemyArmies = enemyUnitData?.games?.[0]?.armies?.filter((army: any) => army.id !== unit?.army?.id) || [];
+  const game = enemyUnitData?.games?.[0];
+  const enemyArmies = game?.armies?.filter((army: any) => army.id !== unit?.army?.id) || [];
   const enemyUnits = enemyArmies?.flatMap((army: any) => army.units) || [];
-  
+
   // State for selected target and weapon
   const [selectedTargetId, setSelectedTargetId] = useState<string>('');
   const [selectedWeaponId, setSelectedWeaponId] = useState<string>('');
@@ -88,6 +89,16 @@ export default function CombatCalculatorPage({
   const availableWeapons = Object.values(weaponGroups);
   const selectedWeapon = availableWeapons.find((w: any) => w.id === selectedWeaponId);
 
+  // Check if a weapon has been fired this turn
+  const isWeaponFired = (weapon: any) => {
+    if (!game?.currentTurn) return false;
+    return weapon.turnsFired && weapon.turnsFired.includes(game.currentTurn);
+  };
+
+  // Count unfired weapons
+  const unfiredWeapons = availableWeapons.filter((w: any) => !isWeaponFired(w));
+  const firedWeapons = availableWeapons.filter((w: any) => isWeaponFired(w));
+
   // Get target's defensive stats and model count
   const targetStats = selectedTarget?.models?.[0] ? {
     T: selectedTarget.models[0].T,
@@ -100,6 +111,45 @@ export default function CombatCalculatorPage({
       onClose();
     } else {
       router.back();
+    }
+  };
+
+  const handleShoot = async () => {
+    if (!selectedWeapon || !game?.currentTurn) return;
+
+    try {
+      // Get all weapons with the same ID (in case of multiple models with same weapon)
+      const weaponsToUpdate = allWeapons.filter((w: any) => w.id === (selectedWeapon as any).id);
+
+      // Update each weapon's turnsFired array
+      for (const weapon of weaponsToUpdate) {
+        const currentTurnsFired = weapon.turnsFired || [];
+        if (!currentTurnsFired.includes(game.currentTurn)) {
+          await db.transact([
+            db.tx.weapons[weapon.id].update({
+              turnsFired: [...currentTurnsFired, game.currentTurn]
+            })
+          ]);
+        }
+      }
+
+      // Check if all weapons will be fired after this update
+      const remainingUnfired = availableWeapons.filter((w: any) => {
+        // If this is the weapon we just fired, it's now fired
+        if (w.id === (selectedWeapon as any).id) return false;
+        // Otherwise check if it was already fired
+        return !isWeaponFired(w);
+      });
+
+      // If no weapons left to fire, close the calculator
+      if (remainingUnfired.length === 0) {
+        handleBack();
+      } else {
+        // Clear selected weapon to allow selecting another
+        setSelectedWeaponId('');
+      }
+    } catch (error) {
+      console.error('Failed to mark weapon as fired:', error);
     }
   };
 
@@ -162,26 +212,40 @@ export default function CombatCalculatorPage({
       {/* Weapon Selection */}
       <div className="mt-8 max-w-2xl mx-auto">
         <div className="bg-gray-800 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Select Weapon</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Select Weapon</h3>
+            <div className="text-sm text-gray-400">
+              {unfiredWeapons.length} / {availableWeapons.length} remaining
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            {availableWeapons.map((weapon: any) => (
-              <button
-                key={weapon.id}
-                onClick={() => setSelectedWeaponId(weapon.id)}
-                className={`p-3 rounded-lg border-2 transition-all ${
-                  selectedWeaponId === weapon.id
-                    ? 'border-red-500 bg-red-500/10'
-                    : 'border-gray-600 hover:border-gray-500 bg-gray-700'
-                }`}
-              >
-                <div className="text-left">
-                  <div className="font-medium text-white">{weapon.name}</div>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Range {weapon.range}" • {weapon.A} attacks
+            {availableWeapons.map((weapon: any) => {
+              const isFired = isWeaponFired(weapon);
+              return (
+                <button
+                  key={weapon.id}
+                  onClick={() => !isFired && setSelectedWeaponId(weapon.id)}
+                  disabled={isFired}
+                  className={`p-3 rounded-lg border-2 transition-all ${
+                    isFired
+                      ? 'border-gray-700 bg-gray-900 opacity-50 cursor-not-allowed'
+                      : selectedWeaponId === weapon.id
+                      ? 'border-red-500 bg-red-500/10'
+                      : 'border-gray-600 hover:border-gray-500 bg-gray-700'
+                  }`}
+                >
+                  <div className="text-left">
+                    <div className={`font-medium ${isFired ? 'text-gray-500 line-through' : 'text-white'}`}>
+                      {weapon.name}
+                      {isFired && <span className="ml-2 text-xs">(Fired)</span>}
+                    </div>
+                    <div className={`text-xs mt-1 ${isFired ? 'text-gray-600' : 'text-gray-400'}`}>
+                      Range {weapon.range}" • {weapon.A} attacks
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
 
           {/* Weapon Profile Display */}
@@ -191,6 +255,16 @@ export default function CombatCalculatorPage({
                 weapon={selectedWeapon as any}
                 target={targetStats}
               />
+
+              {/* Shoot Button */}
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={handleShoot}
+                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                >
+                  Shoot
+                </button>
+              </div>
             </div>
           ) : null}
         </div>
