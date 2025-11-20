@@ -185,14 +185,14 @@ export default function CombatCalculatorPage({
           </div>
 
           {/* Weapon Profile Display */}
-          {selectedWeapon && (
+          {selectedWeapon ? (
             <div className="mt-6">
               <WeaponProfileDisplay
-                weapon={selectedWeapon}
+                weapon={selectedWeapon as any}
                 target={targetStats}
               />
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -220,7 +220,7 @@ export default function CombatCalculatorPage({
           </div>
 
           {/* Selected Target Unit Card */}
-          {selectedTarget && (
+          {selectedTarget ? (
             <div className="mt-4">
               <UnitCard
                 unit={formatUnitForCard(selectedTarget).unit}
@@ -229,7 +229,7 @@ export default function CombatCalculatorPage({
                 className="border-0"
               />
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
