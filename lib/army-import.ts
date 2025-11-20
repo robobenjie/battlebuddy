@@ -944,10 +944,17 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
   }
   
   try {
-    const transactions = [];
-    
-    // Add army transaction
-    transactions.push(
+    // Helper function to batch arrays into chunks
+    const chunkArray = <T>(array: T[], size: number): T[][] => {
+      const chunks: T[][] = [];
+      for (let i = 0; i < array.length; i += size) {
+        chunks.push(array.slice(i, i + size));
+      }
+      return chunks;
+    };
+
+    // Step 1: Create army first
+    await db.transact([
       db.tx.armies[armyMetadata.id].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
@@ -955,11 +962,12 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
         sourceData: armyMetadata.sourceData,
         createdAt: armyMetadata.createdAt
       }).link({ owner: armyMetadata.ownerId })
-    );
-    
-    // Add unit transactions
-    for (const unit of units) {
-      transactions.push(
+    ]);
+
+    // Step 2: Batch units into chunks of 10
+    const unitChunks = chunkArray(units, 10);
+    for (const unitChunk of unitChunks) {
+      const unitTransactions = unitChunk.map(unit =>
         db.tx.units[unit.id].update({
           name: unit.name,
           categories: unit.categories,
@@ -968,11 +976,13 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
           armyId: unit.armyId
         }).link({ army: unit.armyId })
       );
+      await db.transact(unitTransactions);
     }
-    
-    // Add model transactions
-    for (const model of allModels) {
-      transactions.push(
+
+    // Step 3: Batch models into chunks of 20
+    const modelChunks = chunkArray(allModels, 20);
+    for (const modelChunk of modelChunks) {
+      const modelTransactions = modelChunk.map(model =>
         db.tx.models[model.id].update({
           name: model.name,
           unitId: model.unitId,
@@ -985,11 +995,13 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
           woundsTaken: model.woundsTaken
         }).link({ unit: model.unitId })
       );
+      await db.transact(modelTransactions);
     }
-    
-    // Add weapon transactions
-    for (const weapon of allWeapons) {
-      transactions.push(
+
+    // Step 4: Batch weapons into chunks of 30
+    const weaponChunks = chunkArray(allWeapons, 30);
+    for (const weaponChunk of weaponChunks) {
+      const weaponTransactions = weaponChunk.map(weapon =>
         db.tx.weapons[weapon.id].update({
           name: weapon.name,
           range: weapon.range,
@@ -1003,10 +1015,8 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
           modelId: weapon.modelId
         }).link({ model: weapon.modelId })
       );
+      await db.transact(weaponTransactions);
     }
-    
-    // Execute all transactions
-    await db.transact(transactions);
     
     return {
       armyId: armyMetadata.id,
@@ -1051,10 +1061,17 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
   }
   
   try {
-    const transactions = [];
-    
-    // Add army transaction for game context
-    transactions.push(
+    // Helper function to batch arrays into chunks
+    const chunkArray = <T>(array: T[], size: number): T[][] => {
+      const chunks: T[][] = [];
+      for (let i = 0; i < array.length; i += size) {
+        chunks.push(array.slice(i, i + size));
+      }
+      return chunks;
+    };
+
+    // Step 1: Create army first
+    await db.transact([
       db.tx.armies[gameArmyId].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
@@ -1063,11 +1080,12 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
         createdAt: armyMetadata.createdAt,
         gameId: gameId
       }).link({ owner: userId, game: gameId })
-    );
-    
-    // Add unit transactions
-    for (const unit of units) {
-      transactions.push(
+    ]);
+
+    // Step 2: Batch units into chunks of 10
+    const unitChunks = chunkArray(units, 10);
+    for (const unitChunk of unitChunks) {
+      const unitTransactions = unitChunk.map(unit =>
         db.tx.units[unit.id].update({
           name: unit.name,
           categories: unit.categories,
@@ -1076,11 +1094,13 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
           armyId: unit.armyId
         }).link({ army: unit.armyId })
       );
+      await db.transact(unitTransactions);
     }
-    
-    // Add model transactions
-    for (const model of allModels) {
-      transactions.push(
+
+    // Step 3: Batch models into chunks of 20
+    const modelChunks = chunkArray(allModels, 20);
+    for (const modelChunk of modelChunks) {
+      const modelTransactions = modelChunk.map(model =>
         db.tx.models[model.id].update({
           name: model.name,
           unitId: model.unitId,
@@ -1093,11 +1113,13 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
           woundsTaken: model.woundsTaken
         }).link({ unit: model.unitId })
       );
+      await db.transact(modelTransactions);
     }
-    
-    // Add weapon transactions
-    for (const weapon of allWeapons) {
-      transactions.push(
+
+    // Step 4: Batch weapons into chunks of 30
+    const weaponChunks = chunkArray(allWeapons, 30);
+    for (const weaponChunk of weaponChunks) {
+      const weaponTransactions = weaponChunk.map(weapon =>
         db.tx.weapons[weapon.id].update({
           name: weapon.name,
           range: weapon.range,
@@ -1111,10 +1133,8 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
           modelId: weapon.modelId
         }).link({ model: weapon.modelId })
       );
+      await db.transact(weaponTransactions);
     }
-    
-    // Execute all transactions
-    await db.transact(transactions);
     
     return {
       armyId: gameArmyId,
@@ -1167,26 +1187,41 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
     });
 
     delete armyCopy.units;
-    
-    transactions.push(
-      db.tx.armies[gameArmyId].update(armyCopy).link({ 
-        owner: armyData.ownerId, 
-        game: gameId 
+
+    // Helper function to batch arrays into chunks
+    const chunkArray = <T>(array: T[], size: number): T[][] => {
+      const chunks: T[][] = [];
+      for (let i = 0; i < array.length; i += size) {
+        chunks.push(array.slice(i, i + size));
+      }
+      return chunks;
+    };
+
+    // Step 1: Create army first
+    await db.transact([
+      db.tx.armies[gameArmyId].update(armyCopy).link({
+        owner: armyData.ownerId,
+        game: gameId
       })
-    );
+    ]);
+
+    // Prepare all units, models, and weapons
+    const unitTransactions = [];
+    const modelTransactions = [];
+    const weaponTransactions = [];
 
     // Duplicate units
     for (const unit of armyData.units || []) {
       const newUnitId = id();
       newUnitIds.push(newUnitId);
-      
+
       const unitCopy = createCopy(unit, {
         armyId: gameArmyId
       });
-      
+
       delete unitCopy.armyId;
       delete unitCopy.models;
-      transactions.push(
+      unitTransactions.push(
         db.tx.units[newUnitId].update(unitCopy).link({ army: gameArmyId })
       );
 
@@ -1194,14 +1229,14 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
       for (const model of unit.models || []) {
         const newModelId = id();
         newModelIds.push(newModelId);
-        
+
         const modelCopy = createCopy(model, {
           unitId: newUnitId,
           woundsTaken: 0 // Reset for game
         });
         delete modelCopy.unitId;
         delete modelCopy.weapons;
-        transactions.push(
+        modelTransactions.push(
           db.tx.models[newModelId].update(modelCopy).link({ unit: newUnitId })
         );
 
@@ -1209,21 +1244,36 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
         for (const weapon of model.weapons || []) {
           const newWeaponId = id();
           newWeaponIds.push(newWeaponId);
-          
+
           const weaponCopy = createCopy(weapon, {
             modelId: newModelId,
             turnsFired: [] // Reset for game
           });
           delete weaponCopy.model;
-          transactions.push(
+          weaponTransactions.push(
             db.tx.weapons[newWeaponId].update(weaponCopy).link({ model: newModelId })
           );
         }
       }
     }
 
-    // Execute all transactions
-    await db.transact(transactions);
+    // Step 2: Batch units into chunks of 10
+    const unitChunks = chunkArray(unitTransactions, 10);
+    for (const unitChunk of unitChunks) {
+      await db.transact(unitChunk);
+    }
+
+    // Step 3: Batch models into chunks of 20
+    const modelChunks = chunkArray(modelTransactions, 20);
+    for (const modelChunk of modelChunks) {
+      await db.transact(modelChunk);
+    }
+
+    // Step 4: Batch weapons into chunks of 30
+    const weaponChunks = chunkArray(weaponTransactions, 30);
+    for (const weaponChunk of weaponChunks) {
+      await db.transact(weaponChunk);
+    }
 
     return {
       armyId: gameArmyId,

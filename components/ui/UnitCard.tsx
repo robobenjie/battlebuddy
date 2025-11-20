@@ -75,6 +75,15 @@ export default function UnitCard({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const { isOpen, rule, showRule, hideRule } = useRulePopup();
 
+  // Safety check for unit data
+  if (!unit || !unit.id || !unit.name) {
+    return (
+      <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <p className="text-gray-400">Invalid unit data</p>
+      </div>
+    );
+  }
+
   // Get models and weapons from the unit
   const models = getModelsForUnit(unit);
   const weapons = getWeaponsForUnit(unit);
@@ -95,8 +104,8 @@ export default function UnitCard({
   }
 
   // Extract keywords from categories
-  const factionKeywords = extractFactionKeywords(unit.categories);
-  const generalKeywords = extractGeneralKeywords(unit.categories);
+  const factionKeywords = extractFactionKeywords(unit.categories || []);
+  const generalKeywords = extractGeneralKeywords(unit.categories || []);
 
   // Calculate model configurations for collapsed view (group by name)
   const getModelConfigurations = () => {

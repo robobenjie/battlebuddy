@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '../../lib/db';
 import UnitCard from '../ui/UnitCard';
 import { formatUnitForCard, getWeaponsForUnit } from '../../lib/unit-utils';
+import CombatCalculatorPage from '../CombatCalculatorPage';
 
 interface ShootPhaseProps {
   gameId: string;
@@ -26,6 +28,9 @@ interface ShootPhaseProps {
 
 export default function ShootPhase({ gameId, army, currentPlayer, currentUser, game }: ShootPhaseProps) {
   const router = useRouter();
+  const [showCombatCalculator, setShowCombatCalculator] = useState(false);
+  const [selectedUnitId, setSelectedUnitId] = useState<string>('');
+  const [selectedWeaponType, setSelectedWeaponType] = useState<string>('');
 
   // Query units for this army in the game
   const { data: unitsData } = db.useQuery({
@@ -48,16 +53,18 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
   // Check if current user is the active player
   const isActivePlayer = currentUser?.id === currentPlayer.userId;
 
-  // Navigate to combat calculator
-  const navigateToCombatCalculator = (unitId: string, weaponType?: string) => {
-    const params = new URLSearchParams({
-      gameId: gameId,
-      unitId: unitId
-    });
-    if (weaponType) {
-      params.append('weaponType', weaponType);
-    }
-    router.push(`/game/${gameId}/combat-calculator?${params.toString()}`);
+  // Open combat calculator
+  const openCombatCalculator = (unitId: string, weaponType?: string) => {
+    setSelectedUnitId(unitId);
+    setSelectedWeaponType(weaponType || '');
+    setShowCombatCalculator(true);
+  };
+
+  // Close combat calculator
+  const closeCombatCalculator = () => {
+    setShowCombatCalculator(false);
+    setSelectedUnitId('');
+    setSelectedWeaponType('');
   };
 
   // Helper function to get weapon status for a unit, separated by type
@@ -171,7 +178,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
                          </div>
                          {hasUnfiredRegular && (
                            <button
-                             onClick={() => navigateToCombatCalculator(unit.id, 'regular')}
+                             onClick={() => openCombatCalculator(unit.id, 'regular')}
                              disabled={!isActivePlayer}
                              className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:cursor-not-allowed"
                            >
@@ -214,7 +221,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
                          </div>
                          {hasUnfiredPistols && (
                            <button
-                             onClick={() => navigateToCombatCalculator(unit.id, 'pistol')}
+                             onClick={() => openCombatCalculator(unit.id, 'pistol')}
                              disabled={!isActivePlayer}
                              className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:cursor-not-allowed"
                            >
@@ -230,6 +237,22 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
           );
         })}
       </div>
+
+      {/* Combat Calculator Modal */}
+      {showCombatCalculator && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-4">
+              <CombatCalculatorPage 
+                gameId={gameId}
+                unitId={selectedUnitId}
+                weaponType={selectedWeaponType}
+                onClose={closeCombatCalculator}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
