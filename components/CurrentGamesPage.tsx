@@ -115,14 +115,14 @@ export function CurrentGames({ user, embedded }: CurrentGamesProps) {
                   key={game.id}
                   className="bg-gray-800 rounded-lg border border-gray-700 p-6 hover:bg-gray-750 transition-colors"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
+                      <div className="flex items-center flex-wrap gap-3 mb-2">
                         <h3 className="text-xl font-semibold text-white">
                           Game {game.code}
                         </h3>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          game.status === 'active' 
+                          game.status === 'active'
                             ? 'bg-green-600 text-green-100'
                             : 'bg-yellow-600 text-yellow-100'
                         }`}>
@@ -134,7 +134,7 @@ export function CurrentGames({ user, embedded }: CurrentGamesProps) {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center space-x-6 text-sm text-gray-400">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-sm text-gray-400">
                         <div>
                           <span className="font-medium">Players:</span>{' '}
                           {gamePlayers.map((player: any, index: number) => (
@@ -156,7 +156,7 @@ export function CurrentGames({ user, embedded }: CurrentGamesProps) {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center gap-3 sm:flex-shrink-0">
                       <button
                         onClick={() => navigateToGame(game.code)}
                         className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"

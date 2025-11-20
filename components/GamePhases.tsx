@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { db } from '../lib/db';
 import MovementPhase from './phases/MovementPhase';
 import CommandPhase from './phases/CommandPhase';
@@ -8,6 +9,8 @@ import ShootPhase from './phases/ShootPhase';
 import ChargePhase from './phases/ChargePhase';
 import FightPhase from './phases/FightPhase';
 import StratagemsModal from './StratagemsModal';
+import HamburgerMenu from './HamburgerMenu';
+import Sidebar from './Sidebar';
 import { Stratagem } from '../lib/stratagems';
 
 interface GamePhasesProps {
@@ -44,6 +47,8 @@ const PHASE_NAMES: Record<Phase, string> = {
 export default function GamePhases({ gameId, game, players, currentUser }: GamePhasesProps) {
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [showStratagemsModal, setShowStratagemsModal] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const router = useRouter();
 
   // Get current player data
   const currentPlayer = players.find(p => p.id === game.activePlayerId);
@@ -77,10 +82,6 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
   );
 
   const currentUserArmy = currentUserArmyData?.armies?.[0];
-
-  // Debug: Log CP to verify connection
-  console.log('Current User Player CP:', currentUserPlayer?.commandPoints);
-  console.log('Current User Army Faction:', currentUserArmy?.faction);
 
   // Always call hooks in the same order - Query army data for the current player
   const { data: armyData } = db.useQuery(
@@ -283,8 +284,32 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
     ]);
   };
 
+  const handleNavigation = (page: string) => {
+    if (page === 'home') {
+      router.push('/');
+    } else if (page === 'view-armies') {
+      router.push('/');
+    }
+  };
+
+  const handleLogout = () => {
+    db.auth.signOut();
+  };
+
   return (
     <div className="min-h-screen bg-gray-900">
+      {/* Hamburger Menu */}
+      <HamburgerMenu isOpen={isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
+
+      {/* Sidebar */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        currentPage="game"
+        onNavigate={handleNavigation}
+        onLogout={handleLogout}
+      />
+
       {/* Stratagems Modal */}
       <StratagemsModal
         isOpen={showStratagemsModal}
@@ -299,7 +324,7 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
       />
 
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4 pt-20">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between">
             <div>
