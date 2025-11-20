@@ -28,6 +28,8 @@ const _schema = i.schema({
       gameId: i.string().indexed(),
       armyId: i.string().optional(),
       isHost: i.boolean(),
+      victoryPoints: i.number().optional(), // VP tracking
+      commandPoints: i.number().optional(), // CP tracking
     }),
 
     // Core army entity
@@ -39,6 +41,7 @@ const _schema = i.schema({
       ownerId: i.string().indexed(),
       sourceData: i.string(), // raw json
       gameId: i.string().optional().indexed(), // optional link to game for game-specific army copies
+      detachment: i.string().optional(), // detachment name (e.g., "Green Tide", "Speed Freeks")
     }),
 
     // Core unit entity

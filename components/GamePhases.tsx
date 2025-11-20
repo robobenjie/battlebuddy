@@ -7,6 +7,8 @@ import CommandPhase from './phases/CommandPhase';
 import ShootPhase from './phases/ShootPhase';
 import ChargePhase from './phases/ChargePhase';
 import FightPhase from './phases/FightPhase';
+import StratagemsModal from './StratagemsModal';
+import { Stratagem } from '../lib/stratagems';
 
 interface GamePhasesProps {
   gameId: string;
@@ -41,11 +43,45 @@ const PHASE_NAMES: Record<Phase, string> = {
 
 export default function GamePhases({ gameId, game, players, currentUser }: GamePhasesProps) {
   const [isAdvancing, setIsAdvancing] = useState(false);
+  const [showStratagemsModal, setShowStratagemsModal] = useState(false);
 
   // Get current player data
   const currentPlayer = players.find(p => p.id === game.activePlayerId);
   const currentPlayerArmy = currentPlayer?.armyId;
-  
+
+  // Query current user's player data for CP
+  const { data: currentUserPlayerData } = db.useQuery({
+    players: {
+      $: {
+        where: {
+          gameId: gameId,
+          userId: currentUser?.id
+        }
+      }
+    }
+  });
+
+  const currentUserPlayer = currentUserPlayerData?.players?.[0];
+
+  // Query current user's army to get their faction
+  const { data: currentUserArmyData } = db.useQuery(
+    currentUserPlayer?.armyId ? {
+      armies: {
+        $: {
+          where: {
+            id: currentUserPlayer.armyId
+          }
+        }
+      }
+    } : {}
+  );
+
+  const currentUserArmy = currentUserArmyData?.armies?.[0];
+
+  // Debug: Log CP to verify connection
+  console.log('Current User Player CP:', currentUserPlayer?.commandPoints);
+  console.log('Current User Army Faction:', currentUserArmy?.faction);
+
   // Always call hooks in the same order - Query army data for the current player
   const { data: armyData } = db.useQuery(
     currentPlayerArmy ? {
@@ -234,8 +270,34 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
     );
   }
 
+  const handleUseStratagem = async (stratagem: Stratagem) => {
+    if (!currentUserPlayer) return;
+
+    const currentCP = currentUserPlayer.commandPoints || 0;
+    const newCP = Math.max(0, currentCP - stratagem.cost);
+
+    await db.transact([
+      db.tx.players[currentUserPlayer.id].update({
+        commandPoints: newCP
+      })
+    ]);
+  };
+
   return (
     <div className="min-h-screen bg-gray-900">
+      {/* Stratagems Modal */}
+      <StratagemsModal
+        isOpen={showStratagemsModal}
+        onClose={() => setShowStratagemsModal(false)}
+        currentPhase={game.currentPhase}
+        faction={currentUserArmy?.faction}
+        detachment={currentUserArmy?.detachment}
+        commandPoints={currentUserPlayer?.commandPoints || 0}
+        onUseStratagem={handleUseStratagem}
+        activePlayerId={game.activePlayerId}
+        currentUserId={currentUserPlayer?.id}
+      />
+
       {/* Header */}
       <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
         <div className="max-w-6xl mx-auto">
@@ -248,9 +310,19 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
                 Turn {game.currentTurn} • {currentPlayer.name}'s Turn
               </p>
             </div>
-            <div className="text-right text-sm text-gray-400">
-              <p>Game {game.code}</p>
-              <p>Phase {getCurrentPhaseIndex() + 1} of {PHASES.length}</p>
+            <div className="flex items-center gap-4">
+              {/* CP Button */}
+              <button
+                onClick={() => setShowStratagemsModal(true)}
+                className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <span className="text-lg">{currentUserPlayer?.commandPoints || 0}</span>
+                <span className="text-sm">CP</span>
+              </button>
+              <div className="text-right text-sm text-gray-400">
+                <p>Game {game.code}</p>
+                <p>Phase {getCurrentPhaseIndex() + 1} of {PHASES.length}</p>
+              </div>
             </div>
           </div>
         </div>

@@ -12,6 +12,7 @@ export interface ArmyMetadata {
   id: string;
   name: string;
   faction: string;
+  detachment?: string;
   ownerId: string;
   sourceData: string;
   createdAt: number;
@@ -94,22 +95,28 @@ export function extractArmyMetadata(jsonData: NewRecruitRoster, userId: string):
   // Extract basic roster information
   const name = roster.name || 'Unnamed Army';
 
-  // Extract faction from forces selections
+  // Extract faction and detachment from forces selections
   let faction = '';
+  let detachment = '';
 
   if (roster.forces && roster.forces.length > 0) {
     const force = roster.forces[0];
-    
+
     if (force.selections) {
       for (const selection of force.selections) {
         // Extract faction from categories - look for "Faction: X" pattern
         if (selection.categories) {
-          const factionCategory = selection.categories.find(cat => 
+          const factionCategory = selection.categories.find(cat =>
             cat.name && cat.name.startsWith('Faction:')
           );
           if (factionCategory) {
             faction = factionCategory.name.replace('Faction: ', '');
           }
+        }
+
+        // Extract detachment - look for selection with name "Detachment" and get the nested selection name
+        if (selection.name === 'Detachment' && selection.selections && selection.selections.length > 0) {
+          detachment = selection.selections[0].name;
         }
       }
     }
@@ -119,6 +126,7 @@ export function extractArmyMetadata(jsonData: NewRecruitRoster, userId: string):
     id: id(),
     name,
     faction,
+    detachment,
     ownerId: userId,
     sourceData: JSON.stringify(jsonData),
     createdAt: Date.now()
@@ -137,6 +145,7 @@ export async function importArmy(jsonData: NewRecruitRoster, userId: string): Pr
       db.tx.armies[armyMetadata.id].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
+        detachment: armyMetadata.detachment,
         ownerId: armyMetadata.ownerId,
         sourceData: armyMetadata.sourceData,
         createdAt: armyMetadata.createdAt
@@ -269,15 +278,16 @@ export async function importArmyWithUnits(jsonData: NewRecruitRoster, userId: st
   
   // Phase 2: Extract units
   const units = extractUnits(jsonData, armyMetadata.id, userId);
-  
+
   try {
     const transactions = [];
-    
+
     // Add army transaction
     transactions.push(
       db.tx.armies[armyMetadata.id].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
+        detachment: armyMetadata.detachment,
         ownerId: armyMetadata.ownerId,
         sourceData: armyMetadata.sourceData,
         createdAt: armyMetadata.createdAt
@@ -574,15 +584,16 @@ export async function importArmyWithUnitsAndModels(jsonData: NewRecruitRoster, u
     const unitModels = extractModels(unit);
     allModels.push(...unitModels);
   }
-  
+
   try {
     const transactions = [];
-    
+
     // Add army transaction
     transactions.push(
       db.tx.armies[armyMetadata.id].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
+        detachment: armyMetadata.detachment,
         ownerId: armyMetadata.ownerId,
         sourceData: armyMetadata.sourceData,
         createdAt: armyMetadata.createdAt
@@ -958,6 +969,7 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
       db.tx.armies[armyMetadata.id].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
+        detachment: armyMetadata.detachment,
         ownerId: armyMetadata.ownerId,
         sourceData: armyMetadata.sourceData,
         createdAt: armyMetadata.createdAt
@@ -1075,6 +1087,7 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
       db.tx.armies[gameArmyId].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
+        detachment: armyMetadata.detachment,
         ownerId: userId,
         sourceData: armyMetadata.sourceData,
         createdAt: armyMetadata.createdAt,
