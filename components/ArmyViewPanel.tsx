@@ -24,7 +24,9 @@ export default function ArmyViewPanel({ isOpen, onClose, gameId, currentUserId, 
   const { data } = db.useQuery({
     armies: {
       units: {
-        models: {}
+        models: {
+          weapons: {}
+        }
       }
     }
   });
