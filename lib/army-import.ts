@@ -565,12 +565,14 @@ function parseCharacteristicsToStats(characteristics: any[]): {
       case 'T':
         stats.T = numValue || 4;
         break;
+      case 'SV':
       case 'Sv':
         stats.SV = numValue || 3;
         break;
       case 'W':
         stats.W = numValue || 1;
         break;
+      case 'LD':
       case 'Ld':
         stats.LD = numValue || 6;
         break;
