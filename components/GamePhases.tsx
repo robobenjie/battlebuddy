@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/db';
 import MovementPhase from './phases/MovementPhase';
@@ -11,6 +11,7 @@ import FightPhase from './phases/FightPhase';
 import StratagemsModal from './StratagemsModal';
 import HamburgerMenu from './HamburgerMenu';
 import Sidebar from './Sidebar';
+import ArmyViewPanel from './ArmyViewPanel';
 import { Stratagem } from '../lib/stratagems';
 
 interface GamePhasesProps {
@@ -48,7 +49,37 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [showStratagemsModal, setShowStratagemsModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isArmyPanelOpen, setIsArmyPanelOpen] = useState(false);
   const router = useRouter();
+
+  // Swipe gesture handling
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    const swipeDistance = touchStartX.current - touchEndX.current;
+    const minSwipeDistance = 50;
+
+    // Swipe left (to open panel from right)
+    if (swipeDistance > minSwipeDistance && !isArmyPanelOpen) {
+      setIsArmyPanelOpen(true);
+    }
+    // Swipe right (to close panel)
+    else if (swipeDistance < -minSwipeDistance && isArmyPanelOpen) {
+      setIsArmyPanelOpen(false);
+    }
+
+    touchStartX.current = 0;
+    touchEndX.current = 0;
+  };
 
   // Get current player data
   const currentPlayer = players.find(p => p.id === game.activePlayerId);
@@ -297,7 +328,12 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
   };
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div
+      className="min-h-screen bg-gray-900"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Hamburger Menu */}
       <HamburgerMenu isOpen={isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
 
@@ -308,6 +344,15 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
         currentPage="game"
         onNavigate={handleNavigation}
         onLogout={handleLogout}
+      />
+
+      {/* Army View Panel */}
+      <ArmyViewPanel
+        isOpen={isArmyPanelOpen}
+        onClose={() => setIsArmyPanelOpen(false)}
+        gameId={gameId}
+        currentUserId={currentUser?.id}
+        players={players}
       />
 
       {/* Stratagems Modal */}
