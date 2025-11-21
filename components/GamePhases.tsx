@@ -58,24 +58,35 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
+    touchEndX.current = e.touches[0].clientX; // Initialize to start position
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     touchEndX.current = e.touches[0].clientX;
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: React.TouchEvent) => {
     const swipeDistance = touchStartX.current - touchEndX.current;
     const minSwipeDistance = 50;
 
-    // Swipe left (to open panel from right)
-    if (swipeDistance > minSwipeDistance && !isArmyPanelOpen) {
-      setIsArmyPanelOpen(true);
+    // Calculate if this was actually a swipe (moved enough distance)
+    const didSwipe = Math.abs(swipeDistance) >= minSwipeDistance;
+
+    if (didSwipe) {
+      // Prevent default to stop click events from firing
+      e.preventDefault();
+
+      // Swipe left (to open panel from right)
+      if (swipeDistance > 0 && !isArmyPanelOpen) {
+        setIsArmyPanelOpen(true);
+      }
+      // Swipe right (to close panel)
+      else if (swipeDistance < 0 && isArmyPanelOpen) {
+        setIsArmyPanelOpen(false);
+      }
     }
-    // Swipe right (to close panel)
-    else if (swipeDistance < -minSwipeDistance && isArmyPanelOpen) {
-      setIsArmyPanelOpen(false);
-    }
+
+    // If it wasn't a swipe (tap or small movement), let the event through normally
 
     touchStartX.current = 0;
     touchEndX.current = 0;
@@ -270,7 +281,8 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
       army,
       currentPlayer,
       currentUser,
-      game
+      game,
+      players
     };
 
     switch (game.currentPhase) {

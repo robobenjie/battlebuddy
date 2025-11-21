@@ -13,38 +13,62 @@ export default function GamePage() {
   const { user } = db.useAuth();
   const [isStartingGame, setIsStartingGame] = useState(false);
 
-  // Query for the game and its players
-  const { data, isLoading, error } = db.useQuery({
-    games: {},
-    players: {},
-    armies: {
-      units: {
-        models: {
-          weapons: {}
+  // First query just to get the game by code
+  const { data: gamesData } = db.useQuery({
+    games: {
+      $: {
+        where: {
+          code: gameCode
         }
-      },
-    }, // Include armies to check for user armies and game armies
-    units: {},
-    models: {},
-    weapons: {}
+      }
+    }
   });
 
-  // Filter games and players for this specific game code
-  const games = data?.games || [];
-  const allPlayers = data?.players || [];
-  const allArmies = data?.armies || [];
-  const allUnits = data?.units || [];
-  const allModels = data?.models || [];
-  const allWeapons = data?.weapons || [];
-  
-  const game = games.find((g: any) => g.code === gameCode);
-  const players = allPlayers.filter((p: any) => p.gameId === game?.id);
+  const game = gamesData?.games?.[0];
 
-  // Get all user army templates (not game-specific) - host needs to see all armies to copy them
-  const userArmies = allArmies.filter((a: any) => !a.gameId);
-  
-  // Get current user's armies for the army selection UI
-  const currentUserArmies = allArmies.filter((a: any) => a.ownerId === user?.id && !a.gameId);
+  // Now query everything else scoped to this game
+  const { data, isLoading, error } = db.useQuery(
+    game ? {
+      players: {
+        $: {
+          where: {
+            gameId: game.id
+          }
+        }
+      },
+      armies: {
+        units: {
+          models: {
+            weapons: {}
+          }
+        }
+      }
+    } : {}
+  );
+
+  const players = data?.players || [];
+  const allArmies = data?.armies || [];
+
+  // Separate query for user army templates (not game-specific) - only when needed
+  const { data: userArmiesData } = db.useQuery(
+    !game || game.status === 'active' ? {} : {
+      armies: {
+        $: {
+          where: {
+            gameId: null
+          }
+        },
+        units: {
+          models: {
+            weapons: {}
+          }
+        }
+      }
+    }
+  );
+
+  const userArmies = userArmiesData?.armies || [];
+  const currentUserArmies = userArmies.filter((a: any) => a.ownerId === user?.id);
 
   // Function to copy an army using the proper query structure
   const copyArmyToGame = async (armyId: string, playerId: string) => {
@@ -56,13 +80,13 @@ export default function GamePage() {
     }
 
     try {
-      // Get the full army data with units, models, and weapons from the existing query
-      const armyWithDetails = data?.armies?.find(a => a.id === armyId);
+      // Get the full army data with units, models, and weapons from the userArmies query
+      const armyWithDetails = userArmiesData?.armies?.find(a => a.id === armyId);
       if (!armyWithDetails) {
         console.error('❌ Army with details not found');
         return null;
       }
-      
+
       // Duplicate the army using the new function
       const result = await duplicateArmyForGame(armyWithDetails, game.id);
       
