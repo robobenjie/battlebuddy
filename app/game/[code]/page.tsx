@@ -53,11 +53,6 @@ export default function GamePage() {
   const { data: userArmiesData } = db.useQuery(
     !game || game.status === 'active' ? {} : {
       armies: {
-        $: {
-          where: {
-            gameId: null
-          }
-        },
         units: {
           models: {
             weapons: {}
@@ -67,7 +62,9 @@ export default function GamePage() {
     }
   );
 
-  const userArmies = userArmiesData?.armies || [];
+  // Filter for armies without a gameId (templates)
+  const allUserArmies = userArmiesData?.armies || [];
+  const userArmies = allUserArmies.filter((a: any) => !a.gameId);
   const currentUserArmies = userArmies.filter((a: any) => a.ownerId === user?.id);
 
   // Function to copy an army using the proper query structure
