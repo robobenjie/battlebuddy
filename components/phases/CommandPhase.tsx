@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { db } from '../../lib/db';
 
 interface CommandPhaseProps {
@@ -26,9 +26,13 @@ interface CommandPhaseProps {
 export default function CommandPhase({ gameId, army, currentPlayer, currentUser, game, players }: CommandPhaseProps) {
   const renderCount = useRef(0);
   const lastUpdateTime = useRef<number | null>(null);
+  const lastClickTime = useRef<number | null>(null);
 
-  // Optimistic UI state - tracks pending updates
-  const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { victoryPoints?: number; commandPoints?: number }>>({});
+  // Log query structure for sandbox profiling (once on mount)
+  useEffect(() => {
+    console.log('📋 QUERY FOR SANDBOX (this query is in parent component):');
+    console.log('db.useQuery({ players: { $: { where: { gameId: "' + gameId + '" } } } })');
+  }, []);
 
   // Track renders and data changes
   useEffect(() => {
@@ -39,6 +43,13 @@ export default function CommandPhase({ gameId, army, currentPlayer, currentUser,
       const timeSinceLastUpdate = now - lastUpdateTime.current;
       console.log(`[CommandPhase] Re-render #${renderCount.current} - ${timeSinceLastUpdate.toFixed(2)}ms since last update`);
       console.log('[CommandPhase] Current players data:', players.map(p => ({ id: p.id, VP: p.victoryPoints, CP: p.commandPoints })));
+
+      // Log time from click to re-render
+      if (lastClickTime.current !== null) {
+        const clickToRenderTime = now - lastClickTime.current;
+        console.log(`⏱️  CLICK TO RENDER: ${clickToRenderTime.toFixed(2)}ms`);
+        lastClickTime.current = null; // Reset after logging
+      }
     } else {
       console.log(`[CommandPhase] Initial render #${renderCount.current}`);
     }
@@ -46,14 +57,12 @@ export default function CommandPhase({ gameId, army, currentPlayer, currentUser,
     lastUpdateTime.current = now;
   }, [players]);
 
-  // Clear optimistic updates when real data arrives
-  useEffect(() => {
-    setOptimisticUpdates({});
-  }, [players]);
-
   const updatePoints = (playerId: string, field: 'victoryPoints' | 'commandPoints', delta: number) => {
     console.time(`updatePoints-${field}`);
     const t0 = performance.now();
+
+    // Mark the start of this click for measuring to re-render
+    lastClickTime.current = t0;
 
     const player = players.find(p => p.id === playerId);
     if (!player) return;
@@ -67,37 +76,21 @@ export default function CommandPhase({ gameId, army, currentPlayer, currentUser,
     const t1 = performance.now();
     console.log(`[updatePoints] Prep time: ${(t1 - t0).toFixed(2)}ms`);
 
-    // Immediately update optimistic UI
-    setOptimisticUpdates(prev => ({
-      ...prev,
-      [playerId]: {
-        ...prev[playerId],
-        [field]: newValue
-      }
-    }));
+    // Log the transaction for InstantDB sandbox profiling
+    console.log('📋 TRANSACTION FOR SANDBOX:');
+    console.log(`db.transact(db.tx.players["${playerId}"].update({ ${field}: ${newValue} }))`);
 
-    // Schedule the transaction asynchronously to not block the UI
-    setTimeout(() => {
-      const t2 = performance.now();
-      db.transact(
-        db.tx.players[playerId].update({
-          [field]: newValue
-        })
-      );
-      const t3 = performance.now();
-      console.log(`[updatePoints] Transact call time (async): ${(t3 - t2).toFixed(2)}ms`);
-    }, 0);
+    // Just call transact directly - let InstantDB handle optimistic updates
+    db.transact(
+      db.tx.players[playerId].update({
+        [field]: newValue
+      })
+    );
 
     const t2 = performance.now();
-    console.log(`[updatePoints] Handler time (before async): ${(t2 - t1).toFixed(2)}ms`);
+    console.log(`[updatePoints] Transact call time: ${(t2 - t1).toFixed(2)}ms`);
     console.log(`[updatePoints] Total handler time: ${(t2 - t0).toFixed(2)}ms`);
     console.timeEnd(`updatePoints-${field}`);
-  };
-
-  // Get display value - use optimistic value if available, otherwise use real data
-  const getPlayerValue = (player: any, field: 'victoryPoints' | 'commandPoints') => {
-    const optimistic = optimisticUpdates[player.id]?.[field];
-    return optimistic !== undefined ? optimistic : (player[field] || 0);
   };
 
   return (
@@ -122,13 +115,13 @@ export default function CommandPhase({ gameId, army, currentPlayer, currentUser,
                 <div className="flex items-center space-x-3">
                   <button
                     onClick={() => updatePoints(player.id, 'victoryPoints', -1)}
-                    disabled={getPlayerValue(player, 'victoryPoints') === 0}
+                    disabled={(player.victoryPoints || 0) === 0}
                     className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold w-10 h-10 rounded-lg transition-colors"
                   >
                     −
                   </button>
                   <div className="text-3xl font-bold text-white min-w-[60px] text-center">
-                    {getPlayerValue(player, 'victoryPoints')}
+                    {player.victoryPoints || 0}
                   </div>
                   <button
                     onClick={() => updatePoints(player.id, 'victoryPoints', 1)}
@@ -145,13 +138,13 @@ export default function CommandPhase({ gameId, army, currentPlayer, currentUser,
                 <div className="flex items-center space-x-3">
                   <button
                     onClick={() => updatePoints(player.id, 'commandPoints', -1)}
-                    disabled={getPlayerValue(player, 'commandPoints') === 0}
+                    disabled={(player.commandPoints || 0) === 0}
                     className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold w-10 h-10 rounded-lg transition-colors"
                   >
                     −
                   </button>
                   <div className="text-3xl font-bold text-white min-w-[60px] text-center">
-                    {getPlayerValue(player, 'commandPoints')}
+                    {player.commandPoints || 0}
                   </div>
                   <button
                     onClick={() => updatePoints(player.id, 'commandPoints', 1)}
