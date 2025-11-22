@@ -7,7 +7,20 @@ const _schema = i.schema({
       email: i.string().unique().indexed().optional(),
     }),
 
-    
+    // Performance test entities
+    perfCounters: i.entity({
+      value: i.number(),
+      createdAt: i.number(),
+    }),
+
+    // Performance test with indexes (like players table)
+    perfCountersIndexed: i.entity({
+      value: i.number(),
+      gameId: i.string().indexed(),
+      userId: i.string().indexed(),
+      createdAt: i.number(),
+    }),
+
     // Game entities
     games: i.entity({
       name: i.string(),

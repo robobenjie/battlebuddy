@@ -17,20 +17,15 @@ interface CurrentGamesProps {
 export function CurrentGames({ user, embedded }: CurrentGamesProps) {
   const [deleteGameId, setDeleteGameId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { data, isLoading } = db.useQuery({ 
-    games: {}, 
-    players: {}, 
-    armies: {}, 
-    units: {}, 
-    models: {}, 
-    weapons: {} 
+
+  // Only query games and players - we don't need armies/units/models/weapons here
+  const { data, isLoading } = db.useQuery({
+    games: {},
+    players: {}
   });
+
   const allGames = data?.games || [];
   const allPlayers = data?.players || [];
-  const allArmies = data?.armies || [];
-  const allUnits = data?.units || [];
-  const allModels = data?.models || [];
-  const allWeapons = data?.weapons || [];
   const userGames = allGames.filter((game: any) => {
     const gameStatus = game.status === 'waiting' || game.status === 'active';
     const isUserInGame = allPlayers.some((player: any) => player.gameId === game.id && player.userId === user.id);

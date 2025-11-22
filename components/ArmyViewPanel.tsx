@@ -27,6 +27,11 @@ export default function ArmyViewPanel({ isOpen, onClose, gameId, currentUserId, 
         models: {
           weapons: {}
         }
+      },
+      $: {
+        where: {
+          gameId: gameId
+        }
       }
     }
   });

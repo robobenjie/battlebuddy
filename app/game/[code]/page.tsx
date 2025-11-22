@@ -26,8 +26,8 @@ export default function GamePage() {
 
   const game = gamesData?.games?.[0];
 
-  // Now query everything else scoped to this game
-  const { data, isLoading, error } = db.useQuery(
+  // Query players separately from army data to avoid re-evaluation on player updates
+  const { data: playersData } = db.useQuery(
     game ? {
       players: {
         $: {
@@ -35,19 +35,30 @@ export default function GamePage() {
             gameId: game.id
           }
         }
-      },
+      }
+    } : {}
+  );
+
+  // Query armies with full tree separately - scoped to this game only
+  const { data: armiesData, isLoading, error } = db.useQuery(
+    game ? {
       armies: {
         units: {
           models: {
             weapons: {}
+          }
+        },
+        $: {
+          where: {
+            gameId: game.id
           }
         }
       }
     } : {}
   );
 
-  const players = data?.players || [];
-  const allArmies = data?.armies || [];
+  const players = playersData?.players || [];
+  const allArmies = armiesData?.armies || [];
 
   // Separate query for user army templates (not game-specific) - only when needed
   const { data: userArmiesData } = db.useQuery(
