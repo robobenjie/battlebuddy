@@ -114,9 +114,16 @@ export default function CombatCalculatorPage({
 
   // Get all weapons from the queried unit (this will update when weapons are fired)
   const queriedUnit = weaponsData?.units?.[0];
-  const allWeapons = queriedUnit?.models?.flatMap((model: any) =>
-    model.weapons?.filter((weapon: any) => weapon.range > 0) || []
+
+  // Build a map of weapons with their model information
+  const allWeaponsWithModels = queriedUnit?.models?.flatMap((model: any) =>
+    (model.weapons?.filter((weapon: any) => weapon.range > 0) || []).map((weapon: any) => ({
+      ...weapon,
+      modelId: model.id
+    }))
   ) || [];
+
+  const allWeapons = allWeaponsWithModels;
 
   // Group weapons by name
   const weaponGroups: Record<string, any> = allWeapons.reduce((groups: Record<string, any>, weapon: any) => {
@@ -129,6 +136,11 @@ export default function CombatCalculatorPage({
 
   const availableWeapons: any[] = Object.values(weaponGroups);
   const selectedWeapon = availableWeapons.find((w: any) => w.id === selectedWeaponId);
+
+  // Helper to check if a weapon is a pistol
+  const isPistol = (weapon: any) => {
+    return weapon.keywords && weapon.keywords.some((keyword: string) => keyword.toLowerCase() === 'pistol');
+  };
 
   // Check if a weapon group has been fired this turn
   // A weapon group is considered "fired" if ALL weapons with that name are fired
@@ -144,44 +156,80 @@ export default function CombatCalculatorPage({
     );
   };
 
-  // Count unfired weapons
+  // Get models that have fired pistols this turn
+  const modelsThatFiredPistols = new Set(
+    allWeapons
+      .filter((w: any) => isPistol(w) && w.turnsFired && w.turnsFired.includes(game?.currentTurn))
+      .map((w: any) => w.modelId)
+  );
+
+  // Get models that have fired non-pistols this turn
+  const modelsThatFiredNonPistols = new Set(
+    allWeapons
+      .filter((w: any) => !isPistol(w) && w.turnsFired && w.turnsFired.includes(game?.currentTurn))
+      .map((w: any) => w.modelId)
+  );
+
+  // A weapon group is disabled if:
+  // 1. It's already fired, OR
+  // 2. Any instance of it is on a model that has fired the opposite type
+  const isWeaponDisabled = (weapon: any) => {
+    if (isWeaponFired(weapon)) return true;
+
+    // Get all weapons with this name
+    const weaponsWithSameName = allWeapons.filter((w: any) => w.name === weapon.name);
+
+    // Check if any of these weapons are on models that have fired the opposite type
+    return weaponsWithSameName.some((w: any) => {
+      if (isPistol(w)) {
+        // Pistol is disabled if its model has fired a non-pistol
+        return modelsThatFiredNonPistols.has(w.modelId);
+      } else {
+        // Non-pistol is disabled if its model has fired a pistol
+        return modelsThatFiredPistols.has(w.modelId);
+      }
+    });
+  };
+
+  // Available (non-disabled) weapons
+  const availableUnfiredWeapons = availableWeapons.filter((w: any) => !isWeaponDisabled(w));
   const unfiredWeapons = availableWeapons.filter((w: any) => !isWeaponFired(w));
   const firedWeapons = availableWeapons.filter((w: any) => isWeaponFired(w));
 
   console.log('Available weapon types:', availableWeapons.map((w: any) => w.name));
   console.log('Unfired weapon types:', unfiredWeapons.map((w: any) => w.name));
+  console.log('Available unfired weapons:', availableUnfiredWeapons.map((w: any) => w.name));
   console.log('Fired weapon types:', firedWeapons.map((w: any) => w.name));
 
-  // Auto-close modal when all weapons are fired
+  // Auto-close modal when all available weapons are fired or disabled
   useEffect(() => {
-    if (availableWeapons.length > 0 && unfiredWeapons.length === 0) {
-      console.log('All weapons fired (detected via useEffect), closing modal');
+    if (availableWeapons.length > 0 && availableUnfiredWeapons.length === 0) {
+      console.log('All available weapons fired/disabled (detected via useEffect), closing modal');
       handleBack();
     }
-  }, [unfiredWeapons.length, availableWeapons.length]);
+  }, [availableUnfiredWeapons.length, availableWeapons.length]);
 
-  // Auto-select next unfired weapon when current selection is cleared or becomes fired
+  // Auto-select next available unfired weapon when current selection is cleared or becomes fired/disabled
   useEffect(() => {
-    const firstUnfired = unfiredWeapons[0] as any;
-    const firstUnfiredId = firstUnfired?.id;
-    const unfiredIds = unfiredWeapons.map((w: any) => w.id).join(',');
+    const firstAvailable = availableUnfiredWeapons[0] as any;
+    const firstAvailableId = firstAvailable?.id;
 
     console.log('Auto-select effect running:', {
       selectedWeaponId,
-      unfiredWeaponsLength: unfiredWeapons.length,
-      firstUnfired: firstUnfired?.name,
-      firstUnfiredId,
-      selectedIsFired: selectedWeaponId && !unfiredWeapons.find((w: any) => w.id === selectedWeaponId)
+      availableUnfiredLength: availableUnfiredWeapons.length,
+      firstAvailable: firstAvailable?.name,
+      firstAvailableId,
+      selectedIsDisabled: selectedWeaponId && !availableUnfiredWeapons.find((w: any) => w.id === selectedWeaponId)
     });
 
-    // If no weapon is selected and there are unfired weapons, select the first one
-    // OR if the currently selected weapon has been fired, select the next unfired one
-    if (unfiredWeapons.length > 0 && (!selectedWeaponId || (selectedWeaponId && !unfiredWeapons.find((w: any) => w.id === selectedWeaponId)))) {
-      console.log('Auto-selecting next unfired weapon:', firstUnfired?.name, firstUnfiredId);
-      setSelectedWeaponId(firstUnfiredId);
+    // If no weapon is selected and there are available weapons, select the first one
+    // OR if the currently selected weapon has been fired/disabled, select the next available one
+    if (availableUnfiredWeapons.length > 0 && (!selectedWeaponId || (selectedWeaponId && !availableUnfiredWeapons.find((w: any) => w.id === selectedWeaponId)))) {
+      console.log('Auto-selecting next available weapon:', firstAvailable?.name, firstAvailableId);
+      setSelectedWeaponId(firstAvailableId);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedWeaponId, unfiredWeapons.length]);
+  }, [selectedWeaponId, availableUnfiredWeapons.length]);
 
   // Auto-select weapon if preSelectedWeaponName is provided
   useEffect(() => {
@@ -216,22 +264,37 @@ export default function CombatCalculatorPage({
 
     try {
       // Get all weapons with the same NAME in this unit (not just the same ID)
-      const weaponsToUpdate = allWeapons.filter((w: any) => w.name === (selectedWeapon as any).name);
+      const weaponsWithSameName = allWeapons.filter((w: any) => w.name === (selectedWeapon as any).name);
 
-      console.log(`🎯 Firing all ${weaponsToUpdate.length}x ${(selectedWeapon as any).name}`);
+      const selectedIsPistol = isPistol(selectedWeapon);
+
+      // Filter to only weapons on models that can still fire this weapon type
+      const weaponsToUpdate = weaponsWithSameName.filter((weapon: any) => {
+        // Skip if already fired this turn
+        const currentTurnsFired = weapon.turnsFired || [];
+        if (currentTurnsFired.includes(game.currentTurn)) {
+          return false;
+        }
+
+        // Check if this weapon's model has fired the opposite type
+        if (selectedIsPistol) {
+          // Can't fire pistol if model has fired non-pistol
+          return !modelsThatFiredNonPistols.has(weapon.modelId);
+        } else {
+          // Can't fire non-pistol if model has fired pistol
+          return !modelsThatFiredPistols.has(weapon.modelId);
+        }
+      });
+
+      console.log(`🎯 Firing ${weaponsToUpdate.length}/${weaponsWithSameName.length}x ${(selectedWeapon as any).name}`);
 
       // Batch all weapon updates into a single transaction for performance
-      const updates = weaponsToUpdate
-        .filter((weapon: any) => {
-          const currentTurnsFired = weapon.turnsFired || [];
-          return !currentTurnsFired.includes(game.currentTurn);
-        })
-        .map((weapon: any) => {
-          const currentTurnsFired = weapon.turnsFired || [];
-          return db.tx.weapons[weapon.id].update({
-            turnsFired: [...currentTurnsFired, game.currentTurn]
-          });
+      const updates = weaponsToUpdate.map((weapon: any) => {
+        const currentTurnsFired = weapon.turnsFired || [];
+        return db.tx.weapons[weapon.id].update({
+          turnsFired: [...currentTurnsFired, game.currentTurn]
         });
+      });
 
       if (updates.length > 0) {
         const tBefore = performance.now();
@@ -291,19 +354,23 @@ export default function CombatCalculatorPage({
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-white">Select Weapon</h3>
                 <div className="text-sm text-gray-400">
-                  {unfiredWeapons.length} / {availableWeapons.length} remaining
+                  {availableUnfiredWeapons.length} / {availableWeapons.length} remaining
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 mb-6">
                 {availableWeapons.map((weapon: any) => {
                   const isFired = isWeaponFired(weapon);
+                  const isDisabled = isWeaponDisabled(weapon);
+                  const disabledReason = !isFired && isDisabled
+                    ? (isPistol(weapon) ? '(Non-pistols fired)' : '(Pistols fired)')
+                    : '';
                   return (
                     <button
                       key={weapon.id}
-                      onClick={() => !isFired && setSelectedWeaponId(weapon.id)}
-                      disabled={isFired}
+                      onClick={() => !isDisabled && setSelectedWeaponId(weapon.id)}
+                      disabled={isDisabled}
                       className={`p-3 rounded-lg border-2 transition-all ${
-                        isFired
+                        isDisabled
                           ? 'border-gray-700 bg-gray-900 opacity-50 cursor-not-allowed'
                           : selectedWeaponId === weapon.id
                           ? 'border-red-500 bg-red-500/10'
@@ -311,11 +378,12 @@ export default function CombatCalculatorPage({
                       }`}
                     >
                       <div className="text-left">
-                        <div className={`font-medium ${isFired ? 'text-gray-500 line-through' : 'text-white'}`}>
+                        <div className={`font-medium ${isDisabled ? 'text-gray-500 line-through' : 'text-white'}`}>
                           {weapon.name}
                           {isFired && <span className="ml-2 text-xs">(Fired)</span>}
+                          {disabledReason && <span className="ml-2 text-xs">{disabledReason}</span>}
                         </div>
-                        <div className={`text-xs mt-1 ${isFired ? 'text-gray-600' : 'text-gray-400'}`}>
+                        <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-600' : 'text-gray-400'}`}>
                           Range {weapon.range}" • {weapon.A} attacks
                         </div>
                       </div>
