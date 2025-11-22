@@ -198,7 +198,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
 
                      {/* Divider if both types exist */}
                      {weaponStatus.pistols.length > 0 && weaponStatus.regularWeapons.length > 0 && hasAnyUnfired && (
-                       <div className="text-center text-xs text-gray-500" py-2>
+                       <div className="text-center text-xs text-gray-500 py-2">
                          --or--
                        </div>
                      )}

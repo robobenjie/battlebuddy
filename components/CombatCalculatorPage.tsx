@@ -96,13 +96,30 @@ export default function CombatCalculatorPage({
     }
   }, []);
 
-  // Get all weapons from the unit
-  const allWeapons = unit?.models?.flatMap((model: any) =>
+  // Query the unit's weapons dynamically so they update when fired
+  const { data: weaponsData } = db.useQuery(
+    unit?.id ? {
+      units: {
+        models: {
+          weapons: {}
+        },
+        $: {
+          where: {
+            id: unit.id
+          }
+        }
+      }
+    } : {}
+  );
+
+  // Get all weapons from the queried unit (this will update when weapons are fired)
+  const queriedUnit = weaponsData?.units?.[0];
+  const allWeapons = queriedUnit?.models?.flatMap((model: any) =>
     model.weapons?.filter((weapon: any) => weapon.range > 0) || []
   ) || [];
 
   // Group weapons by name
-  const weaponGroups = allWeapons.reduce((groups: any, weapon: any) => {
+  const weaponGroups: Record<string, any> = allWeapons.reduce((groups: Record<string, any>, weapon: any) => {
     const key = weapon.name;
     if (!groups[key]) {
       groups[key] = weapon;
@@ -110,7 +127,7 @@ export default function CombatCalculatorPage({
     return groups;
   }, {});
 
-  const availableWeapons = Object.values(weaponGroups);
+  const availableWeapons: any[] = Object.values(weaponGroups);
   const selectedWeapon = availableWeapons.find((w: any) => w.id === selectedWeaponId);
 
   // Check if a weapon group has been fired this turn
@@ -131,10 +148,45 @@ export default function CombatCalculatorPage({
   const unfiredWeapons = availableWeapons.filter((w: any) => !isWeaponFired(w));
   const firedWeapons = availableWeapons.filter((w: any) => isWeaponFired(w));
 
+  console.log('Available weapon types:', availableWeapons.map((w: any) => w.name));
+  console.log('Unfired weapon types:', unfiredWeapons.map((w: any) => w.name));
+  console.log('Fired weapon types:', firedWeapons.map((w: any) => w.name));
+
+  // Auto-close modal when all weapons are fired
+  useEffect(() => {
+    if (availableWeapons.length > 0 && unfiredWeapons.length === 0) {
+      console.log('All weapons fired (detected via useEffect), closing modal');
+      handleBack();
+    }
+  }, [unfiredWeapons.length, availableWeapons.length]);
+
+  // Auto-select next unfired weapon when current selection is cleared or becomes fired
+  useEffect(() => {
+    const firstUnfired = unfiredWeapons[0] as any;
+    const firstUnfiredId = firstUnfired?.id;
+    const unfiredIds = unfiredWeapons.map((w: any) => w.id).join(',');
+
+    console.log('Auto-select effect running:', {
+      selectedWeaponId,
+      unfiredWeaponsLength: unfiredWeapons.length,
+      firstUnfired: firstUnfired?.name,
+      firstUnfiredId,
+      selectedIsFired: selectedWeaponId && !unfiredWeapons.find((w: any) => w.id === selectedWeaponId)
+    });
+
+    // If no weapon is selected and there are unfired weapons, select the first one
+    // OR if the currently selected weapon has been fired, select the next unfired one
+    if (unfiredWeapons.length > 0 && (!selectedWeaponId || (selectedWeaponId && !unfiredWeapons.find((w: any) => w.id === selectedWeaponId)))) {
+      console.log('Auto-selecting next unfired weapon:', firstUnfired?.name, firstUnfiredId);
+      setSelectedWeaponId(firstUnfiredId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedWeaponId, unfiredWeapons.length]);
+
   // Auto-select weapon if preSelectedWeaponName is provided
   useEffect(() => {
     if (preSelectedWeaponName && availableWeapons.length > 0 && !selectedWeaponId) {
-      const weapon = availableWeapons.find((w: any) => w.name === preSelectedWeaponName);
+      const weapon = availableWeapons.find((w: any) => w.name === preSelectedWeaponName) as any;
       if (weapon) {
         setSelectedWeaponId(weapon.id);
       }
@@ -188,27 +240,8 @@ export default function CombatCalculatorPage({
         console.log(`⏱️  Fired ${updates.length} weapons in ${(tAfter - tBefore).toFixed(2)}ms`);
       }
 
-      // Clear selected weapon immediately so UI updates
+      // Clear selected weapon - let useEffect handle closing modal if all weapons fired
       setSelectedWeaponId('');
-
-      // Use setTimeout to check remaining weapons after React re-renders with updated data
-      setTimeout(() => {
-        // Re-calculate unfired weapons based on updated data
-        const stillUnfired = availableWeapons.filter((w: any) => {
-          // Skip the weapon we just fired
-          if (w.name === (selectedWeapon as any).name) return false;
-          // Check if other weapons are still unfired
-          return !isWeaponFired(w);
-        });
-
-        console.log(`Remaining unfired weapon types after update: ${stillUnfired.length}`);
-
-        // If no weapons left to fire, close the calculator
-        if (stillUnfired.length === 0) {
-          console.log('All weapons fired, closing modal');
-          handleBack();
-        }
-      }, 50); // Small delay to let InstantDB update local state
     } catch (error) {
       console.error('Failed to mark weapon as fired:', error);
     }
