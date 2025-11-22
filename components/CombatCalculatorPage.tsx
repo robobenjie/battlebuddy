@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '../lib/db';
 import UnitCard from './ui/UnitCard';
@@ -10,37 +10,47 @@ import { formatUnitForCard } from '../lib/unit-utils';
 interface CombatCalculatorPageProps {
   gameId?: string;
   unitId?: string;
+  unit?: any;
+  currentArmyId?: string;
   weaponType?: string;
+  preSelectedWeaponName?: string;
   onClose?: () => void;
 }
 
-export default function CombatCalculatorPage({ 
-  gameId: propGameId, 
-  unitId: propUnitId, 
+export default function CombatCalculatorPage({
+  gameId: propGameId,
+  unitId: propUnitId,
+  unit: propUnit,
+  currentArmyId: propCurrentArmyId,
   weaponType,
-  onClose 
+  preSelectedWeaponName,
+  onClose
 }: CombatCalculatorPageProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const gameId = propGameId || searchParams.get('gameId') || '';
   const unitId = propUnitId || searchParams.get('unitId') || '';
-  // Query the unit data
-  const { data: unitData } = db.useQuery({
-    units: {
-      models: {
-        weapons: {}
-      },
-      army: {},
-      statuses: {},
-      $: {
-        where: {
-          id: unitId
+
+  // If unit is passed as prop, use it directly (no query needed)
+  // Otherwise, query it (for standalone usage via URL)
+  const { data: unitData } = db.useQuery(
+    propUnit ? {} : {
+      units: {
+        models: {
+          weapons: {}
+        },
+        army: {},
+        statuses: {},
+        $: {
+          where: {
+            id: unitId
+          }
         }
       }
     }
-  });
+  );
 
-  const unit = unitData?.units?.[0];
+  const unit = propUnit || unitData?.units?.[0];
 
   
   // Now try the full query
@@ -64,13 +74,27 @@ export default function CombatCalculatorPage({
   
   
   const game = enemyUnitData?.games?.[0];
-  const enemyArmies = game?.armies?.filter((army: any) => army.id !== unit?.army?.id) || [];
-  const enemyUnits = enemyArmies?.flatMap((army: any) => army.units) || [];
+  // Filter out the current unit's army - use prop if available, fallback to unit.armyId
+  const currentArmyId = propCurrentArmyId || unit?.armyId;
+
+  const enemyArmies = game?.armies?.filter((army: any) => army.id !== currentArmyId) || [];
+  const enemyUnits = (enemyArmies?.flatMap((army: any) => army.units) || [])
+    .sort((a: any, b: any) => a.name.localeCompare(b.name)); // Sort alphabetically
 
   // State for selected target and weapon
   const [selectedTargetId, setSelectedTargetId] = useState<string>('');
   const [selectedWeaponId, setSelectedWeaponId] = useState<string>('');
   const selectedTarget = enemyUnits.find((enemyUnit: any) => enemyUnit.id === selectedTargetId);
+
+  // Ref for target select to auto-focus
+  const targetSelectRef = useRef<HTMLSelectElement>(null);
+
+  // Auto-focus the target dropdown when component mounts
+  useEffect(() => {
+    if (targetSelectRef.current) {
+      targetSelectRef.current.focus();
+    }
+  }, []);
 
   // Get all weapons from the unit
   const allWeapons = unit?.models?.flatMap((model: any) =>
@@ -89,15 +113,33 @@ export default function CombatCalculatorPage({
   const availableWeapons = Object.values(weaponGroups);
   const selectedWeapon = availableWeapons.find((w: any) => w.id === selectedWeaponId);
 
-  // Check if a weapon has been fired this turn
+  // Check if a weapon group has been fired this turn
+  // A weapon group is considered "fired" if ALL weapons with that name are fired
   const isWeaponFired = (weapon: any) => {
     if (!game?.currentTurn) return false;
-    return weapon.turnsFired && weapon.turnsFired.includes(game.currentTurn);
+
+    // Get all weapons with this name
+    const weaponsWithSameName = allWeapons.filter((w: any) => w.name === weapon.name);
+
+    // Check if ALL of them have been fired this turn
+    return weaponsWithSameName.every((w: any) =>
+      w.turnsFired && w.turnsFired.includes(game.currentTurn)
+    );
   };
 
   // Count unfired weapons
   const unfiredWeapons = availableWeapons.filter((w: any) => !isWeaponFired(w));
   const firedWeapons = availableWeapons.filter((w: any) => isWeaponFired(w));
+
+  // Auto-select weapon if preSelectedWeaponName is provided
+  useEffect(() => {
+    if (preSelectedWeaponName && availableWeapons.length > 0 && !selectedWeaponId) {
+      const weapon = availableWeapons.find((w: any) => w.name === preSelectedWeaponName);
+      if (weapon) {
+        setSelectedWeaponId(weapon.id);
+      }
+    }
+  }, [preSelectedWeaponName, availableWeapons, selectedWeaponId]);
 
   // Get target's defensive stats and model count
   const targetStats = selectedTarget?.models?.[0] ? {
@@ -116,39 +158,57 @@ export default function CombatCalculatorPage({
   };
 
   const handleShoot = async () => {
-    if (!selectedWeapon || !game?.currentTurn) return;
+    if (!selectedWeapon || !game?.currentTurn) {
+      return;
+    }
 
     try {
-      // Get all weapons with the same ID (in case of multiple models with same weapon)
-      const weaponsToUpdate = allWeapons.filter((w: any) => w.id === (selectedWeapon as any).id);
+      // Get all weapons with the same NAME in this unit (not just the same ID)
+      const weaponsToUpdate = allWeapons.filter((w: any) => w.name === (selectedWeapon as any).name);
 
-      // Update each weapon's turnsFired array
-      for (const weapon of weaponsToUpdate) {
-        const currentTurnsFired = weapon.turnsFired || [];
-        if (!currentTurnsFired.includes(game.currentTurn)) {
-          await db.transact([
-            db.tx.weapons[weapon.id].update({
-              turnsFired: [...currentTurnsFired, game.currentTurn]
-            })
-          ]);
+      console.log(`🎯 Firing all ${weaponsToUpdate.length}x ${(selectedWeapon as any).name}`);
+
+      // Batch all weapon updates into a single transaction for performance
+      const updates = weaponsToUpdate
+        .filter((weapon: any) => {
+          const currentTurnsFired = weapon.turnsFired || [];
+          return !currentTurnsFired.includes(game.currentTurn);
+        })
+        .map((weapon: any) => {
+          const currentTurnsFired = weapon.turnsFired || [];
+          return db.tx.weapons[weapon.id].update({
+            turnsFired: [...currentTurnsFired, game.currentTurn]
+          });
+        });
+
+      if (updates.length > 0) {
+        const tBefore = performance.now();
+        await db.transact(updates);
+        const tAfter = performance.now();
+        console.log(`⏱️  Fired ${updates.length} weapons in ${(tAfter - tBefore).toFixed(2)}ms`);
+      }
+
+      // Clear selected weapon immediately so UI updates
+      setSelectedWeaponId('');
+
+      // Use setTimeout to check remaining weapons after React re-renders with updated data
+      setTimeout(() => {
+        // Re-calculate unfired weapons based on updated data
+        const stillUnfired = availableWeapons.filter((w: any) => {
+          // Skip the weapon we just fired
+          if (w.name === (selectedWeapon as any).name) return false;
+          // Check if other weapons are still unfired
+          return !isWeaponFired(w);
+        });
+
+        console.log(`Remaining unfired weapon types after update: ${stillUnfired.length}`);
+
+        // If no weapons left to fire, close the calculator
+        if (stillUnfired.length === 0) {
+          console.log('All weapons fired, closing modal');
+          handleBack();
         }
-      }
-
-      // Check if all weapons will be fired after this update
-      const remainingUnfired = availableWeapons.filter((w: any) => {
-        // If this is the weapon we just fired, it's now fired
-        if (w.id === (selectedWeapon as any).id) return false;
-        // Otherwise check if it was already fired
-        return !isWeaponFired(w);
-      });
-
-      // If no weapons left to fire, close the calculator
-      if (remainingUnfired.length === 0) {
-        handleBack();
-      } else {
-        // Clear selected weapon to allow selecting another
-        setSelectedWeaponId('');
-      }
+      }, 50); // Small delay to let InstantDB update local state
     } catch (error) {
       console.error('Failed to mark weapon as fired:', error);
     }
@@ -189,98 +249,58 @@ export default function CombatCalculatorPage({
 
   return (
     <div className="text-white">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Combat Calculator</h1>
-        <button
-          onClick={handleBack}
-          className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-        >
-          Back
-        </button>
-      </div>
-
-      {/* Unit Card */}
       <div className="max-w-2xl mx-auto">
-        <UnitCard
-          unit={unitDataForCard.unit}
-          expandable={true}
-          defaultExpanded={false}
-          className="border-0"
-        />
-      </div>
-
-      {/* Weapon Selection */}
-      <div className="mt-8 max-w-2xl mx-auto">
+        {/* Main Card */}
         <div className="bg-gray-800 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Select Weapon</h3>
-            <div className="text-sm text-gray-400">
-              {unfiredWeapons.length} / {availableWeapons.length} remaining
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {availableWeapons.map((weapon: any) => {
-              const isFired = isWeaponFired(weapon);
-              return (
-                <button
-                  key={weapon.id}
-                  onClick={() => !isFired && setSelectedWeaponId(weapon.id)}
-                  disabled={isFired}
-                  className={`p-3 rounded-lg border-2 transition-all ${
-                    isFired
-                      ? 'border-gray-700 bg-gray-900 opacity-50 cursor-not-allowed'
-                      : selectedWeaponId === weapon.id
-                      ? 'border-red-500 bg-red-500/10'
-                      : 'border-gray-600 hover:border-gray-500 bg-gray-700'
-                  }`}
-                >
-                  <div className="text-left">
-                    <div className={`font-medium ${isFired ? 'text-gray-500 line-through' : 'text-white'}`}>
-                      {weapon.name}
-                      {isFired && <span className="ml-2 text-xs">(Fired)</span>}
-                    </div>
-                    <div className={`text-xs mt-1 ${isFired ? 'text-gray-600' : 'text-gray-400'}`}>
-                      Range {weapon.range}" • {weapon.A} attacks
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Weapon Profile Display */}
-          {selectedWeapon ? (
-            <div className="mt-6">
-              <WeaponProfileDisplay
-                weapon={selectedWeapon as any}
-                target={targetStats}
-              />
-
-              {/* Shoot Button */}
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={handleShoot}
-                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
-                >
-                  Shoot
-                </button>
+          {/* Weapon Selection - only show if more than one weapon */}
+          {availableWeapons.length > 1 && (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white">Select Weapon</h3>
+                <div className="text-sm text-gray-400">
+                  {unfiredWeapons.length} / {availableWeapons.length} remaining
+                </div>
               </div>
-            </div>
-          ) : null}
-        </div>
-      </div>
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                {availableWeapons.map((weapon: any) => {
+                  const isFired = isWeaponFired(weapon);
+                  return (
+                    <button
+                      key={weapon.id}
+                      onClick={() => !isFired && setSelectedWeaponId(weapon.id)}
+                      disabled={isFired}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        isFired
+                          ? 'border-gray-700 bg-gray-900 opacity-50 cursor-not-allowed'
+                          : selectedWeaponId === weapon.id
+                          ? 'border-red-500 bg-red-500/10'
+                          : 'border-gray-600 hover:border-gray-500 bg-gray-700'
+                      }`}
+                    >
+                      <div className="text-left">
+                        <div className={`font-medium ${isFired ? 'text-gray-500 line-through' : 'text-white'}`}>
+                          {weapon.name}
+                          {isFired && <span className="ml-2 text-xs">(Fired)</span>}
+                        </div>
+                        <div className={`text-xs mt-1 ${isFired ? 'text-gray-600' : 'text-gray-400'}`}>
+                          Range {weapon.range}" • {weapon.A} attacks
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
-      {/* Target Selection */}
-      <div className="mt-8 max-w-2xl mx-auto">
-        <div className="bg-gray-800 rounded-lg p-6">
-          {/* Target Dropdown */}
-          <div className="mb-4">
+          {/* Target Selection */}
+          <div className="mb-6">
             <label htmlFor="target-select" className="block text-sm font-medium text-gray-300 mb-2">
               Select Target Unit
             </label>
             <select
               id="target-select"
+              ref={targetSelectRef}
               value={selectedTargetId}
               onChange={(e) => setSelectedTargetId(e.target.value)}
               className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
@@ -294,17 +314,44 @@ export default function CombatCalculatorPage({
             </select>
           </div>
 
-          {/* Selected Target Unit Card */}
-          {selectedTarget ? (
-            <div className="mt-4">
-              <UnitCard
-                unit={formatUnitForCard(selectedTarget).unit}
-                expandable={true}
-                defaultExpanded={false}
-                className="border-0"
+          {/* Weapon Profile Display / Results Table */}
+          {selectedWeapon && (
+            <div className="mb-6">
+              <WeaponProfileDisplay
+                weapon={selectedWeapon as any}
+                target={targetStats}
+                unitName={unit?.name}
               />
             </div>
-          ) : null}
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-700">
+            <button
+              onClick={handleBack}
+              className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+            >
+              Back
+            </button>
+            {selectedWeapon && (
+              <button
+                onClick={handleShoot}
+                className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+              >
+                Fire
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Collapsed Unit Card at bottom */}
+        <div className="mt-6">
+          <UnitCard
+            unit={unitDataForCard.unit}
+            expandable={true}
+            defaultExpanded={false}
+            className="border-0"
+          />
         </div>
       </div>
     </div>

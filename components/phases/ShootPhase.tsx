@@ -29,8 +29,9 @@ interface ShootPhaseProps {
 export default function ShootPhase({ gameId, army, currentPlayer, currentUser, game }: ShootPhaseProps) {
   const router = useRouter();
   const [showCombatCalculator, setShowCombatCalculator] = useState(false);
-  const [selectedUnitId, setSelectedUnitId] = useState<string>('');
+  const [selectedUnit, setSelectedUnit] = useState<any>(null);
   const [selectedWeaponType, setSelectedWeaponType] = useState<string>('');
+  const [selectedWeaponName, setSelectedWeaponName] = useState<string>('');
 
   // Query units for this army in the game
   const { data: unitsData } = db.useQuery({
@@ -54,17 +55,22 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
   const isActivePlayer = currentUser?.id === currentPlayer.userId;
 
   // Open combat calculator
-  const openCombatCalculator = (unitId: string, weaponType?: string) => {
-    setSelectedUnitId(unitId);
-    setSelectedWeaponType(weaponType || '');
-    setShowCombatCalculator(true);
+  const openCombatCalculator = (unitId: string, weaponType?: string, weaponName?: string) => {
+    const unit = units.find((u: any) => u.id === unitId);
+    if (unit) {
+      setSelectedUnit(unit);
+      setSelectedWeaponType(weaponType || '');
+      setSelectedWeaponName(weaponName || '');
+      setShowCombatCalculator(true);
+    }
   };
 
   // Close combat calculator
   const closeCombatCalculator = () => {
     setShowCombatCalculator(false);
-    setSelectedUnitId('');
+    setSelectedUnit(null);
     setSelectedWeaponType('');
+    setSelectedWeaponName('');
   };
 
   // Helper function to get weapon status for a unit, separated by type
@@ -156,35 +162,37 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
                      {weaponStatus.regularWeapons.length > 0 && (
                        <div className="flex items-center justify-between">
                          <div className="flex-1">
-                           <div className="space-y-1">
+                           <div className="space-y-2">
                              {weaponStatus.regularWeapons.map((weapon, index) => (
-                               <div key={index} className="text-sm">
-                                 {weapon.isFired ? (
-                                   <span className="text-gray-500 line-through">
-                                     {weapon.name} ({weapon.range}" range)
-                                   </span>
-                                 ) : weapon.unfired === weapon.total ? (
-                                   <span className="text-gray-400">
-                                     {weapon.total}x {weapon.name} ({weapon.range}" range)
-                                   </span>
-                                 ) : (
-                                   <span className="text-gray-400">
-                                     {weapon.unfired}/{weapon.total} {weapon.name} ({weapon.range}" range)
-                                   </span>
+                               <div key={index} className="flex items-center justify-between text-sm">
+                                 <div>
+                                   {weapon.isFired ? (
+                                     <span className="text-gray-500 line-through">
+                                       {weapon.name} ({weapon.range}" range)
+                                     </span>
+                                   ) : weapon.unfired === weapon.total ? (
+                                     <span className="text-gray-400">
+                                       {weapon.total}x {weapon.name} ({weapon.range}" range)
+                                     </span>
+                                   ) : (
+                                     <span className="text-gray-400">
+                                       {weapon.unfired}/{weapon.total} {weapon.name} ({weapon.range}" range)
+                                     </span>
+                                   )}
+                                 </div>
+                                 {!weapon.isFired && (
+                                   <button
+                                     onClick={() => openCombatCalculator(unit.id, 'regular', weapon.name)}
+                                     disabled={!isActivePlayer}
+                                     className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-1 px-3 rounded transition-colors text-xs disabled:cursor-not-allowed ml-2"
+                                   >
+                                     Fire
+                                   </button>
                                  )}
                                </div>
                              ))}
                            </div>
                          </div>
-                         {hasUnfiredRegular && (
-                           <button
-                             onClick={() => openCombatCalculator(unit.id, 'regular')}
-                             disabled={!isActivePlayer}
-                             className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:cursor-not-allowed"
-                           >
-                             Fire
-                           </button>
-                         )}
                        </div>
                      )}
 
@@ -199,35 +207,37 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
                      {weaponStatus.pistols.length > 0 && (
                        <div className="flex items-center justify-between">
                          <div className="flex-1">
-                           <div className="space-y-1">
+                           <div className="space-y-2">
                              {weaponStatus.pistols.map((weapon, index) => (
-                               <div key={index} className="text-sm">
-                                 {weapon.isFired ? (
-                                   <span className="text-gray-500 line-through">
-                                     {weapon.name} ({weapon.range}" range)
-                                   </span>
-                                 ) : weapon.unfired === weapon.total ? (
-                                   <span className="text-gray-400">
-                                     {weapon.total}x {weapon.name} ({weapon.range}" range)
-                                   </span>
-                                 ) : (
-                                   <span className="text-gray-400">
-                                     {weapon.unfired}/{weapon.total} {weapon.name} ({weapon.range}" range)
-                                   </span>
+                               <div key={index} className="flex items-center justify-between text-sm">
+                                 <div>
+                                   {weapon.isFired ? (
+                                     <span className="text-gray-500 line-through">
+                                       {weapon.name} ({weapon.range}" range)
+                                     </span>
+                                   ) : weapon.unfired === weapon.total ? (
+                                     <span className="text-gray-400">
+                                       {weapon.total}x {weapon.name} ({weapon.range}" range)
+                                     </span>
+                                   ) : (
+                                     <span className="text-gray-400">
+                                       {weapon.unfired}/{weapon.total} {weapon.name} ({weapon.range}" range)
+                                     </span>
+                                   )}
+                                 </div>
+                                 {!weapon.isFired && (
+                                   <button
+                                     onClick={() => openCombatCalculator(unit.id, 'pistol', weapon.name)}
+                                     disabled={!isActivePlayer}
+                                     className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-1 px-3 rounded transition-colors text-xs disabled:cursor-not-allowed ml-2"
+                                   >
+                                     Fire
+                                   </button>
                                  )}
                                </div>
                              ))}
                            </div>
                          </div>
-                         {hasUnfiredPistols && (
-                           <button
-                             onClick={() => openCombatCalculator(unit.id, 'pistol')}
-                             disabled={!isActivePlayer}
-                             className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm disabled:cursor-not-allowed"
-                           >
-                             Fire
-                           </button>
-                         )}
                        </div>
                      )}
                   </div>
@@ -239,14 +249,16 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
       </div>
 
       {/* Combat Calculator Modal */}
-      {showCombatCalculator && (
+      {showCombatCalculator && selectedUnit && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-gray-900 rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="p-4">
-              <CombatCalculatorPage 
+              <CombatCalculatorPage
                 gameId={gameId}
-                unitId={selectedUnitId}
+                unit={selectedUnit}
+                currentArmyId={army.id}
                 weaponType={selectedWeaponType}
+                preSelectedWeaponName={selectedWeaponName}
                 onClose={closeCombatCalculator}
               />
             </div>

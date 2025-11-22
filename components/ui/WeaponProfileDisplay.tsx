@@ -24,6 +24,7 @@ interface Target {
 interface WeaponProfileDisplayProps {
   weapon: Weapon;
   target?: Target;
+  unitName?: string;
   className?: string;
 }
 
@@ -87,6 +88,7 @@ function getSaveRoll(targetSave: number, weaponAP: number, invulnerableSave?: nu
 export default function WeaponProfileDisplay({
   weapon,
   target,
+  unitName,
   className = ''
 }: WeaponProfileDisplayProps) {
   const [isAtHalfRange, setIsAtHalfRange] = useState(false);
@@ -192,7 +194,9 @@ export default function WeaponProfileDisplay({
 
   return (
     <div className={`bg-gray-800 rounded-lg p-4 ${className}`}>
-      <h3 className="text-lg font-semibold text-white mb-3">{weapon.name}</h3>
+      <h3 className="text-lg font-semibold text-white mb-3">
+        {unitName ? `${unitName}: ` : ''}{weapon.name}
+      </h3>
 
       <table className="w-full text-sm table-fixed">
         <colgroup>
