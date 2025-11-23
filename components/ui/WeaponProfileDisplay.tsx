@@ -26,6 +26,7 @@ interface WeaponProfileDisplayProps {
   target?: Target;
   unitName?: string;
   className?: string;
+  hideRange?: boolean;
 }
 
 // Parse keyword to extract numeric value
@@ -89,7 +90,8 @@ export default function WeaponProfileDisplay({
   weapon,
   target,
   unitName,
-  className = ''
+  className = '',
+  hideRange = false
 }: WeaponProfileDisplayProps) {
   const [isAtHalfRange, setIsAtHalfRange] = useState(false);
 
@@ -184,7 +186,7 @@ export default function WeaponProfileDisplay({
   };
 
   const rows = [
-    { stat: 'Range', value: `${weapon.range}"`, modifier: '' },
+    ...(!hideRange ? [{ stat: 'Range', value: `${weapon.range}"`, modifier: '' }] : []),
     getAttacksRow(),
     getHitsRow(),
     getWoundsRow(),

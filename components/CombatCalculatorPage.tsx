@@ -116,8 +116,11 @@ export default function CombatCalculatorPage({
   const queriedUnit = weaponsData?.units?.[0];
 
   // Build a map of weapons with their model information
+  // Filter by weapon type: melee (range === 0) or ranged (range > 0)
   const allWeaponsWithModels = queriedUnit?.models?.flatMap((model: any) =>
-    (model.weapons?.filter((weapon: any) => weapon.range > 0) || []).map((weapon: any) => ({
+    (model.weapons?.filter((weapon: any) =>
+      weaponType === 'melee' ? weapon.range === 0 : weapon.range > 0
+    ) || []).map((weapon: any) => ({
       ...weapon,
       modelId: model.id
     }))
@@ -172,9 +175,12 @@ export default function CombatCalculatorPage({
 
   // A weapon group is disabled if:
   // 1. It's already fired, OR
-  // 2. Any instance of it is on a model that has fired the opposite type
+  // 2. For ranged weapons only: Any instance of it is on a model that has fired the opposite type (pistol/non-pistol rule)
   const isWeaponDisabled = (weapon: any) => {
     if (isWeaponFired(weapon)) return true;
+
+    // Melee weapons don't have pistol/non-pistol restriction
+    if (weaponType === 'melee') return false;
 
     // Get all weapons with this name
     const weaponsWithSameName = allWeapons.filter((w: any) => w.name === weapon.name);
@@ -384,7 +390,7 @@ export default function CombatCalculatorPage({
                           {disabledReason && <span className="ml-2 text-xs">{disabledReason}</span>}
                         </div>
                         <div className={`text-xs mt-1 ${isDisabled ? 'text-gray-600' : 'text-gray-400'}`}>
-                          Range {weapon.range}" • {weapon.A} attacks
+                          {weaponType !== 'melee' && `Range ${weapon.range}" • `}{weapon.A} attacks
                         </div>
                       </div>
                     </button>
@@ -422,6 +428,7 @@ export default function CombatCalculatorPage({
                 weapon={selectedWeapon as any}
                 target={targetStats}
                 unitName={unit?.name}
+                hideRange={weaponType === 'melee'}
               />
             </div>
           )}
@@ -439,7 +446,7 @@ export default function CombatCalculatorPage({
                 onClick={handleShoot}
                 className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
               >
-                Fire
+                {weaponType === 'melee' ? 'Fight' : 'Fire'}
               </button>
             )}
           </div>

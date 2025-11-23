@@ -1,5 +1,12 @@
 'use client';
 
+import { useState } from 'react';
+import { db } from '../../lib/db';
+import { id } from '@instantdb/react';
+import UnitCard from '../ui/UnitCard';
+import { formatUnitForCard } from '../../lib/unit-utils';
+import CombatCalculatorPage from '../CombatCalculatorPage';
+
 interface FightPhaseProps {
   gameId: string;
   army: {
@@ -20,28 +27,272 @@ interface FightPhaseProps {
 }
 
 export default function FightPhase({ gameId, army, currentPlayer, currentUser, game }: FightPhaseProps) {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showCombatCalculator, setShowCombatCalculator] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState<any>(null);
+  const [selectedUnitArmyId, setSelectedUnitArmyId] = useState<string>('');
+
+  // Query ALL armies and units in this game
+  const { data: gameData } = db.useQuery({
+    games: {
+      armies: {
+        units: {
+          models: {
+            weapons: {}
+          },
+          statuses: {},
+        },
+      },
+      $: {
+        where: {
+          id: gameId
+        }
+      }
+    },
+  });
+
+  // Query players to get player names
+  const { data: playersData } = db.useQuery({
+    players: {
+      $: {
+        where: {
+          gameId: gameId
+        }
+      }
+    }
+  });
+
+  const allArmies = gameData?.games[0]?.armies || [];
+  const players = playersData?.players || [];
+
+  // Helper to get army name (fallback to player name if needed)
+  const getArmyDisplayName = (army: any) => {
+    return army?.name || 'Unknown Army';
+  };
+
+  // Helper function to check if unit has charged this turn
+  const hasChargedThisTurn = (unit: any) => {
+    if (!unit || !unit.statuses) return false;
+    return unit.statuses.some((status: any) =>
+      status.name === 'charged' &&
+      status.turns && status.turns.includes(game.currentTurn)
+    );
+  };
+
+  // Helper function to check if unit has fought this turn
+  const hasFoughtThisTurn = (unit: any) => {
+    if (!unit || !unit.statuses) return false;
+    return unit.statuses.some((status: any) =>
+      status.name === 'fought' &&
+      status.turns && status.turns.includes(game.currentTurn)
+    );
+  };
+
+  // Helper function to create unit status for current turn
+  const createUnitStatus = async (unitId: string, statusName: string) => {
+    await db.transact([
+      db.tx.unitStatuses[id()].update({
+        unitId: unitId,
+        name: statusName,
+        turns: [game.currentTurn],
+        rules: []
+      }).link({ unit: unitId })
+    ]);
+  };
+
+  // Helper function to delete fought status for current turn
+  const deleteFoughtStatusForTurn = async (unit: any) => {
+    if (!unit || !unit.statuses) return;
+
+    const statusesToDelete = unit.statuses.filter((status: any) =>
+      status.name === 'fought' &&
+      status.turns && status.turns.includes(game.currentTurn)
+    );
+
+    if (statusesToDelete.length > 0) {
+      await db.transact(
+        statusesToDelete.map((status: any) =>
+          db.tx.unitStatuses[status.id].delete()
+        )
+      );
+    }
+  };
+
+  // Open combat calculator for melee weapons
+  const openCombatCalculator = (unit: any, armyId: string) => {
+    setSelectedUnit(unit);
+    setSelectedUnitArmyId(armyId);
+    setShowCombatCalculator(true);
+  };
+
+  // Close combat calculator and mark unit as fought
+  const closeCombatCalculator = async () => {
+    if (selectedUnit) {
+      // Mark unit as fought
+      try {
+        await createUnitStatus(selectedUnit.id, 'fought');
+      } catch (error) {
+        console.error('Error marking unit as fought:', error);
+      }
+    }
+    setShowCombatCalculator(false);
+    setSelectedUnit(null);
+    setSelectedUnitArmyId('');
+  };
+
+  // Handle undo action
+  const handleUndo = async (unit: any) => {
+    setIsProcessing(true);
+    try {
+      await deleteFoughtStatusForTurn(unit);
+    } catch (error) {
+      console.error('Error undoing fight:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Organize units by section and army
+  const fightsFirstUnits: Array<{ army: any; units: any[] }> = [];
+  const regularUnits: Array<{ army: any; units: any[] }> = [];
+
+  allArmies.forEach((army: any) => {
+    const charged = (army.units || []).filter((unit: any) => hasChargedThisTurn(unit));
+    const regular = (army.units || []).filter((unit: any) => !hasChargedThisTurn(unit));
+
+    if (charged.length > 0) {
+      fightsFirstUnits.push({ army, units: charged });
+    }
+    if (regular.length > 0) {
+      regularUnits.push({ army, units: regular });
+    }
+  });
+
+  // Check if a unit belongs to the current user
+  const isMyUnit = (armyId: string) => {
+    const unitArmy = allArmies.find((a: any) => a.id === armyId) as any;
+    return unitArmy?.ownerId === currentUser?.id;
+  };
+
+  if (allArmies.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-400">No armies found for this game.</p>
+      </div>
+    );
+  }
+
+  // Render a unit with fight button (compact single-row layout)
+  const renderUnit = (unit: any, armyId: string) => {
+    const hasFought = hasFoughtThisTurn(unit);
+    const isOwner = isMyUnit(armyId);
+
+    return (
+      <div key={unit.id} className={`flex items-center justify-between py-2 ${!isOwner ? 'opacity-60' : ''}`}>
+        {/* Unit name and status */}
+        <div className="flex items-center space-x-3 flex-1 min-w-0">
+          <span className="text-white font-medium truncate">{unit.name}</span>
+          {hasFought && (
+            <span className="px-2 py-0.5 rounded text-xs bg-red-600 text-red-100 whitespace-nowrap">
+              Fought
+            </span>
+          )}
+        </div>
+
+        {/* Fight button and undo */}
+        <div className="flex items-center space-x-2">
+          {hasFought && isOwner && (
+            <button
+              onClick={() => handleUndo(unit)}
+              disabled={isProcessing}
+              className="text-xs text-blue-400 hover:text-blue-300 underline disabled:text-gray-500"
+            >
+              undo
+            </button>
+          )}
+          <button
+            onClick={() => openCombatCalculator(unit, armyId)}
+            disabled={!isOwner || hasFought}
+            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-1.5 px-3 rounded transition-colors text-sm disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            Fight
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-gray-800 rounded-lg p-4">
         <h2 className="text-lg font-semibold text-white mb-2">Fight Phase</h2>
         <p className="text-gray-400 text-sm">
-          Units engaged in combat fight with their melee weapons.
+          Units engaged in combat fight with their melee weapons. Either player can activate their units.
         </p>
       </div>
 
-      <div className="bg-gray-800 rounded-lg p-6 text-center">
-        <h3 className="text-xl font-medium text-white mb-4">Fight Phase Features</h3>
-        <div className="space-y-3 text-gray-400 text-sm">
-          <p>• Choose Combat Order</p>
-          <p>• Select Melee Weapons</p>
-          <p>• Roll to Hit and Wound</p>
-          <p>• Apply Damage</p>
-          <p>• Resolve Pile In and Consolidate</p>
+      {/* Fights First Section */}
+      {fightsFirstUnits.length > 0 && (
+        <div className="bg-gray-800 rounded-lg p-4">
+          <h3 className="text-md font-semibold text-white mb-1">Fights First</h3>
+          <p className="text-gray-400 text-xs mb-4">
+            Units that charged this turn
+          </p>
+          <div className="space-y-3">
+            {fightsFirstUnits.map(({ army, units }) => (
+              <div key={army.id}>
+                {/* Army header */}
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                  {getArmyDisplayName(army)}
+                </div>
+                <div className="space-y-1 border-l-2 border-gray-700 pl-3">
+                  {units.map((unit: any) => renderUnit(unit, army.id))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="mt-6">
-          <p className="text-gray-500 text-xs">Implementation coming soon...</p>
+      )}
+
+      {/* Regular Fight Phase Section */}
+      {regularUnits.length > 0 && (
+        <div className="bg-gray-800 rounded-lg p-4">
+          <h3 className="text-md font-semibold text-white mb-1">Fight Phase</h3>
+          <p className="text-gray-400 text-xs mb-4">
+            All other units
+          </p>
+          <div className="space-y-3">
+            {regularUnits.map(({ army, units }) => (
+              <div key={army.id}>
+                {/* Army header */}
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                  {getArmyDisplayName(army)}
+                </div>
+                <div className="space-y-1 border-l-2 border-gray-700 pl-3">
+                  {units.map((unit: any) => renderUnit(unit, army.id))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Combat Calculator Modal */}
+      {showCombatCalculator && selectedUnit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-4">
+              <CombatCalculatorPage
+                gameId={gameId}
+                unit={selectedUnit}
+                currentArmyId={selectedUnitArmyId}
+                weaponType="melee"
+                onClose={closeCombatCalculator}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+}
