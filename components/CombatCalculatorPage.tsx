@@ -53,7 +53,7 @@ export default function CombatCalculatorPage({
   const unit = propUnit || unitData?.units?.[0];
 
   
-  // Now try the full query
+  // Now try the full query, including destroyed units
   const { data: enemyUnitData, isLoading, error } = db.useQuery({
     games: {
       armies: {
@@ -64,6 +64,7 @@ export default function CombatCalculatorPage({
           statuses: {}
         }
       },
+      destroyedUnits: {},
       $: {
         where: {
           id: gameId
@@ -71,14 +72,17 @@ export default function CombatCalculatorPage({
       }
     }
   });
-  
-  
+
+
   const game = enemyUnitData?.games?.[0];
+  const destroyedUnitIds = new Set((game?.destroyedUnits || []).map((u: any) => u.id));
+
   // Filter out the current unit's army - use prop if available, fallback to unit.armyId
   const currentArmyId = propCurrentArmyId || unit?.armyId;
 
   const enemyArmies = game?.armies?.filter((army: any) => army.id !== currentArmyId) || [];
   const enemyUnits = (enemyArmies?.flatMap((army: any) => army.units) || [])
+    .filter((unit: any) => !destroyedUnitIds.has(unit.id)) // Filter out destroyed units
     .sort((a: any, b: any) => a.name.localeCompare(b.name)); // Sort alphabetically
 
   // State for selected target and weapon

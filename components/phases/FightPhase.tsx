@@ -32,7 +32,7 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
   const [selectedUnit, setSelectedUnit] = useState<any>(null);
   const [selectedUnitArmyId, setSelectedUnitArmyId] = useState<string>('');
 
-  // Query ALL armies and units in this game
+  // Query ALL armies and units in this game, including destroyed units
   const { data: gameData } = db.useQuery({
     games: {
       armies: {
@@ -43,6 +43,7 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
           statuses: {},
         },
       },
+      destroyedUnits: {},
       $: {
         where: {
           id: gameId
@@ -62,8 +63,16 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
     }
   });
 
-  const allArmies = gameData?.games[0]?.armies || [];
+  const gameRecord = gameData?.games[0];
+  const allArmies = gameRecord?.armies || [];
+  const destroyedUnitIds = new Set((gameRecord?.destroyedUnits || []).map((u: any) => u.id));
   const players = playersData?.players || [];
+
+  // Filter out destroyed units from all armies
+  const armiesWithoutDestroyed = allArmies.map((army: any) => ({
+    ...army,
+    units: (army.units || []).filter((unit: any) => !destroyedUnitIds.has(unit.id))
+  }));
 
   // Helper to get army name (fallback to player name if needed)
   const getArmyDisplayName = (army: any) => {
@@ -152,11 +161,11 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
     }
   };
 
-  // Organize units by section and army
+  // Organize units by section and army (using filtered armies without destroyed units)
   const fightsFirstUnits: Array<{ army: any; units: any[] }> = [];
   const regularUnits: Array<{ army: any; units: any[] }> = [];
 
-  allArmies.forEach((army: any) => {
+  armiesWithoutDestroyed.forEach((army: any) => {
     const charged = (army.units || []).filter((unit: any) => hasChargedThisTurn(unit));
     const regular = (army.units || []).filter((unit: any) => !hasChargedThisTurn(unit));
 
@@ -174,10 +183,10 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
     return unitArmy?.ownerId === currentUser?.id;
   };
 
-  if (allArmies.length === 0) {
+  if (armiesWithoutDestroyed.length === 0 || armiesWithoutDestroyed.every((a: any) => !a.units || a.units.length === 0)) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-400">No armies found for this game.</p>
+        <p className="text-gray-400">No units available for combat.</p>
       </div>
     );
   }

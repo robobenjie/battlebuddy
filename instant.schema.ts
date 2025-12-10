@@ -151,6 +151,12 @@ const _schema = i.schema({
       forward: { on: "armies", has: "one", label: "game", required: false, onDelete: "cascade" },
       reverse: { on: "games", has: "many", label: "armies" },
     },
+
+    // Game-Unit relationships for destroyed units
+    gameDestroyedUnits: {
+      forward: { on: "units", has: "many", label: "gamesWhereDestroyed" },
+      reverse: { on: "games", has: "many", label: "destroyedUnits" },
+    },
   },
 });
 

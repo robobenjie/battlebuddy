@@ -28,7 +28,7 @@ interface ChargePhaseProps {
 export default function ChargePhase({ gameId, army, currentPlayer, currentUser, game }: ChargePhaseProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Query units for this army in the game
+  // Query units for this army in the game and destroyed units list
   const { data: unitsData } = db.useQuery({
     armies: {
       units: {
@@ -43,9 +43,21 @@ export default function ChargePhase({ gameId, army, currentPlayer, currentUser, 
         }
       }
     },
+    games: {
+      destroyedUnits: {},
+      $: {
+        where: {
+          id: gameId
+        }
+      }
+    }
   });
 
-  const units = unitsData?.armies[0].units || [];
+  const allUnits = unitsData?.armies[0]?.units || [];
+  const destroyedUnitIds = new Set((unitsData?.games?.[0]?.destroyedUnits || []).map((u: any) => u.id));
+
+  // Filter out destroyed units
+  const units = allUnits.filter((unit: any) => !destroyedUnitIds.has(unit.id));
 
   // Check if current user is the active player
   const isActivePlayer = currentUser?.id === currentPlayer.userId;

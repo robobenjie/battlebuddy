@@ -20,23 +20,33 @@ interface ArmyViewPanelProps {
 export default function ArmyViewPanel({ isOpen, onClose, gameId, currentUserId, players }: ArmyViewPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Query all armies for this game
+  // Query all armies for this game, including destroyed units link
   const { data } = db.useQuery({
     armies: {
       units: {
         models: {
           weapons: {}
-        }
+        },
+        gamesWhereDestroyed: {}
       },
       $: {
         where: {
           gameId: gameId
         }
       }
+    },
+    games: {
+      destroyedUnits: {},
+      $: {
+        where: {
+          id: gameId
+        }
+      }
     }
   });
 
   const allArmies = data?.armies || [];
+  const game = data?.games?.[0];
 
   // Get game-specific armies for the players
   const gameArmies = allArmies.filter((army: any) => army.gameId === gameId);
@@ -47,6 +57,30 @@ export default function ArmyViewPanel({ isOpen, onClose, gameId, currentUserId, 
 
   const opponentPlayer = players.find(p => p.userId !== currentUserId);
   const opponentArmy = gameArmies.find((army: any) => army.ownerId === opponentPlayer?.userId);
+
+  // Helper to check if a unit is destroyed in this game
+  const isUnitDestroyed = (unitId: string) => {
+    return game?.destroyedUnits?.some((unit: any) => unit.id === unitId) || false;
+  };
+
+  // Helper to toggle unit destroyed status
+  const toggleUnitDestroyed = async (unitId: string) => {
+    if (!game) return;
+
+    const isDestroyed = isUnitDestroyed(unitId);
+
+    if (isDestroyed) {
+      // Unlink the unit from the game's destroyed units
+      await db.transact([
+        db.tx.games[game.id].unlink({ destroyedUnits: unitId })
+      ]);
+    } else {
+      // Link the unit to the game's destroyed units
+      await db.transact([
+        db.tx.games[game.id].link({ destroyedUnits: unitId })
+      ]);
+    }
+  };
 
   // Filter units based on search query
   const filterUnits = (units: any[]) => {
@@ -85,14 +119,30 @@ export default function ArmyViewPanel({ isOpen, onClose, gameId, currentUserId, 
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredUnits.map((unit: any) => (
-              <UnitCard
-                key={unit.id}
-                unit={unit}
-                expandable={true}
-                defaultExpanded={false}
-              />
-            ))}
+            {filteredUnits.map((unit: any) => {
+              const destroyed = isUnitDestroyed(unit.id);
+              return (
+                <div key={unit.id} className="relative">
+                  <div className={destroyed ? 'opacity-50' : ''}>
+                    <UnitCard
+                      unit={unit}
+                      expandable={true}
+                      defaultExpanded={false}
+                    />
+                  </div>
+                  <button
+                    onClick={() => toggleUnitDestroyed(unit.id)}
+                    className={`absolute top-2 right-2 px-3 py-1 rounded text-sm font-semibold transition-colors ${
+                      destroyed
+                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                        : 'bg-gray-600 hover:bg-gray-700 text-gray-300'
+                    }`}
+                  >
+                    {destroyed ? 'Destroyed' : 'Mark Destroyed'}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
