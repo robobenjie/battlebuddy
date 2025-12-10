@@ -178,10 +178,13 @@ export default function WeaponProfileDisplay({
   };
 
   const getHitsRow = () => {
-    const baseHit = getHitRoll(weapon);
+    const hasTorrent = weapon.keywords?.some(kw => kw.toLowerCase() === 'torrent');
+    const baseHit = hasTorrent ? 'Auto' : getHitRoll(weapon);
     let modifier = '';
 
-    if (sustainedHitsValue !== null) {
+    if (hasTorrent) {
+      modifier = 'Torrent: automatic hits';
+    } else if (sustainedHitsValue !== null) {
       modifier = `6+ gets ${sustainedHitsValue} extra hit${sustainedHitsValue > 1 ? 's' : ''} (sustained hits ${sustainedHitsValue})`;
     }
 

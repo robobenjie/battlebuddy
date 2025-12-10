@@ -6,6 +6,9 @@ import { db } from '../lib/db';
 import UnitCard from './ui/UnitCard';
 import WeaponProfileDisplay from './ui/WeaponProfileDisplay';
 import { formatUnitForCard, sortUnitsByPriority } from '../lib/unit-utils';
+import DigitalDiceMenu from './DigitalDiceMenu';
+import DiceRollResults from './ui/DiceRollResults';
+import { executeCombatSequence, executeSavePhase, CombatResult, CombatOptions, WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
 
 interface CombatCalculatorPageProps {
   gameId?: string;
@@ -91,6 +94,11 @@ export default function CombatCalculatorPage({
   const [selectedTargetId, setSelectedTargetId] = useState<string>('');
   const [selectedWeaponId, setSelectedWeaponId] = useState<string>('');
   const selectedTarget = enemyUnits.find((enemyUnit: any) => enemyUnit.id === selectedTargetId);
+
+  // State for Digital Dice functionality
+  const [showDigitalDiceMenu, setShowDigitalDiceMenu] = useState(false);
+  const [combatResult, setCombatResult] = useState<CombatResult | null>(null);
+  const [showSavePhase, setShowSavePhase] = useState(false);
 
   // Ref for target select to auto-focus
   const targetSelectRef = useRef<HTMLSelectElement>(null);
@@ -268,12 +276,81 @@ export default function CombatCalculatorPage({
     status.turns && status.turns.includes(game?.currentTurn)
   ) || false;
 
+  // Check if unit has moved or advanced this turn (for heavy weapon bonus)
+  const unitHasMovedOrAdvanced = unit?.statuses?.some((status: any) =>
+    (status.name === 'moved' || status.name === 'advanced') &&
+    status.turns && status.turns.includes(game?.currentTurn)
+  ) || false;
+
+  // Count total weapons with the same name
+  const totalWeaponCount = selectedWeapon
+    ? allWeapons.filter((w: any) => w.name === (selectedWeapon as any).name).length
+    : 0;
+
   const handleBack = () => {
     if (onClose) {
       onClose();
     } else {
       router.back();
     }
+  };
+
+  const handleDigitalDiceClick = () => {
+    setShowDigitalDiceMenu(true);
+  };
+
+  const handleRollAttacks = (options: CombatOptions) => {
+    if (!selectedWeapon || !targetStats) return;
+
+    // Convert weapon to WeaponStats format
+    const weaponStats: WeaponStats = {
+      name: (selectedWeapon as any).name,
+      range: (selectedWeapon as any).range,
+      A: (selectedWeapon as any).A,
+      WS: (selectedWeapon as any).WS,
+      S: (selectedWeapon as any).S,
+      AP: (selectedWeapon as any).AP,
+      D: (selectedWeapon as any).D,
+      keywords: (selectedWeapon as any).keywords || []
+    };
+
+    // Execute combat sequence (attack and wound phases)
+    const result = executeCombatSequence(weaponStats, targetStats, options);
+    setCombatResult(result);
+    setShowSavePhase(false);
+    setShowDigitalDiceMenu(false);
+  };
+
+  const handleRollSaves = () => {
+    if (!combatResult || !selectedWeapon || !targetStats) return;
+
+    // Execute save phase
+    const weaponStats: WeaponStats = {
+      name: (selectedWeapon as any).name,
+      range: (selectedWeapon as any).range,
+      A: (selectedWeapon as any).A,
+      WS: (selectedWeapon as any).WS,
+      S: (selectedWeapon as any).S,
+      AP: (selectedWeapon as any).AP,
+      D: (selectedWeapon as any).D,
+      keywords: (selectedWeapon as any).keywords || []
+    };
+
+    const updatedResult = executeSavePhase(combatResult, weaponStats, targetStats);
+    setCombatResult(updatedResult);
+    setShowSavePhase(true);
+  };
+
+  const handleCloseDiceResults = () => {
+    setCombatResult(null);
+    setShowSavePhase(false);
+  };
+
+  const handleDone = async () => {
+    // Mark weapons as fired, same as handleShoot
+    await handleShoot();
+    // Close the modal
+    handleCloseDiceResults();
   };
 
   const handleShoot = async () => {
@@ -455,14 +532,24 @@ export default function CombatCalculatorPage({
             >
               Back
             </button>
-            {selectedWeapon && (
-              <button
-                onClick={handleShoot}
-                className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-              >
-                {weaponType === 'melee' ? 'Fight' : 'Fire'}
-              </button>
-            )}
+            <div className="flex gap-3">
+              {selectedWeapon && selectedTarget && game && !isWeaponDisabled(selectedWeapon) && (
+                <button
+                  onClick={handleDigitalDiceClick}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                >
+                  Digital Dice
+                </button>
+              )}
+              {selectedWeapon && game && !isWeaponDisabled(selectedWeapon) && (
+                <button
+                  onClick={handleShoot}
+                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                >
+                  {weaponType === 'melee' ? 'Fight' : 'Fire'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -476,6 +563,76 @@ export default function CombatCalculatorPage({
           />
         </div>
       </div>
+
+      {/* Digital Dice Menu Modal */}
+      {showDigitalDiceMenu && selectedWeapon && targetStats && (
+        <DigitalDiceMenu
+          weapon={{
+            name: (selectedWeapon as any).name,
+            range: (selectedWeapon as any).range,
+            A: (selectedWeapon as any).A,
+            WS: (selectedWeapon as any).WS,
+            S: (selectedWeapon as any).S,
+            AP: (selectedWeapon as any).AP,
+            D: (selectedWeapon as any).D,
+            keywords: (selectedWeapon as any).keywords || []
+          }}
+          target={targetStats}
+          totalWeaponCount={totalWeaponCount}
+          unitHasCharged={unitHasCharged}
+          unitHasMovedOrAdvanced={unitHasMovedOrAdvanced}
+          onRollAttacks={handleRollAttacks}
+          onClose={() => setShowDigitalDiceMenu(false)}
+        />
+      )}
+
+      {/* Dice Roll Results Modal */}
+      {combatResult && selectedWeapon && targetStats && (
+        <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-700">
+            <h2 className="text-xl font-bold text-white">Combat Results</h2>
+            <button
+              onClick={handleCloseDiceResults}
+              className="text-gray-400 hover:text-white text-2xl font-bold"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="flex-1 overflow-hidden">
+              <DiceRollResults
+                combatResult={combatResult}
+                weapon={{
+                  name: (selectedWeapon as any).name,
+                  range: (selectedWeapon as any).range,
+                  A: (selectedWeapon as any).A,
+                  WS: (selectedWeapon as any).WS,
+                  S: (selectedWeapon as any).S,
+                  AP: (selectedWeapon as any).AP,
+                  D: (selectedWeapon as any).D,
+                  keywords: (selectedWeapon as any).keywords || []
+                }}
+                target={targetStats}
+                onRollSaves={handleRollSaves}
+                showSavePhase={showSavePhase}
+              />
+            </div>
+
+            {/* Done Button */}
+            <div className="p-4 border-t border-gray-700">
+              <button
+                onClick={handleDone}
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

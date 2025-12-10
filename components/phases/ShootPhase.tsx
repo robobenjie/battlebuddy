@@ -92,33 +92,43 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
   const getWeaponStatus = (unit: any) => {
     const weapons = getWeaponsForUnit(unit);
     const rangedWeapons = weapons.filter((weapon: any) => weapon.range > 0);
-    
+
     // Separate pistols from other ranged weapons
-    const pistols = rangedWeapons.filter((weapon: any) => 
+    const pistols = rangedWeapons.filter((weapon: any) =>
       weapon.keywords && weapon.keywords.some((keyword: string) => keyword.toLowerCase() === 'pistol')
     );
-    const regularWeapons = rangedWeapons.filter((weapon: any) => 
+    const regularWeapons = rangedWeapons.filter((weapon: any) =>
       !weapon.keywords || !weapon.keywords.some((keyword: string) => keyword.toLowerCase() === 'pistol')
     );
-    
+
+    // Check if any pistols have been fired this turn
+    const anyPistolsFired = pistols.some((weapon: any) =>
+      weapon.turnsFired && weapon.turnsFired.includes(game.currentTurn)
+    );
+
+    // Check if any non-pistols have been fired this turn
+    const anyNonPistolsFired = regularWeapons.some((weapon: any) =>
+      weapon.turnsFired && weapon.turnsFired.includes(game.currentTurn)
+    );
+
     const processWeaponGroup = (weaponList: any[]) => {
       const weaponGroups = new Map<string, { total: number, fired: number, range: number }>();
-      
+
       weaponList.forEach((weapon: any) => {
         const key = weapon.name;
         const isFired = weapon.turnsFired && weapon.turnsFired.includes(game.currentTurn);
-        
+
         if (!weaponGroups.has(key)) {
           weaponGroups.set(key, { total: 0, fired: 0, range: weapon.range });
         }
-        
+
         const group = weaponGroups.get(key)!;
         group.total += 1;
         if (isFired) {
           group.fired += 1;
         }
       });
-      
+
       return Array.from(weaponGroups.entries()).map(([name, stats]) => ({
         name,
         total: stats.total,
@@ -128,10 +138,12 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
         isFired: stats.fired === stats.total
       }));
     };
-    
+
     return {
       pistols: processWeaponGroup(pistols),
-      regularWeapons: processWeaponGroup(regularWeapons)
+      regularWeapons: processWeaponGroup(regularWeapons),
+      anyPistolsFired,
+      anyNonPistolsFired
     };
   };
 
@@ -195,7 +207,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
                                      </span>
                                    )}
                                  </div>
-                                 {!weapon.isFired && (
+                                 {!weapon.isFired && !weaponStatus.anyPistolsFired && (
                                    <button
                                      onClick={() => openCombatCalculator(unit.id, 'regular', weapon.name)}
                                      disabled={!isActivePlayer}
@@ -240,7 +252,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
                                      </span>
                                    )}
                                  </div>
-                                 {!weapon.isFired && (
+                                 {!weapon.isFired && !weaponStatus.anyNonPistolsFired && (
                                    <button
                                      onClick={() => openCombatCalculator(unit.id, 'pistol', weapon.name)}
                                      disabled={!isActivePlayer}
