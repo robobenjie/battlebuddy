@@ -8,6 +8,7 @@ import CommandPhase from './phases/CommandPhase';
 import ShootPhase from './phases/ShootPhase';
 import ChargePhase from './phases/ChargePhase';
 import FightPhase from './phases/FightPhase';
+import ChooseFirstPlayerPhase from './phases/ChooseFirstPlayerPhase';
 import StratagemsModal from './StratagemsModal';
 import HamburgerMenu from './HamburgerMenu';
 import Sidebar from './Sidebar';
@@ -55,6 +56,17 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
   // Swipe gesture handling
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
+
+  // Special case: Show choose first player screen
+  if (game.currentPhase === 'choose-first-player') {
+    return (
+      <ChooseFirstPlayerPhase
+        gameId={gameId}
+        game={game}
+        players={players}
+      />
+    );
+  }
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;

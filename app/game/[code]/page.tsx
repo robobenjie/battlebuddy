@@ -178,13 +178,13 @@ export default function GamePage() {
         console.log(`Current player ${currentPlayer.name} has no army selected`);
       }
 
-      // Start the game with first player and command phase
+      // Start the game with choose-first-player phase
       await db.transact([
-        db.tx.games[game.id].update({ 
+        db.tx.games[game.id].update({
           status: 'active',
           currentTurn: 1,
-          currentPhase: 'command',
-          activePlayerId: players[0].id,
+          currentPhase: 'choose-first-player',
+          activePlayerId: null, // Will be set by player choice
           phaseHistory: []
         })
       ]);
@@ -250,7 +250,10 @@ export default function GamePage() {
           <h2 className="text-2xl font-semibold mb-4">Players ({players.length})</h2>
           <div className="space-y-3">
             {players.map((player) => {
-              const playerArmy = allArmies.find(a => a.id === player.armyId && !a.gameId);
+              // Find player's army - either the template or the game-specific copy
+              const templateArmy = player.armyId ? allUserArmies.find(a => a.id === player.armyId) : null;
+              const gameArmy = allArmies.find(a => a.gameId === game?.id && a.ownerId === player.userId);
+              const playerArmy = gameArmy || templateArmy;
               const isCurrentUser = player.userId === user?.id;
               return (
                 <div
@@ -275,7 +278,7 @@ export default function GamePage() {
                     {playerArmy ? (
                       <>
                         <span className="text-green-400">{playerArmy.name}</span>
-                        {isCurrentUser && (
+                        {isCurrentUser && !gameArmy && (
                           <button
                             onClick={async () => {
                               await db.transact([
