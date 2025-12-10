@@ -9,6 +9,7 @@ import { formatUnitForCard, sortUnitsByPriority } from '../lib/unit-utils';
 import DigitalDiceMenu from './DigitalDiceMenu';
 import DiceRollResults from './ui/DiceRollResults';
 import { executeCombatSequence, executeSavePhase, CombatResult, CombatOptions, WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
+import { getRulesForUnit, getOrkArmyRules, getOrkDetachmentRules, Rule, ArmyState, buildCombatContext, evaluateAllRules, getAddedKeywords } from '../lib/rules-engine';
 
 interface CombatCalculatorPageProps {
   gameId?: string;
@@ -99,6 +100,17 @@ export default function CombatCalculatorPage({
   const [showDigitalDiceMenu, setShowDigitalDiceMenu] = useState(false);
   const [combatResult, setCombatResult] = useState<CombatResult | null>(null);
   const [showSavePhase, setShowSavePhase] = useState(false);
+
+  // State for active rules display
+  const [activeRules, setActiveRules] = useState<Rule[]>([]);
+  const [hitModifier, setHitModifier] = useState(0);
+  const [woundModifier, setWoundModifier] = useState(0);
+  const [addedKeywords, setAddedKeywords] = useState<string[]>([]);
+  const [modifierSources, setModifierSources] = useState<{
+    hit?: string[];
+    wound?: string[];
+    keywords?: Array<{ keyword: string; source: string }>;
+  }>({});
 
   // Ref for target select to auto-focus
   const targetSelectRef = useRef<HTMLSelectElement>(null);
@@ -216,15 +228,9 @@ export default function CombatCalculatorPage({
   const unfiredWeapons = availableWeapons.filter((w: any) => !isWeaponFired(w));
   const firedWeapons = availableWeapons.filter((w: any) => isWeaponFired(w));
 
-  console.log('Available weapon types:', availableWeapons.map((w: any) => w.name));
-  console.log('Unfired weapon types:', unfiredWeapons.map((w: any) => w.name));
-  console.log('Available unfired weapons:', availableUnfiredWeapons.map((w: any) => w.name));
-  console.log('Fired weapon types:', firedWeapons.map((w: any) => w.name));
-
   // Auto-close modal when all available weapons are fired or disabled
   useEffect(() => {
     if (availableWeapons.length > 0 && availableUnfiredWeapons.length === 0) {
-      console.log('All available weapons fired/disabled (detected via useEffect), closing modal');
       handleBack();
     }
   }, [availableUnfiredWeapons.length, availableWeapons.length]);
@@ -234,18 +240,9 @@ export default function CombatCalculatorPage({
     const firstAvailable = availableUnfiredWeapons[0] as any;
     const firstAvailableId = firstAvailable?.id;
 
-    console.log('Auto-select effect running:', {
-      selectedWeaponId,
-      availableUnfiredLength: availableUnfiredWeapons.length,
-      firstAvailable: firstAvailable?.name,
-      firstAvailableId,
-      selectedIsDisabled: selectedWeaponId && !availableUnfiredWeapons.find((w: any) => w.id === selectedWeaponId)
-    });
-
     // If no weapon is selected and there are available weapons, select the first one
     // OR if the currently selected weapon has been fired/disabled, select the next available one
     if (availableUnfiredWeapons.length > 0 && (!selectedWeaponId || (selectedWeaponId && !availableUnfiredWeapons.find((w: any) => w.id === selectedWeaponId)))) {
-      console.log('Auto-selecting next available weapon:', firstAvailable?.name, firstAvailableId);
       setSelectedWeaponId(firstAvailableId);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -287,6 +284,97 @@ export default function CombatCalculatorPage({
     ? allWeapons.filter((w: any) => w.name === (selectedWeapon as any).name).length
     : 0;
 
+  // Calculate modifiers when weapon or target changes
+  useEffect(() => {
+    if (!selectedWeaponId || !selectedTarget || !unit || !game) {
+      // Reset modifiers if no weapon/target selected
+      setActiveRules([]);
+      setHitModifier(0);
+      setWoundModifier(0);
+      setModifierSources({ hit: [], wound: [], keywords: [] });
+      return;
+    }
+
+    // selectedWeapon is computed from selectedWeaponId
+    if (!selectedWeapon || !targetStats) return;
+
+    // Convert weapon to WeaponStats format
+    const weaponStats: WeaponStats = {
+      name: (selectedWeapon as any).name,
+      range: (selectedWeapon as any).range,
+      A: (selectedWeapon as any).A,
+      WS: (selectedWeapon as any).WS,
+      S: (selectedWeapon as any).S,
+      AP: (selectedWeapon as any).AP,
+      D: (selectedWeapon as any).D,
+      keywords: (selectedWeapon as any).keywords || []
+    };
+
+    // Load applicable rules for this unit
+    const unitName = unit?.name || '';
+    const unitRules = getRulesForUnit(unitName);
+    const armyRules = getOrkArmyRules();
+    const detachmentRules = getOrkDetachmentRules();
+
+    // Combine all applicable rules
+    const allRules: Rule[] = [...unitRules, ...armyRules, ...detachmentRules];
+
+    // TODO: Query army states from database
+    const armyStates: ArmyState[] = [];
+
+    // Build context to evaluate which rules apply
+    const context = buildCombatContext({
+      attacker: unit,
+      defender: targetStats,
+      weapon: weaponStats,
+      game: game,
+      combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
+      options: {
+        modelsFiring: 1,
+        withinHalfRange: false,
+        unitRemainedStationary: false,
+        unitHasCharged: false,
+        blastBonusAttacks: 0
+      },
+      rules: allRules,
+      armyStates: armyStates
+    });
+
+    // Evaluate rules to see which ones apply
+    const appliedRules = evaluateAllRules(allRules, context);
+
+    // Extract modifiers
+    const hitMod = context.modifiers.get('hit');
+    const woundMod = context.modifiers.get('wound');
+
+    // Extract modifier sources
+    const hitSources = context.modifiers.getModifiers('hit').map(m => m.source);
+    const woundSources = context.modifiers.getModifiers('wound').map(m => m.source);
+
+    // Extract keyword sources
+    const keywordSources: Array<{ keyword: string; source: string }> = [];
+    const allMods = context.modifiers.getAllModifiers();
+    for (const [stat, mods] of allMods.entries()) {
+      if (stat.startsWith('keyword:')) {
+        for (const mod of mods) {
+          const keyword = stat.replace('keyword:', '');
+          const keywordString = mod.value > 0 ? `${keyword} ${mod.value}` : keyword;
+          keywordSources.push({ keyword: keywordString, source: mod.source });
+        }
+      }
+    }
+
+    // Save for display
+    setActiveRules(appliedRules);
+    setHitModifier(hitMod);
+    setWoundModifier(woundMod);
+    setModifierSources({
+      hit: hitSources,
+      wound: woundSources,
+      keywords: keywordSources
+    });
+  }, [selectedWeaponId, selectedTarget?.id, unit?.id, game?.id, weaponType]); // Use IDs to avoid object reference changes
+
   const handleBack = () => {
     if (onClose) {
       onClose();
@@ -314,8 +402,76 @@ export default function CombatCalculatorPage({
       keywords: (selectedWeapon as any).keywords || []
     };
 
-    // Execute combat sequence (attack and wound phases)
-    const result = executeCombatSequence(weaponStats, targetStats, options);
+    // Load applicable rules for this unit
+    const unitName = unit?.name || '';
+    const unitRules = getRulesForUnit(unitName);
+    const armyRules = getOrkArmyRules();
+    const detachmentRules = getOrkDetachmentRules();
+
+    // Combine all applicable rules
+    const allRules: Rule[] = [...unitRules, ...armyRules, ...detachmentRules];
+
+    // TODO: Query army states from database
+    // For now, create empty array (Waaagh! would be activated via UI later)
+    const armyStates: ArmyState[] = [];
+
+    // Build context to evaluate which rules apply
+    const context = buildCombatContext({
+      attacker: unit,
+      defender: targetStats,
+      weapon: weaponStats,
+      game: game,
+      combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
+      options,
+      rules: allRules,
+      armyStates: armyStates
+    });
+
+    // Evaluate rules to see which ones apply
+    const appliedRules = evaluateAllRules(allRules, context);
+
+    // Extract modifiers
+    const hitMod = context.modifiers.get('hit');
+    const woundMod = context.modifiers.get('wound');
+    const keywords = getAddedKeywords(context);
+
+    // Extract modifier sources (which rules provided each modifier)
+    const hitSources = context.modifiers.getModifiers('hit').map(m => m.source);
+    const woundSources = context.modifiers.getModifiers('wound').map(m => m.source);
+
+    // Extract keyword sources
+    const keywordSources: Array<{ keyword: string; source: string }> = [];
+    const allMods = context.modifiers.getAllModifiers();
+    for (const [stat, mods] of allMods.entries()) {
+      if (stat.startsWith('keyword:')) {
+        for (const mod of mods) {
+          const keyword = stat.replace('keyword:', '');
+          const keywordString = mod.value > 0 ? `${keyword} ${mod.value}` : keyword;
+          keywordSources.push({ keyword: keywordString, source: mod.source });
+        }
+      }
+    }
+
+    // Save for display
+    setActiveRules(appliedRules);
+    setHitModifier(hitMod);
+    setWoundModifier(woundMod);
+    setAddedKeywords(keywords);
+    setModifierSources({
+      hit: hitSources,
+      wound: woundSources,
+      keywords: keywordSources
+    });
+
+    // Execute combat sequence with rules engine
+    const result = executeCombatSequence(weaponStats, targetStats, options, {
+      attacker: unit,
+      game: game,
+      combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
+      rules: allRules,
+      armyStates: armyStates
+    });
+
     setCombatResult(result);
     setShowSavePhase(false);
     setShowDigitalDiceMenu(false);
@@ -520,6 +676,10 @@ export default function CombatCalculatorPage({
                 unitName={unit?.name}
                 hideRange={weaponType === 'melee'}
                 unitHasCharged={unitHasCharged}
+                hitModifier={hitModifier}
+                woundModifier={woundModifier}
+                activeRules={activeRules}
+                modifierSources={modifierSources}
               />
             </div>
           )}
@@ -618,6 +778,11 @@ export default function CombatCalculatorPage({
                 target={targetStats}
                 onRollSaves={handleRollSaves}
                 showSavePhase={showSavePhase}
+                activeRules={activeRules}
+                hitModifier={hitModifier}
+                woundModifier={woundModifier}
+                addedKeywords={addedKeywords}
+                modifierSources={modifierSources}
               />
             </div>
 

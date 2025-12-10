@@ -113,6 +113,47 @@ const _schema = i.schema({
       turnsFired: i.json(), // array of turns when this weapon was fired
       modelId: i.string().indexed(),
     }),
+
+    // Rules engine entities
+    rules: i.entity({
+      id: i.string().unique().indexed(),
+      name: i.string().indexed(),
+      description: i.string(),
+      scope: i.string(), // 'weapon', 'unit', 'model', 'detachment', 'army'
+      conditions: i.json(), // array of RuleCondition objects
+      effects: i.json(), // array of RuleEffect objects
+      duration: i.string(), // 'permanent', 'turn', 'phase', 'until-deactivated'
+      activation: i.json().optional(), // RuleActivation object
+    }),
+
+    // Army states tracking (e.g., Waaagh!, Oath of Moment target, etc.)
+    // Each army has its own states, so multiple Ork armies can have separate Waaghs
+    armyStates: i.entity({
+      id: i.string().unique().indexed(),
+      armyId: i.string().indexed(),
+      state: i.string(), // 'waaagh-active', 'oath-target-xxx', etc.
+      activatedTurn: i.number(),
+      expiresPhase: i.string().optional(),
+    }),
+
+    // Linking tables for rules to entities
+    unitRules: i.entity({
+      id: i.string().unique().indexed(),
+      unitId: i.string().indexed(),
+      ruleId: i.string().indexed(),
+    }),
+
+    weaponRules: i.entity({
+      id: i.string().unique().indexed(),
+      weaponId: i.string().indexed(),
+      ruleId: i.string().indexed(),
+    }),
+
+    detachmentRules: i.entity({
+      id: i.string().unique().indexed(),
+      armyId: i.string().indexed(), // Detachment rules are army-level
+      ruleId: i.string().indexed(),
+    }),
   },
   
   links: {
@@ -156,6 +197,40 @@ const _schema = i.schema({
     gameDestroyedUnits: {
       forward: { on: "units", has: "many", label: "gamesWhereDestroyed" },
       reverse: { on: "games", has: "many", label: "destroyedUnits" },
+    },
+
+    // Rule relationships
+    ruleUnit: {
+      forward: { on: "unitRules", has: "one", label: "unit", required: true, onDelete: "cascade" },
+      reverse: { on: "units", has: "many", label: "ruleLinks" },
+    },
+    ruleUnitRule: {
+      forward: { on: "unitRules", has: "one", label: "rule", required: true, onDelete: "cascade" },
+      reverse: { on: "rules", has: "many", label: "unitLinks" },
+    },
+
+    ruleWeapon: {
+      forward: { on: "weaponRules", has: "one", label: "weapon", required: true, onDelete: "cascade" },
+      reverse: { on: "weapons", has: "many", label: "ruleLinks" },
+    },
+    ruleWeaponRule: {
+      forward: { on: "weaponRules", has: "one", label: "rule", required: true, onDelete: "cascade" },
+      reverse: { on: "rules", has: "many", label: "weaponLinks" },
+    },
+
+    ruleDetachment: {
+      forward: { on: "detachmentRules", has: "one", label: "army", required: true, onDelete: "cascade" },
+      reverse: { on: "armies", has: "many", label: "detachmentRuleLinks" },
+    },
+    ruleDetachmentRule: {
+      forward: { on: "detachmentRules", has: "one", label: "rule", required: true, onDelete: "cascade" },
+      reverse: { on: "rules", has: "many", label: "detachmentLinks" },
+    },
+
+    // Army state relationships
+    armyStateArmy: {
+      forward: { on: "armyStates", has: "one", label: "army", required: true, onDelete: "cascade" },
+      reverse: { on: "armies", has: "many", label: "states" },
     },
   },
 });

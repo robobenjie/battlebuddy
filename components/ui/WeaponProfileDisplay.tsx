@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getEffectiveHitValue, getEffectiveWoundValue, formatModifierSources, formatModifierDisplay } from '../../lib/combat-display-utils';
 
 interface Weapon {
   id: string;
@@ -29,6 +30,14 @@ interface WeaponProfileDisplayProps {
   className?: string;
   hideRange?: boolean;
   unitHasCharged?: boolean; // whether the attacking unit charged this turn (for lance)
+  // Rules engine modifiers
+  hitModifier?: number;
+  woundModifier?: number;
+  activeRules?: Array<{ id: string; name: string }>;
+  modifierSources?: {
+    hit?: string[];
+    wound?: string[];
+  };
 }
 
 // Parse keyword to extract numeric value
@@ -36,35 +45,6 @@ function parseKeywordValue(keyword: string, prefix: string): number | null {
   const regex = new RegExp(`^${prefix}\\s+(\\d+)$`, 'i');
   const match = keyword.match(regex);
   return match ? parseInt(match[1], 10) : null;
-}
-
-// Calculate hit roll needed (BS value)
-function getHitRoll(weapon: Weapon): string {
-  // WS field contains BS for ranged weapons
-  if (weapon.WS !== undefined && weapon.WS !== null) {
-    return `${weapon.WS}+`;
-  }
-  return 'N/A';
-}
-
-// Calculate wound roll needed (returns numeric value 2-6)
-function getWoundRollValue(weaponStrength: number, targetToughness: number): number {
-  if (weaponStrength >= targetToughness * 2) {
-    return 2;
-  } else if (weaponStrength > targetToughness) {
-    return 3;
-  } else if (weaponStrength === targetToughness) {
-    return 4;
-  } else if (weaponStrength < targetToughness && weaponStrength >= targetToughness / 2) {
-    return 5;
-  } else {
-    return 6;
-  }
-}
-
-// Calculate wound roll needed
-function getWoundRoll(weaponStrength: number, targetToughness: number): string {
-  return `${getWoundRollValue(weaponStrength, targetToughness)}+`;
 }
 
 // Check if weapon has anti-x keyword matching target categories
@@ -129,7 +109,11 @@ export default function WeaponProfileDisplay({
   unitName,
   className = '',
   hideRange = false,
-  unitHasCharged = false
+  unitHasCharged = false,
+  hitModifier = 0,
+  woundModifier = 0,
+  activeRules = [],
+  modifierSources
 }: WeaponProfileDisplayProps) {
   const [isAtHalfRange, setIsAtHalfRange] = useState(false);
 
@@ -179,83 +163,90 @@ export default function WeaponProfileDisplay({
 
   const getHitsRow = () => {
     const hasTorrent = weapon.keywords?.some(kw => kw.toLowerCase() === 'torrent');
-    const baseHit = hasTorrent ? 'Auto' : getHitRoll(weapon);
-    let modifier = '';
 
     if (hasTorrent) {
-      modifier = 'Torrent: automatic hits';
-    } else if (sustainedHitsValue !== null) {
-      modifier = `6+ gets ${sustainedHitsValue} extra hit${sustainedHitsValue > 1 ? 's' : ''} (sustained hits ${sustainedHitsValue})`;
+      return {
+        stat: 'Hits on',
+        value: 'Auto',
+        modifier: 'Torrent: automatic hits'
+      };
+    }
+
+    // Calculate effective hit value with modifiers
+    const effectiveHit = getEffectiveHitValue(weapon.WS, hitModifier);
+    const modifierParts: string[] = [];
+
+    // Add rule modifiers if present
+    if (hitModifier > 0 && modifierSources?.hit) {
+      const sources = formatModifierSources(modifierSources.hit, activeRules);
+      const display = formatModifierDisplay(hitModifier, sources);
+      if (display) {
+        modifierParts.push(display);
+      }
+    }
+
+    // Add sustained hits info
+    if (sustainedHitsValue !== null) {
+      modifierParts.push(`6+ gets ${sustainedHitsValue} extra hit${sustainedHitsValue > 1 ? 's' : ''} (sustained hits ${sustainedHitsValue})`);
     }
 
     return {
       stat: 'Hits on',
-      value: baseHit,
-      modifier
+      value: effectiveHit.display,
+      modifier: modifierParts.join(', ')
     };
   };
 
   const getWoundsRow = () => {
     if (!target) return { stat: 'Wounds on', value: '?', modifier: '' };
 
-    let baseWoundValue = getWoundRollValue(weapon.S, target.T);
-    const modifiers: string[] = [];
-    const activeEffects: string[] = [];
-
-    // Track if we have any +1 to wound modifiers (max +1 total in 10th ed)
-    let hasWoundModifier = false;
-
-    // Check for lance keyword (only on charge turns) - gives +1 to wound
+    // Check for lance keyword
     const hasLance = hasLanceKeyword(weapon.keywords);
-    if (hasLance && unitHasCharged) {
-      hasWoundModifier = true;
-      activeEffects.push('lance');
-    }
 
-    // Apply +1 to wound modifier if any (max +1)
-    let modifiedWoundValue = baseWoundValue;
-    if (hasWoundModifier) {
-      modifiedWoundValue = Math.max(2, baseWoundValue - 1); // Improve by 1, minimum 2+
+    // Calculate effective wound value with modifiers (includes lance if charged)
+    // Note: woundModifier from rules engine already accounts for +1 to wound from abilities
+    const effectiveWound = getEffectiveWoundValue(
+      weapon.S,
+      target.T,
+      woundModifier,
+      hasLance,
+      unitHasCharged
+    );
+
+    const modifierParts: string[] = [];
+
+    // Add rule modifiers if present
+    if (woundModifier > 0 && modifierSources?.wound) {
+      const sources = formatModifierSources(modifierSources.wound, activeRules);
+      const display = formatModifierDisplay(woundModifier, sources);
+      if (display) {
+        modifierParts.push(display);
+      }
     }
 
     // Check for anti-x keyword - provides critical wound threshold
     const antiBonus = getAntiKeywordBonus(weapon.keywords, target.categories);
-    let finalWoundValue = modifiedWoundValue;
-
     if (antiBonus) {
-      // Use the better (lower) of the two values: modified wound roll or anti-x threshold
-      finalWoundValue = Math.min(modifiedWoundValue, antiBonus.threshold);
-      activeEffects.push(`anti-${antiBonus.category} ${antiBonus.threshold}+`);
+      modifierParts.push(`Critical wound: anti-${antiBonus.category} ${antiBonus.threshold}+`);
     }
 
-    const finalWound = `${finalWoundValue}+`;
+    // Add S vs T info
+    modifierParts.push(`(S${weapon.S} vs T${target.T})`);
 
-    // Always show S and T
-    modifiers.push(`(S${weapon.S}, T${target.T})`);
-
-    // Show active effects
-    if (activeEffects.length > 0) {
-      const effectText = activeEffects.join(', ');
-      if (hasWoundModifier && antiBonus) {
-        // Both modifier and anti-x active
-        modifiers.push(`${effectText}`);
-      } else if (hasWoundModifier) {
-        // Only modifier
-        modifiers.push(`+1 to wound (${effectText})`);
-      } else if (antiBonus) {
-        // Only anti-x
-        modifiers.push(`Critical wound: ${effectText}`);
-      }
+    // Add lance info if active
+    if (hasLance && unitHasCharged) {
+      modifierParts.push('+1 to wound (lance, charged)');
     }
 
+    // Add twin-linked info
     if (hasTwinLinked) {
-      modifiers.push('Reroll wounds (twin-linked)');
+      modifierParts.push('Reroll wounds (twin-linked)');
     }
 
     return {
       stat: 'Wounds on',
-      value: finalWound,
-      modifier: modifiers.join(' ')
+      value: effectiveWound.display,
+      modifier: modifierParts.join(' ')
     };
   };
 
