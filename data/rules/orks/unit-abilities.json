@@ -1,0 +1,122 @@
+[
+  {
+    "id": "tank-hunters",
+    "name": "Tank Hunters",
+    "description": "Each time a model in this unit makes an attack that targets a MONSTER or VEHICLE unit, add 1 to the Hit roll and add 1 to the Wound roll.",
+    "scope": "unit",
+    "conditions": [
+      {
+        "type": "target-category",
+        "params": {
+          "categories": ["MONSTER", "VEHICLE"]
+        },
+        "operator": "OR"
+      }
+    ],
+    "effects": [
+      {
+        "type": "modify-hit",
+        "target": "self",
+        "params": {
+          "modifier": 1
+        }
+      },
+      {
+        "type": "modify-wound",
+        "target": "self",
+        "params": {
+          "modifier": 1
+        }
+      }
+    ],
+    "duration": "permanent"
+  },
+  {
+    "id": "might-is-right",
+    "name": "Might is Right",
+    "description": "While this model is leading a unit, each time a model in that unit makes a melee attack, add 1 to the Hit roll.",
+    "scope": "unit",
+    "conditions": [
+      {
+        "type": "being-led",
+        "params": {}
+      },
+      {
+        "type": "weapon-type",
+        "params": {
+          "weaponTypes": ["melee"]
+        }
+      }
+    ],
+    "effects": [
+      {
+        "type": "modify-hit",
+        "target": "self",
+        "params": {
+          "modifier": 1
+        }
+      }
+    ],
+    "duration": "permanent"
+  },
+  {
+    "id": "da-biggest-and-da-best",
+    "name": "Da Biggest and da Best",
+    "description": "While the Waaagh! is active for your army, add 4 to the Attacks characteristic of this model's melee weapons.",
+    "scope": "model",
+    "conditions": [
+      {
+        "type": "army-state",
+        "params": {
+          "armyStates": ["waaagh-active"]
+        }
+      },
+      {
+        "type": "weapon-type",
+        "params": {
+          "weaponTypes": ["melee"]
+        }
+      }
+    ],
+    "effects": [
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "A",
+          "modifier": 4
+        }
+      }
+    ],
+    "duration": "permanent"
+  },
+  {
+    "id": "super-runts",
+    "name": "Super Runts",
+    "description": "While this model is leading a unit: Each time a model in that unit makes an attack, add 1 to the Hit roll and add 1 to the Wound roll.",
+    "scope": "unit",
+    "conditions": [
+      {
+        "type": "being-led",
+        "params": {}
+      }
+    ],
+    "effects": [
+      {
+        "type": "modify-hit",
+        "target": "self",
+        "params": {
+          "modifier": 1
+        }
+      },
+      {
+        "type": "modify-wound",
+        "target": "self",
+        "params": {
+          "modifier": 1
+        }
+      }
+    ],
+    "duration": "permanent"
+  }
+]

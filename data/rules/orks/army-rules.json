@@ -1,0 +1,113 @@
+[
+  {
+    "id": "waaagh-strength-bonus",
+    "name": "Waaagh! - Strength Bonus",
+    "description": "While the Waaagh! is active, add 1 to the Strength characteristic of melee weapons equipped by models from your army.",
+    "scope": "army",
+    "conditions": [
+      {
+        "type": "army-state",
+        "params": {
+          "armyStates": ["waaagh-active"]
+        }
+      },
+      {
+        "type": "weapon-type",
+        "params": {
+          "weaponTypes": ["melee"]
+        }
+      }
+    ],
+    "effects": [
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "S",
+          "modifier": 1
+        }
+      }
+    ],
+    "duration": "until-deactivated"
+  },
+  {
+    "id": "waaagh-attacks-bonus",
+    "name": "Waaagh! - Attacks Bonus",
+    "description": "While the Waaagh! is active, add 1 to the Attacks characteristic of melee weapons equipped by models from your army.",
+    "scope": "army",
+    "conditions": [
+      {
+        "type": "army-state",
+        "params": {
+          "armyStates": ["waaagh-active"]
+        }
+      },
+      {
+        "type": "weapon-type",
+        "params": {
+          "weaponTypes": ["melee"]
+        }
+      }
+    ],
+    "effects": [
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "A",
+          "modifier": 1
+        }
+      }
+    ],
+    "duration": "until-deactivated"
+  },
+  {
+    "id": "waaagh-invuln-save",
+    "name": "Waaagh! - Invulnerable Save",
+    "description": "While the Waaagh! is active, models from your army have a 5+ invulnerable save.",
+    "scope": "army",
+    "conditions": [
+      {
+        "type": "army-state",
+        "params": {
+          "armyStates": ["waaagh-active"]
+        }
+      }
+    ],
+    "effects": [
+      {
+        "type": "modify-save",
+        "target": "unit",
+        "params": {
+          "stat": "INV",
+          "modifier": 5
+        }
+      }
+    ],
+    "duration": "until-deactivated"
+  },
+  {
+    "id": "waaagh-charge-after-advance",
+    "name": "Waaagh! - Charge After Advance",
+    "description": "While the Waaagh! is active, units from your army are eligible to declare a charge in a turn in which they Advanced.",
+    "scope": "army",
+    "conditions": [
+      {
+        "type": "army-state",
+        "params": {
+          "armyStates": ["waaagh-active"]
+        }
+      }
+    ],
+    "effects": [
+      {
+        "type": "grant-ability",
+        "target": "unit",
+        "params": {
+          "ability": "charge-after-advance"
+        }
+      }
+    ],
+    "duration": "until-deactivated"
+  }
+]
