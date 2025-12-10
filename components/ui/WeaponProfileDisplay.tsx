@@ -19,6 +19,7 @@ interface Target {
   SV: number; // save value
   INV?: number; // invulnerable save value
   modelCount?: number; // number of models in target unit
+  categories?: string[]; // unit categories for anti-x keywords
 }
 
 interface WeaponProfileDisplayProps {
@@ -27,6 +28,7 @@ interface WeaponProfileDisplayProps {
   unitName?: string;
   className?: string;
   hideRange?: boolean;
+  unitHasCharged?: boolean; // whether the attacking unit charged this turn (for lance)
 }
 
 // Parse keyword to extract numeric value
@@ -45,19 +47,54 @@ function getHitRoll(weapon: Weapon): string {
   return 'N/A';
 }
 
+// Calculate wound roll needed (returns numeric value 2-6)
+function getWoundRollValue(weaponStrength: number, targetToughness: number): number {
+  if (weaponStrength >= targetToughness * 2) {
+    return 2;
+  } else if (weaponStrength > targetToughness) {
+    return 3;
+  } else if (weaponStrength === targetToughness) {
+    return 4;
+  } else if (weaponStrength < targetToughness && weaponStrength >= targetToughness / 2) {
+    return 5;
+  } else {
+    return 6;
+  }
+}
+
 // Calculate wound roll needed
 function getWoundRoll(weaponStrength: number, targetToughness: number): string {
-  if (weaponStrength >= targetToughness * 2) {
-    return '2+';
-  } else if (weaponStrength > targetToughness) {
-    return '3+';
-  } else if (weaponStrength === targetToughness) {
-    return '4+';
-  } else if (weaponStrength < targetToughness && weaponStrength >= targetToughness / 2) {
-    return '5+';
-  } else {
-    return '6+';
+  return `${getWoundRollValue(weaponStrength, targetToughness)}+`;
+}
+
+// Check if weapon has anti-x keyword matching target categories
+// Returns the critical wound threshold if applicable
+function getAntiKeywordBonus(weaponKeywords: string[], targetCategories?: string[]): { category: string; threshold: number } | null {
+  if (!targetCategories || targetCategories.length === 0) return null;
+
+  for (const keyword of weaponKeywords) {
+    // Match patterns like "Anti-Monster 4+", "anti-infantry 2+", etc.
+    const antiMatch = keyword.match(/^anti[- ](.+?)\s+(\d+)\+?$/i);
+    if (antiMatch) {
+      const antiCategory = antiMatch[1].trim();
+      const threshold = parseInt(antiMatch[2], 10);
+
+      // Check if target has this category (case-insensitive)
+      const hasCategory = targetCategories.some(cat =>
+        cat.toLowerCase() === antiCategory.toLowerCase()
+      );
+
+      if (hasCategory) {
+        return { category: antiCategory, threshold };
+      }
+    }
   }
+  return null;
+}
+
+// Check if weapon has lance keyword
+function hasLanceKeyword(weaponKeywords: string[]): boolean {
+  return weaponKeywords.some(k => k.toLowerCase() === 'lance');
 }
 
 // Calculate save roll after AP, considering invulnerable save
@@ -91,7 +128,8 @@ export default function WeaponProfileDisplay({
   target,
   unitName,
   className = '',
-  hideRange = false
+  hideRange = false,
+  unitHasCharged = false
 }: WeaponProfileDisplayProps) {
   const [isAtHalfRange, setIsAtHalfRange] = useState(false);
 
@@ -157,11 +195,55 @@ export default function WeaponProfileDisplay({
   const getWoundsRow = () => {
     if (!target) return { stat: 'Wounds on', value: '?', modifier: '' };
 
-    const baseWound = getWoundRoll(weapon.S, target.T);
+    let baseWoundValue = getWoundRollValue(weapon.S, target.T);
     const modifiers: string[] = [];
+    const activeEffects: string[] = [];
+
+    // Track if we have any +1 to wound modifiers (max +1 total in 10th ed)
+    let hasWoundModifier = false;
+
+    // Check for lance keyword (only on charge turns) - gives +1 to wound
+    const hasLance = hasLanceKeyword(weapon.keywords);
+    if (hasLance && unitHasCharged) {
+      hasWoundModifier = true;
+      activeEffects.push('lance');
+    }
+
+    // Apply +1 to wound modifier if any (max +1)
+    let modifiedWoundValue = baseWoundValue;
+    if (hasWoundModifier) {
+      modifiedWoundValue = Math.max(2, baseWoundValue - 1); // Improve by 1, minimum 2+
+    }
+
+    // Check for anti-x keyword - provides critical wound threshold
+    const antiBonus = getAntiKeywordBonus(weapon.keywords, target.categories);
+    let finalWoundValue = modifiedWoundValue;
+
+    if (antiBonus) {
+      // Use the better (lower) of the two values: modified wound roll or anti-x threshold
+      finalWoundValue = Math.min(modifiedWoundValue, antiBonus.threshold);
+      activeEffects.push(`anti-${antiBonus.category} ${antiBonus.threshold}+`);
+    }
+
+    const finalWound = `${finalWoundValue}+`;
 
     // Always show S and T
     modifiers.push(`(S${weapon.S}, T${target.T})`);
+
+    // Show active effects
+    if (activeEffects.length > 0) {
+      const effectText = activeEffects.join(', ');
+      if (hasWoundModifier && antiBonus) {
+        // Both modifier and anti-x active
+        modifiers.push(`${effectText}`);
+      } else if (hasWoundModifier) {
+        // Only modifier
+        modifiers.push(`+1 to wound (${effectText})`);
+      } else if (antiBonus) {
+        // Only anti-x
+        modifiers.push(`Critical wound: ${effectText}`);
+      }
+    }
 
     if (hasTwinLinked) {
       modifiers.push('Reroll wounds (twin-linked)');
@@ -169,7 +251,7 @@ export default function WeaponProfileDisplay({
 
     return {
       stat: 'Wounds on',
-      value: baseWound,
+      value: finalWound,
       modifier: modifiers.join(' ')
     };
   };

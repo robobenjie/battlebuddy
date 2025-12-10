@@ -253,13 +253,20 @@ export default function CombatCalculatorPage({
     }
   }, [preSelectedWeaponName, availableWeapons, selectedWeaponId]);
 
-  // Get target's defensive stats and model count
+  // Get target's defensive stats, model count, and categories
   const targetStats = selectedTarget?.models?.[0] ? {
     T: selectedTarget.models[0].T,
     SV: selectedTarget.models[0].SV,
     INV: selectedTarget.models[0].INV,
-    modelCount: selectedTarget.models?.length || 0
+    modelCount: selectedTarget.models?.length || 0,
+    categories: selectedTarget.categories || []
   } : undefined;
+
+  // Check if the attacking unit charged this turn (for lance keyword)
+  const unitHasCharged = unit?.statuses?.some((status: any) =>
+    status.name === 'charged' &&
+    status.turns && status.turns.includes(game?.currentTurn)
+  ) || false;
 
   const handleBack = () => {
     if (onClose) {
@@ -435,6 +442,7 @@ export default function CombatCalculatorPage({
                 target={targetStats}
                 unitName={unit?.name}
                 hideRange={weaponType === 'melee'}
+                unitHasCharged={unitHasCharged}
               />
             </div>
           )}
