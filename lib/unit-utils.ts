@@ -125,4 +125,59 @@ export const getWeaponCount = (weapon: any, unit: any) => {
   });
   
   return weaponsWithSameName.length;
+};
+
+// Category priority order for sorting
+export const UNIT_CATEGORY_ORDER = [
+  'Epic Heroes',
+  'Character',
+  'Battleline',
+  'Infantry',
+  'Mounted',
+  'Monster',
+  'Vehicle',
+  'Dedicated Transport'
+];
+
+// Get primary category for sorting (first matching category from priority list)
+export const getPrimaryCategory = (unit: any): string => {
+  const categories = unit.categories || [];
+  for (const priorityCategory of UNIT_CATEGORY_ORDER) {
+    if (categories.some((cat: string) => cat.toLowerCase() === priorityCategory.toLowerCase())) {
+      return priorityCategory;
+    }
+  }
+  return 'Other';
+};
+
+/**
+ * Sort units by:
+ * 1. Destroyed status (undestroyed first)
+ * 2. Category priority (Epic Heroes, Character, Battleline, Infantry, Mounted, Monster, Vehicle, Dedicated Transport, others)
+ * 3. Alphabetically by name
+ *
+ * @param units - Array of units to sort
+ * @param destroyedUnitIds - Set of unit IDs that are destroyed (optional)
+ * @returns Sorted array of units
+ */
+export const sortUnitsByPriority = (units: any[], destroyedUnitIds?: Set<string>): any[] => {
+  return [...units].sort((a, b) => {
+    // First, sort by destroyed status (undestroyed first) if destroyedUnitIds is provided
+    if (destroyedUnitIds) {
+      const aDestroyed = destroyedUnitIds.has(a.id) ? 1 : 0;
+      const bDestroyed = destroyedUnitIds.has(b.id) ? 1 : 0;
+      if (aDestroyed !== bDestroyed) return aDestroyed - bDestroyed;
+    }
+
+    // Then by category priority
+    const aCategoryIndex = UNIT_CATEGORY_ORDER.indexOf(getPrimaryCategory(a));
+    const bCategoryIndex = UNIT_CATEGORY_ORDER.indexOf(getPrimaryCategory(b));
+    const aIndex = aCategoryIndex === -1 ? UNIT_CATEGORY_ORDER.length : aCategoryIndex;
+    const bIndex = bCategoryIndex === -1 ? UNIT_CATEGORY_ORDER.length : bCategoryIndex;
+
+    if (aIndex !== bIndex) return aIndex - bIndex;
+
+    // Finally, alphabetically by name
+    return a.name.localeCompare(b.name);
+  });
 }; 

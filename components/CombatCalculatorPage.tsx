@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '../lib/db';
 import UnitCard from './ui/UnitCard';
 import WeaponProfileDisplay from './ui/WeaponProfileDisplay';
-import { formatUnitForCard } from '../lib/unit-utils';
+import { formatUnitForCard, sortUnitsByPriority } from '../lib/unit-utils';
 
 interface CombatCalculatorPageProps {
   gameId?: string;
@@ -81,9 +81,11 @@ export default function CombatCalculatorPage({
   const currentArmyId = propCurrentArmyId || unit?.armyId;
 
   const enemyArmies = game?.armies?.filter((army: any) => army.id !== currentArmyId) || [];
-  const enemyUnits = (enemyArmies?.flatMap((army: any) => army.units) || [])
-    .filter((unit: any) => !destroyedUnitIds.has(unit.id)) // Filter out destroyed units
-    .sort((a: any, b: any) => a.name.localeCompare(b.name)); // Sort alphabetically
+  const enemyUnits = sortUnitsByPriority(
+    (enemyArmies?.flatMap((army: any) => army.units) || [])
+      .filter((unit: any) => !destroyedUnitIds.has(unit.id)), // Filter out destroyed units
+    destroyedUnitIds
+  );
 
   // State for selected target and weapon
   const [selectedTargetId, setSelectedTargetId] = useState<string>('');

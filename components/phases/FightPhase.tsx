@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { db } from '../../lib/db';
 import { id } from '@instantdb/react';
 import UnitCard from '../ui/UnitCard';
-import { formatUnitForCard } from '../../lib/unit-utils';
+import { formatUnitForCard, sortUnitsByPriority } from '../../lib/unit-utils';
 import CombatCalculatorPage from '../CombatCalculatorPage';
 
 interface FightPhaseProps {
@@ -170,10 +170,10 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
     const regular = (army.units || []).filter((unit: any) => !hasChargedThisTurn(unit));
 
     if (charged.length > 0) {
-      fightsFirstUnits.push({ army, units: charged });
+      fightsFirstUnits.push({ army, units: sortUnitsByPriority(charged, destroyedUnitIds) });
     }
     if (regular.length > 0) {
-      regularUnits.push({ army, units: regular });
+      regularUnits.push({ army, units: sortUnitsByPriority(regular, destroyedUnitIds) });
     }
   });
 

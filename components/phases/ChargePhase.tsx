@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { db } from '../../lib/db';
 import { id } from '@instantdb/react';
 import UnitCard from '../ui/UnitCard';
-import { formatUnitForCard } from '../../lib/unit-utils';
+import { formatUnitForCard, sortUnitsByPriority } from '../../lib/unit-utils';
 
 interface ChargePhaseProps {
   gameId: string;
@@ -56,8 +56,11 @@ export default function ChargePhase({ gameId, army, currentPlayer, currentUser, 
   const allUnits = unitsData?.armies[0]?.units || [];
   const destroyedUnitIds = new Set((unitsData?.games?.[0]?.destroyedUnits || []).map((u: any) => u.id));
 
-  // Filter out destroyed units
-  const units = allUnits.filter((unit: any) => !destroyedUnitIds.has(unit.id));
+  // Filter out destroyed units and sort
+  const units = sortUnitsByPriority(
+    allUnits.filter((unit: any) => !destroyedUnitIds.has(unit.id)),
+    destroyedUnitIds
+  );
 
   // Check if current user is the active player
   const isActivePlayer = currentUser?.id === currentPlayer.userId;

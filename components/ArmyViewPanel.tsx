@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { db } from '../lib/db';
 import UnitCard from './ui/UnitCard';
+import { sortUnitsByPriority } from '../lib/unit-utils';
 
 interface ArmyViewPanelProps {
   isOpen: boolean;
@@ -82,14 +83,22 @@ export default function ArmyViewPanel({ isOpen, onClose, gameId, currentUserId, 
     }
   };
 
-  // Filter units based on search query
+  // Filter and sort units based on search query
   const filterUnits = (units: any[]) => {
-    if (!searchQuery.trim()) return units;
+    const destroyedIds = new Set(
+      (game?.destroyedUnits || []).map((u: any) => u.id)
+    );
+
+    if (!searchQuery.trim()) {
+      return sortUnitsByPriority(units, destroyedIds);
+    }
+
     const query = searchQuery.toLowerCase();
-    return units.filter((unit: any) =>
+    const filtered = units.filter((unit: any) =>
       unit.name.toLowerCase().includes(query) ||
       unit.nickname?.toLowerCase().includes(query)
     );
+    return sortUnitsByPriority(filtered, destroyedIds);
   };
 
   const renderArmy = (army: any, playerName: string, isCurrentUser: boolean) => {

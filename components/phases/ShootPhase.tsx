@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '../../lib/db';
 import UnitCard from '../ui/UnitCard';
-import { formatUnitForCard, getWeaponsForUnit } from '../../lib/unit-utils';
+import { formatUnitForCard, getWeaponsForUnit, sortUnitsByPriority } from '../../lib/unit-utils';
 import CombatCalculatorPage from '../CombatCalculatorPage';
 
 interface ShootPhaseProps {
@@ -60,8 +60,11 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
   const allUnits = unitsData?.armies[0]?.units || [];
   const destroyedUnitIds = new Set((unitsData?.games?.[0]?.destroyedUnits || []).map((u: any) => u.id));
 
-  // Filter out destroyed units
-  const units = allUnits.filter((unit: any) => !destroyedUnitIds.has(unit.id));
+  // Filter out destroyed units and sort
+  const units = sortUnitsByPriority(
+    allUnits.filter((unit: any) => !destroyedUnitIds.has(unit.id)),
+    destroyedUnitIds
+  );
 
   // Check if current user is the active player
   const isActivePlayer = currentUser?.id === currentPlayer.userId;
