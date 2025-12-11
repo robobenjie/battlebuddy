@@ -65,46 +65,50 @@ export default function ChargePhase({ gameId, army, currentPlayer, currentUser, 
   // Check if current user is the active player
   const isActivePlayer = currentUser?.id === currentPlayer.userId;
 
-  // Helper function to check if unit has charged this turn
+  // Helper function to check if unit has charged this player's turn
   const hasChargedThisTurn = (unitId: string) => {
     const unit = units.find(u => u.id === unitId);
     if (!unit || !unit.statuses) return false;
+    const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
     return unit.statuses.some((status: any) =>
       status.name === 'charged' &&
-      status.turns && status.turns.includes(game.currentTurn)
+      status.turns && status.turns.includes(turnPlayerId)
     );
   };
 
-  // Helper function to check if unit has advanced this turn
+  // Helper function to check if unit has advanced this player's turn
   const hasAdvancedThisTurn = (unitId: string) => {
     const unit = units.find(u => u.id === unitId);
     if (!unit || !unit.statuses) return false;
+    const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
     return unit.statuses.some((status: any) =>
       status.name === 'advanced' &&
-      status.turns && status.turns.includes(game.currentTurn)
+      status.turns && status.turns.includes(turnPlayerId)
     );
   };
 
-  // Helper function to create unit status for current turn
+  // Helper function to create unit status for current player's turn
   const createUnitStatus = async (unitId: string, statusName: string) => {
+    const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
     await db.transact([
       db.tx.unitStatuses[id()].update({
         unitId: unitId,
         name: statusName,
-        turns: [game.currentTurn],
+        turns: [turnPlayerId],
         rules: []
       }).link({ unit: unitId })
     ]);
   };
 
-  // Helper function to delete unit statuses for current turn
+  // Helper function to delete unit statuses for current player's turn
   const deleteUnitStatusesForTurn = async (unitId: string) => {
     const unit = units.find(u => u.id === unitId);
     if (!unit || !unit.statuses) return;
 
+    const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
     const statusesToDelete = unit.statuses.filter((status: any) =>
       status.name === 'charged' &&
-      status.turns && status.turns.includes(game.currentTurn)
+      status.turns && status.turns.includes(turnPlayerId)
     );
 
     if (statusesToDelete.length > 0) {

@@ -101,14 +101,17 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
       !weapon.keywords || !weapon.keywords.some((keyword: string) => keyword.toLowerCase() === 'pistol')
     );
 
-    // Check if any pistols have been fired this turn
+    // Create turn+player identifier
+    const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
+
+    // Check if any pistols have been fired this player's turn
     const anyPistolsFired = pistols.some((weapon: any) =>
-      weapon.turnsFired && weapon.turnsFired.includes(game.currentTurn)
+      weapon.turnsFired && weapon.turnsFired.includes(turnPlayerId)
     );
 
-    // Check if any non-pistols have been fired this turn
+    // Check if any non-pistols have been fired this player's turn
     const anyNonPistolsFired = regularWeapons.some((weapon: any) =>
-      weapon.turnsFired && weapon.turnsFired.includes(game.currentTurn)
+      weapon.turnsFired && weapon.turnsFired.includes(turnPlayerId)
     );
 
     const processWeaponGroup = (weaponList: any[]) => {
@@ -116,7 +119,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
 
       weaponList.forEach((weapon: any) => {
         const key = weapon.name;
-        const isFired = weapon.turnsFired && weapon.turnsFired.includes(game.currentTurn);
+        const isFired = weapon.turnsFired && weapon.turnsFired.includes(turnPlayerId);
 
         if (!weaponGroups.has(key)) {
           weaponGroups.set(key, { total: 0, fired: 0, range: weapon.range });
@@ -287,6 +290,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
                 weaponType={selectedWeaponType}
                 preSelectedWeaponName={selectedWeaponName}
                 onClose={closeCombatCalculator}
+                currentPlayer={currentPlayer}
               />
             </div>
           </div>

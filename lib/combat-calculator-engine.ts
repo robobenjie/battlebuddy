@@ -10,6 +10,7 @@ import {
   calculateSaveThreshold,
   rollSaves,
   parseDamageValue,
+  parseAttackCount,
   AttackResult,
   WoundResult,
   SaveResult
@@ -214,6 +215,48 @@ export function executeCombatSequence(
       ...weapon,
       keywords: [...weapon.keywords, ...addedKeywords]
     };
+
+    // Apply weapon characteristic modifiers from rules
+    const aMod = context.modifiers.get('A') || 0;
+    const sMod = context.modifiers.get('S') || 0;
+    const apMod = context.modifiers.get('AP') || 0;
+    const dMod = context.modifiers.get('D') || 0;
+
+    // Check for "Extra Attacks" keyword - these weapons cannot have attacks modified
+    const hasExtraAttacks = weapon.keywords?.some((kw: string) =>
+      kw.toLowerCase() === 'extra attacks'
+    );
+
+    // Modify attacks properly (handle string parsing)
+    let modifiedA = weapon.A;
+    // Only apply A modifier if weapon doesn't have "Extra Attacks" keyword
+    if (aMod !== 0 && !hasExtraAttacks) {
+      const parsed = parseAttackCount(weapon.A);
+      if (parsed.dice > 0) {
+        // Dice notation: add to modifier (e.g., "d6" → "d6+5")
+        const newMod = parsed.modifier + aMod;
+        if (newMod > 0) {
+          modifiedA = `D${parsed.dice}+${newMod}`;
+        } else {
+          modifiedA = `D${parsed.dice}`;
+        }
+      } else {
+        // Fixed attacks: add to fixed value (e.g., "5" → "10")
+        const newFixed = parsed.fixed + parsed.modifier + aMod;
+        modifiedA = newFixed.toString();
+      }
+    }
+
+    weapon = {
+      ...weapon,
+      A: modifiedA,
+      S: weapon.S + sMod,
+      AP: weapon.AP + apMod,
+      D: weapon.D + dMod
+    };
+
+    console.log('⚔️ Applied weapon modifiers:', { A: aMod, S: sMod, AP: apMod, D: dMod });
+    console.log('📈 Modified weapon stats:', { A: weapon.A, S: weapon.S, AP: weapon.AP, D: weapon.D });
   }
 
   // Parse keywords (now includes rule-added keywords)

@@ -79,43 +79,51 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
     return army?.name || 'Unknown Army';
   };
 
-  // Helper function to check if unit has charged this turn
+  // Helper function to check if unit has charged this player's turn
   const hasChargedThisTurn = (unit: any) => {
     if (!unit || !unit.statuses) return false;
+    // Create turn+player identifier (e.g., "2-player123")
+    const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
     return unit.statuses.some((status: any) =>
       status.name === 'charged' &&
-      status.turns && status.turns.includes(game.currentTurn)
+      status.turns && status.turns.includes(turnPlayerId)
     );
   };
 
-  // Helper function to check if unit has fought this turn
+  // Helper function to check if unit has fought this player's turn
   const hasFoughtThisTurn = (unit: any) => {
     if (!unit || !unit.statuses) return false;
+    // Create turn+player identifier (e.g., "2-player123")
+    const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
     return unit.statuses.some((status: any) =>
       status.name === 'fought' &&
-      status.turns && status.turns.includes(game.currentTurn)
+      status.turns && status.turns.includes(turnPlayerId)
     );
   };
 
-  // Helper function to create unit status for current turn
+  // Helper function to create unit status for current player's turn
   const createUnitStatus = async (unitId: string, statusName: string) => {
+    // Create turn+player identifier (e.g., "2-player123")
+    const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
     await db.transact([
       db.tx.unitStatuses[id()].update({
         unitId: unitId,
         name: statusName,
-        turns: [game.currentTurn],
+        turns: [turnPlayerId],
         rules: []
       }).link({ unit: unitId })
     ]);
   };
 
-  // Helper function to delete fought status for current turn
+  // Helper function to delete fought status for current player's turn
   const deleteFoughtStatusForTurn = async (unit: any) => {
     if (!unit || !unit.statuses) return;
 
+    // Create turn+player identifier (e.g., "2-player123")
+    const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
     const statusesToDelete = unit.statuses.filter((status: any) =>
       status.name === 'fought' &&
-      status.turns && status.turns.includes(game.currentTurn)
+      status.turns && status.turns.includes(turnPlayerId)
     );
 
     if (statusesToDelete.length > 0) {
@@ -297,6 +305,7 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
                 currentArmyId={selectedUnitArmyId}
                 weaponType="melee"
                 onClose={closeCombatCalculator}
+                currentPlayer={currentPlayer}
               />
             </div>
           </div>

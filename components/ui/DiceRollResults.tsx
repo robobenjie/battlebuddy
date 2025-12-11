@@ -58,11 +58,25 @@ export default function DiceRollResults({
   // Check if weapon has variable attacks (contains D for dice)
   const hasVariableAttacks = weapon.A.toUpperCase().includes('D');
 
+  // Check if we can skip save rolling:
+  // - Save is impossible (worse than 6+)
+  // - Damage is not variable (fixed number)
+  const modifiedSave = target.SV - weapon.AP;
+  const usingInvuln = target.INV && (target.INV < modifiedSave || modifiedSave <= 1);
+  const saveThreshold = usingInvuln ? target.INV : (modifiedSave <= 1 ? 7 : modifiedSave);
+  const hasVariableDamage = weapon.D.toUpperCase().includes('D');
+  const canSkipSaveRolling = saveThreshold >= 7 && !hasVariableDamage;
+
+  // If we can skip save rolling and saves haven't been shown yet, calculate damage directly
+  const shouldShowDirectDamage = canSkipSaveRolling && !showSavePhase && summary.totalWounds > 0;
+
+  // Calculate melta bonus for direct damage
+  const meltaBonus = (keywords.meltaValue && options.withinHalfRange) ? keywords.meltaValue : 0;
+  const damagePerWound = parseInt(weapon.D, 10) + meltaBonus;
+  const directTotalDamage = shouldShowDirectDamage ? summary.totalWounds * damagePerWound : 0;
+
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4">
-      {/* Active Rules Card */}
-      <ActiveRulesDisplay rules={activeRules} />
-
       {/* Attacks Rolled Card (if variable attacks) */}
       {hasVariableAttacks && attackPhase.attackCountRolls && attackPhase.attackCountRolls.length > 0 && (
         <div className="bg-gray-800 rounded-lg overflow-hidden">
@@ -465,8 +479,47 @@ export default function DiceRollResults({
         </div>
       )}
 
-      {/* Save Information (before rolling) */}
-      {!showSavePhase && summary.totalWounds > 0 && (
+      {/* Direct Damage (when saves are impossible and damage is fixed) */}
+      {shouldShowDirectDamage && (
+        <div className="bg-gray-800 rounded-lg overflow-hidden">
+          <div className="p-4">
+            <div className="text-sm space-y-1 mb-3">
+              <p>
+                <span className="text-gray-400">Wounds inflicted:</span>{' '}
+                <span className="text-white font-semibold">{summary.totalWounds}</span>
+              </p>
+              <p>
+                <span className="text-gray-400">Save required:</span>{' '}
+                <span className="text-white">No save possible</span>
+                <span className="text-xs text-gray-400">
+                  {' '}({target.SV}+ save, {Math.abs(weapon.AP)} AP)
+                </span>
+              </p>
+              <p>
+                <span className="text-gray-400">Damage per wound:</span>{' '}
+                <span className="text-white font-semibold">{weapon.D}</span>
+                {keywords.meltaValue && options.withinHalfRange && (
+                  <span className="text-xs text-gray-400">
+                    {' '}(+{keywords.meltaValue} from Melta)
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="border-t border-gray-600 pt-3">
+              <p className="text-xl font-bold text-center">
+                <span className="text-red-500">TOTAL DAMAGE: {directTotalDamage}</span>
+              </p>
+              <p className="text-xs text-gray-400 text-center mt-2">
+                {summary.totalWounds} wounds × {weapon.D}
+                {keywords.meltaValue && options.withinHalfRange && ` (+${keywords.meltaValue} Melta)`} damage
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Information (before rolling) - only show if saves are possible OR damage is variable */}
+      {!showSavePhase && !shouldShowDirectDamage && summary.totalWounds > 0 && (
         <div className="bg-gray-800 rounded-lg overflow-hidden">
           <h4 className="font-semibold text-red-400 px-4 py-3 bg-gray-900">SAVE INFORMATION</h4>
           <div className="flex">
@@ -485,8 +538,6 @@ export default function DiceRollResults({
                   <span className="text-gray-400">Save on:</span>{' '}
                   <span className="text-white">
                     {(() => {
-                      const modifiedSave = target.SV - weapon.AP;
-                      const usingInvuln = target.INV && (target.INV < modifiedSave || modifiedSave <= 1);
                       if (usingInvuln) {
                         return `${target.INV}+ (invuln)`;
                       }
@@ -516,14 +567,21 @@ export default function DiceRollResults({
         </div>
       )}
 
-      {/* Roll Saves Button */}
-      {!showSavePhase && onRollSaves && summary.totalWounds > 0 && (
+      {/* Roll Saves Button - only show if saves are possible OR damage is variable */}
+      {!showSavePhase && !shouldShowDirectDamage && onRollSaves && summary.totalWounds > 0 && (
         <button
           onClick={onRollSaves}
           className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
         >
           Roll Saves
         </button>
+      )}
+
+      {/* Active Rules - moved to bottom with subtle styling */}
+      {activeRules.length > 0 && (
+        <div className="mt-6 pt-4 border-t border-gray-700">
+          <ActiveRulesDisplay rules={activeRules} />
+        </div>
       )}
     </div>
   );

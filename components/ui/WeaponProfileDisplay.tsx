@@ -25,6 +25,16 @@ interface Target {
 
 interface WeaponProfileDisplayProps {
   weapon: Weapon;
+  modifiedWeapon?: {
+    name: string;
+    range: number;
+    A: string;
+    WS?: number;
+    S: number;
+    AP: number;
+    D: string;
+    keywords: string[];
+  };
   target?: Target;
   unitName?: string;
   className?: string;
@@ -33,10 +43,20 @@ interface WeaponProfileDisplayProps {
   // Rules engine modifiers
   hitModifier?: number;
   woundModifier?: number;
+  weaponStatModifiers?: {
+    A?: number;
+    S?: number;
+    AP?: number;
+    D?: number;
+  };
   activeRules?: Array<{ id: string; name: string }>;
   modifierSources?: {
     hit?: string[];
     wound?: string[];
+    A?: string[];
+    S?: string[];
+    AP?: string[];
+    D?: string[];
   };
 }
 
@@ -105,6 +125,7 @@ function getSaveRoll(targetSave: number, weaponAP: number, invulnerableSave?: nu
 
 export default function WeaponProfileDisplay({
   weapon,
+  modifiedWeapon: propModifiedWeapon,
   target,
   unitName,
   className = '',
@@ -112,10 +133,37 @@ export default function WeaponProfileDisplay({
   unitHasCharged = false,
   hitModifier = 0,
   woundModifier = 0,
+  weaponStatModifiers = {},
   activeRules = [],
   modifierSources
 }: WeaponProfileDisplayProps) {
   const [isAtHalfRange, setIsAtHalfRange] = useState(false);
+
+  // Use provided modifiedWeapon or calculate it (for backwards compatibility)
+  const modifiedWeapon = propModifiedWeapon || (() => {
+    // Check for "Extra Attacks" keyword
+    const hasExtraAttacks = weapon.keywords?.some((kw: string) =>
+      kw.toLowerCase() === 'extra attacks'
+    );
+
+    let modifiedA = weapon.A;
+    // Only apply A modifier if weapon doesn't have "Extra Attacks" keyword
+    if (weaponStatModifiers.A && !hasExtraAttacks) {
+      const numMatch = weapon.A.match(/^\d+$/);
+      if (numMatch) {
+        modifiedA = (parseInt(weapon.A, 10) + weaponStatModifiers.A).toString();
+      } else {
+        modifiedA = `${weapon.A}+${weaponStatModifiers.A}`;
+      }
+    }
+    return {
+      ...weapon,
+      A: modifiedA,
+      S: weapon.S + (weaponStatModifiers.S || 0),
+      AP: weapon.AP + (weaponStatModifiers.AP || 0),
+      D: weapon.D
+    };
+  })();
 
   // Parse keywords
   const rapidFireValue = weapon.keywords
@@ -145,6 +193,12 @@ export default function WeaponProfileDisplay({
     const blastBonus = getBlastBonus();
     const modifiers: string[] = [];
 
+    // Show attack modifiers from rules
+    if (weaponStatModifiers.A && modifierSources?.A && modifierSources.A.length > 0) {
+      const sources = formatModifierSources(modifierSources.A, activeRules);
+      modifiers.push(`${weapon.A} → ${modifiedWeapon.A} (${sources})`);
+    }
+
     if (rapidFireValue !== null) {
       const halfRange = weapon.range / 2;
       modifiers.push(`+${rapidFireValue} within ${halfRange}" (rapid fire ${rapidFireValue})`);
@@ -156,7 +210,7 @@ export default function WeaponProfileDisplay({
 
     return {
       stat: 'Attacks',
-      value: weapon.A,
+      value: modifiedWeapon.A,
       modifier: modifiers.join(', ')
     };
   };
@@ -206,7 +260,7 @@ export default function WeaponProfileDisplay({
     // Calculate effective wound value with modifiers (includes lance if charged)
     // Note: woundModifier from rules engine already accounts for +1 to wound from abilities
     const effectiveWound = getEffectiveWoundValue(
-      weapon.S,
+      modifiedWeapon.S,
       target.T,
       woundModifier,
       hasLance,
@@ -230,8 +284,11 @@ export default function WeaponProfileDisplay({
       modifierParts.push(`Critical wound: anti-${antiBonus.category} ${antiBonus.threshold}+`);
     }
 
-    // Add S vs T info
-    modifierParts.push(`(S${weapon.S} vs T${target.T})`);
+    // Add S vs T info - show modifier if present
+    const strengthDisplay = weaponStatModifiers.S
+      ? `S${modifiedWeapon.S} (${weapon.S}+${weaponStatModifiers.S})`
+      : `S${modifiedWeapon.S}`;
+    modifierParts.push(`(${strengthDisplay} vs T${target.T})`);
 
     // Add lance info if active
     if (hasLance && unitHasCharged) {
@@ -253,11 +310,18 @@ export default function WeaponProfileDisplay({
   const getSaveRow = () => {
     if (!target) return { stat: 'Save on', value: '?', modifier: '' };
 
-    const saveResult = getSaveRoll(target.SV, weapon.AP, target.INV);
+    const saveResult = getSaveRoll(target.SV, modifiedWeapon.AP, target.INV);
+
+    // Add AP modifier info if present
+    let modifier = saveResult.modifier;
+    if (weaponStatModifiers.AP) {
+      modifier = `${modifier} (AP${modifiedWeapon.AP}: ${weapon.AP}${weaponStatModifiers.AP >= 0 ? '+' : ''}${weaponStatModifiers.AP})`;
+    }
+
     return {
       stat: 'Save on',
       value: saveResult.value,
-      modifier: saveResult.modifier
+      modifier: modifier
     };
   };
 

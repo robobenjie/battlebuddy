@@ -19,6 +19,11 @@ interface CombatCalculatorPageProps {
   weaponType?: string;
   preSelectedWeaponName?: string;
   onClose?: () => void;
+  currentPlayer?: {
+    id: string;
+    userId: string;
+    name: string;
+  };
 }
 
 export default function CombatCalculatorPage({
@@ -28,7 +33,8 @@ export default function CombatCalculatorPage({
   currentArmyId: propCurrentArmyId,
   weaponType,
   preSelectedWeaponName,
-  onClose
+  onClose,
+  currentPlayer: propCurrentPlayer
 }: CombatCalculatorPageProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -81,6 +87,10 @@ export default function CombatCalculatorPage({
   const game = enemyUnitData?.games?.[0];
   const destroyedUnitIds = new Set((game?.destroyedUnits || []).map((u: any) => u.id));
 
+  // Use prop currentPlayer if provided, otherwise derive from game
+  // (When called from phase components, currentPlayer is passed; when standalone, need to derive it)
+  const currentPlayer = propCurrentPlayer || (game ? { id: game.activePlayerId || '', userId: '', name: '' } : null);
+
   // Filter out the current unit's army - use prop if available, fallback to unit.armyId
   const currentArmyId = propCurrentArmyId || unit?.armyId;
 
@@ -105,12 +115,52 @@ export default function CombatCalculatorPage({
   const [activeRules, setActiveRules] = useState<Rule[]>([]);
   const [hitModifier, setHitModifier] = useState(0);
   const [woundModifier, setWoundModifier] = useState(0);
+  const [weaponStatModifiers, setWeaponStatModifiers] = useState<{
+    A?: number;
+    S?: number;
+    AP?: number;
+    D?: number;
+  }>({});
   const [addedKeywords, setAddedKeywords] = useState<string[]>([]);
   const [modifierSources, setModifierSources] = useState<{
     hit?: string[];
     wound?: string[];
     keywords?: Array<{ keyword: string; source: string }>;
+    A?: string[];
+    S?: string[];
+    AP?: string[];
+    D?: string[];
   }>({});
+
+  // Helper to apply weapon modifiers (consolidates logic for display and dice rolling)
+  const applyWeaponModifiers = (baseWeapon: any, modifiers: { A?: number; S?: number; AP?: number; D?: number }): WeaponStats => {
+    // Check for "Extra Attacks" keyword - these weapons cannot have attacks modified
+    const hasExtraAttacks = baseWeapon.keywords?.some((kw: string) =>
+      kw.toLowerCase() === 'extra attacks'
+    );
+
+    let modifiedA = baseWeapon.A;
+    // Only apply A modifier if weapon doesn't have "Extra Attacks" keyword
+    if (modifiers.A && !hasExtraAttacks) {
+      const numMatch = baseWeapon.A.match(/^\d+$/);
+      if (numMatch) {
+        modifiedA = (parseInt(baseWeapon.A, 10) + modifiers.A).toString();
+      } else {
+        modifiedA = `${baseWeapon.A}+${modifiers.A}`;
+      }
+    }
+
+    return {
+      name: baseWeapon.name,
+      range: baseWeapon.range,
+      A: modifiedA,
+      WS: baseWeapon.WS,
+      S: baseWeapon.S + (modifiers.S || 0),
+      AP: baseWeapon.AP + (modifiers.AP || 0),
+      D: baseWeapon.D, // TODO: handle D modifiers
+      keywords: baseWeapon.keywords || []
+    };
+  };
 
   // Ref for target select to auto-focus
   const targetSelectRef = useRef<HTMLSelectElement>(null);
@@ -132,6 +182,19 @@ export default function CombatCalculatorPage({
         $: {
           where: {
             id: unit.id
+          }
+        }
+      }
+    } : {}
+  );
+
+  // Query army states for the current army
+  const { data: armyStatesData } = db.useQuery(
+    currentArmyId ? {
+      armyStates: {
+        $: {
+          where: {
+            armyId: currentArmyId
           }
         }
       }
@@ -174,28 +237,32 @@ export default function CombatCalculatorPage({
   // Check if a weapon group has been fired this turn
   // A weapon group is considered "fired" if ALL weapons with that name are fired
   const isWeaponFired = (weapon: any) => {
-    if (!game?.currentTurn) return false;
+    if (!game?.currentTurn || !currentPlayer) return false;
+
+    // Create turn+player identifier
+    const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
 
     // Get all weapons with this name
     const weaponsWithSameName = allWeapons.filter((w: any) => w.name === weapon.name);
 
-    // Check if ALL of them have been fired this turn
+    // Check if ALL of them have been fired this player's turn
     return weaponsWithSameName.every((w: any) =>
-      w.turnsFired && w.turnsFired.includes(game.currentTurn)
+      w.turnsFired && w.turnsFired.includes(turnPlayerId)
     );
   };
 
-  // Get models that have fired pistols this turn
+  // Get models that have fired pistols this player's turn
+  const turnPlayerId = game && currentPlayer ? `${game.currentTurn}-${currentPlayer.id}` : '';
   const modelsThatFiredPistols = new Set(
     allWeapons
-      .filter((w: any) => isPistol(w) && w.turnsFired && w.turnsFired.includes(game?.currentTurn))
+      .filter((w: any) => isPistol(w) && w.turnsFired && w.turnsFired.includes(turnPlayerId))
       .map((w: any) => w.modelId)
   );
 
-  // Get models that have fired non-pistols this turn
+  // Get models that have fired non-pistols this player's turn
   const modelsThatFiredNonPistols = new Set(
     allWeapons
-      .filter((w: any) => !isPistol(w) && w.turnsFired && w.turnsFired.includes(game?.currentTurn))
+      .filter((w: any) => !isPistol(w) && w.turnsFired && w.turnsFired.includes(turnPlayerId))
       .map((w: any) => w.modelId)
   );
 
@@ -319,12 +386,23 @@ export default function CombatCalculatorPage({
     // Combine all applicable rules
     const allRules: Rule[] = [...unitRules, ...armyRules, ...detachmentRules];
 
-    // TODO: Query army states from database
-    const armyStates: ArmyState[] = [];
+    // Get army states from query
+    const armyStates: ArmyState[] = armyStatesData?.armyStates || [];
+
+    // Debug logging
+    console.log('🔍 WAAAGH Debug:', {
+      currentArmyId,
+      unitArmyId: unit?.armyId,
+      armyStatesData,
+      armyStates,
+      hasWaaagh: armyStates.some(s => s.state === 'waaagh-active'),
+      armyRules: armyRules.map(r => r.id),
+      weaponType
+    });
 
     // Build context to evaluate which rules apply
     const context = buildCombatContext({
-      attacker: unit,
+      attacker: { ...unit, armyId: currentArmyId },
       defender: targetStats,
       weapon: weaponStats,
       game: game,
@@ -343,13 +421,25 @@ export default function CombatCalculatorPage({
     // Evaluate rules to see which ones apply
     const appliedRules = evaluateAllRules(allRules, context);
 
+    // Debug: log applied rules
+    console.log('✅ Applied Rules:', appliedRules.map(r => r.id));
+    console.log('📊 Context modifiers:', context.modifiers.getAllModifiers());
+
     // Extract modifiers
     const hitMod = context.modifiers.get('hit');
     const woundMod = context.modifiers.get('wound');
+    const aMod = context.modifiers.get('A') || 0;
+    const sMod = context.modifiers.get('S') || 0;
+    const apMod = context.modifiers.get('AP') || 0;
+    const dMod = context.modifiers.get('D') || 0;
 
     // Extract modifier sources
     const hitSources = context.modifiers.getModifiers('hit').map(m => m.source);
     const woundSources = context.modifiers.getModifiers('wound').map(m => m.source);
+    const aSources = context.modifiers.getModifiers('A').map(m => m.source);
+    const sSources = context.modifiers.getModifiers('S').map(m => m.source);
+    const apSources = context.modifiers.getModifiers('AP').map(m => m.source);
+    const dSources = context.modifiers.getModifiers('D').map(m => m.source);
 
     // Extract keyword sources
     const keywordSources: Array<{ keyword: string; source: string }> = [];
@@ -368,10 +458,15 @@ export default function CombatCalculatorPage({
     setActiveRules(appliedRules);
     setHitModifier(hitMod);
     setWoundModifier(woundMod);
+    setWeaponStatModifiers({ A: aMod, S: sMod, AP: apMod, D: dMod });
     setModifierSources({
       hit: hitSources,
       wound: woundSources,
-      keywords: keywordSources
+      keywords: keywordSources,
+      A: aSources,
+      S: sSources,
+      AP: apSources,
+      D: dSources
     });
   }, [selectedWeaponId, selectedTarget?.id, unit?.id, game?.id, weaponType]); // Use IDs to avoid object reference changes
 
@@ -411,13 +506,23 @@ export default function CombatCalculatorPage({
     // Combine all applicable rules
     const allRules: Rule[] = [...unitRules, ...armyRules, ...detachmentRules];
 
-    // TODO: Query army states from database
-    // For now, create empty array (Waaagh! would be activated via UI later)
-    const armyStates: ArmyState[] = [];
+    // Get army states from query
+    const armyStates: ArmyState[] = armyStatesData?.armyStates || [];
+
+    // Debug logging
+    console.log('🔍 WAAAGH Debug:', {
+      currentArmyId,
+      unitArmyId: unit?.armyId,
+      armyStatesData,
+      armyStates,
+      hasWaaagh: armyStates.some(s => s.state === 'waaagh-active'),
+      armyRules: armyRules.map(r => r.id),
+      weaponType
+    });
 
     // Build context to evaluate which rules apply
     const context = buildCombatContext({
-      attacker: unit,
+      attacker: { ...unit, armyId: currentArmyId },
       defender: targetStats,
       weapon: weaponStats,
       game: game,
@@ -429,6 +534,10 @@ export default function CombatCalculatorPage({
 
     // Evaluate rules to see which ones apply
     const appliedRules = evaluateAllRules(allRules, context);
+
+    // Debug: log applied rules
+    console.log('✅ Applied Rules:', appliedRules.map(r => r.id));
+    console.log('📊 Context modifiers:', context.modifiers.getAllModifiers());
 
     // Extract modifiers
     const hitMod = context.modifiers.get('hit');
@@ -465,7 +574,7 @@ export default function CombatCalculatorPage({
 
     // Execute combat sequence with rules engine
     const result = executeCombatSequence(weaponStats, targetStats, options, {
-      attacker: unit,
+      attacker: { ...unit, armyId: currentArmyId },
       game: game,
       combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
       rules: allRules,
@@ -520,11 +629,14 @@ export default function CombatCalculatorPage({
 
       const selectedIsPistol = isPistol(selectedWeapon);
 
+      // Create turn+player identifier
+      const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
+
       // Filter to only weapons on models that can still fire this weapon type
       const weaponsToUpdate = weaponsWithSameName.filter((weapon: any) => {
-        // Skip if already fired this turn
+        // Skip if already fired this player's turn
         const currentTurnsFired = weapon.turnsFired || [];
-        if (currentTurnsFired.includes(game.currentTurn)) {
+        if (currentTurnsFired.includes(turnPlayerId)) {
           return false;
         }
 
@@ -544,7 +656,7 @@ export default function CombatCalculatorPage({
       const updates = weaponsToUpdate.map((weapon: any) => {
         const currentTurnsFired = weapon.turnsFired || [];
         return db.tx.weapons[weapon.id].update({
-          turnsFired: [...currentTurnsFired, game.currentTurn]
+          turnsFired: [...currentTurnsFired, turnPlayerId]
         });
       });
 
@@ -672,12 +784,14 @@ export default function CombatCalculatorPage({
             <div className="mb-6">
               <WeaponProfileDisplay
                 weapon={selectedWeapon as any}
+                modifiedWeapon={applyWeaponModifiers(selectedWeapon, weaponStatModifiers)}
                 target={targetStats}
                 unitName={unit?.name}
                 hideRange={weaponType === 'melee'}
                 unitHasCharged={unitHasCharged}
                 hitModifier={hitModifier}
                 woundModifier={woundModifier}
+                weaponStatModifiers={weaponStatModifiers}
                 activeRules={activeRules}
                 modifierSources={modifierSources}
               />
@@ -727,16 +841,7 @@ export default function CombatCalculatorPage({
       {/* Digital Dice Menu Modal */}
       {showDigitalDiceMenu && selectedWeapon && targetStats && (
         <DigitalDiceMenu
-          weapon={{
-            name: (selectedWeapon as any).name,
-            range: (selectedWeapon as any).range,
-            A: (selectedWeapon as any).A,
-            WS: (selectedWeapon as any).WS,
-            S: (selectedWeapon as any).S,
-            AP: (selectedWeapon as any).AP,
-            D: (selectedWeapon as any).D,
-            keywords: (selectedWeapon as any).keywords || []
-          }}
+          weapon={applyWeaponModifiers(selectedWeapon, weaponStatModifiers)}
           target={targetStats}
           totalWeaponCount={totalWeaponCount}
           unitHasCharged={unitHasCharged}

@@ -140,12 +140,12 @@ export function rollAttacks(
     const criticalHits = Array.from({ length: attackCount }, (_, i) => i);
     const lethalHits = modifiers.lethalHits ? Array.from({ length: attackCount }, (_, i) => i) : [];
 
-    // Sustained Hits: add extra hits for each critical (all are critical with Torrent)
+    // Sustained Hits: add extra hits to the total count but NOT as extra dice
     if (modifiers.sustainedHitsValue && modifiers.sustainedHitsValue > 0) {
       const extraHits = attackCount * modifiers.sustainedHitsValue;
+      // Add extra hit indices beyond the actual rolled dice
       for (let i = 0; i < extraHits; i++) {
-        attackRolls.push({ value: 6 });
-        hits.push(attackRolls.length - 1);
+        hits.push(attackRolls.length + i);
       }
     }
 
@@ -181,12 +181,14 @@ export function rollAttacks(
     }
   });
 
-  // Sustained Hits: add extra hits for each critical
+  // Sustained Hits: add extra hits to the total count but NOT as extra dice
+  // The visual display will show "+1" squares next to critical hits instead
   if (modifiers.sustainedHitsValue && modifiers.sustainedHitsValue > 0) {
     const extraHits = criticalHits.length * modifiers.sustainedHitsValue;
+    // Add extra hit indices beyond the actual rolled dice
+    // These won't have corresponding dice in attackRolls, but will be counted in hits
     for (let i = 0; i < extraHits; i++) {
-      attackRolls.push({ value: 6 }); // Extra hits are automatic
-      hits.push(attackRolls.length - 1);
+      hits.push(attackRolls.length + i);
     }
   }
 

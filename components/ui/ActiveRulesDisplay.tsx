@@ -20,16 +20,16 @@ export default function ActiveRulesDisplay({ rules }: ActiveRulesDisplayProps) {
   if (rules.length === 0) return null;
 
   return (
-    <div className="bg-purple-900 border-2 border-purple-500 rounded-lg overflow-hidden">
-      <h4 className="font-semibold text-purple-200 px-4 py-3 bg-purple-950">
-        ⚡ ACTIVE RULES
+    <div className="bg-gray-800 rounded-lg overflow-hidden">
+      <h4 className="text-xs font-medium text-gray-500 uppercase px-3 py-2">
+        Active Rules
       </h4>
-      <div className="p-4 space-y-3">
+      <div className="px-3 pb-3 space-y-2">
         {rules.map((rule, index) => (
-          <div key={index} className="bg-purple-950 rounded p-3">
-            <p className="font-semibold text-purple-200 mb-1">{rule.name}</p>
-            <p className="text-xs text-purple-300 mb-2">{rule.description}</p>
-            <div className="flex flex-wrap gap-2">
+          <div key={index} className="text-xs">
+            <p className="font-medium text-gray-300 mb-0.5">{rule.name}</p>
+            <p className="text-gray-500 mb-1 leading-snug">{rule.description}</p>
+            <div className="flex flex-wrap gap-1">
               {rule.effects.map((effect, effIndex) => {
                 let effectText = '';
                 if (effect.type === 'modify-hit' && effect.params.modifier) {
@@ -48,7 +48,7 @@ export default function ActiveRulesDisplay({ rules }: ActiveRulesDisplayProps) {
                   return (
                     <span
                       key={effIndex}
-                      className="bg-purple-800 text-purple-100 text-xs px-2 py-1 rounded font-semibold"
+                      className="bg-gray-700 text-gray-300 text-xs px-1.5 py-0.5 rounded"
                     >
                       {effectText}
                     </span>
