@@ -7,6 +7,7 @@
 
 import { id } from '@instantdb/react';
 import { db } from './db';
+import { extractRulesFromSourceData, matchRuleToImplementation, getAllUnitRuleImplementations, ImportedRule } from './rules-matching';
 
 export interface ArmyMetadata {
   id: string;
@@ -1082,7 +1083,18 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
       );
       await db.transact(weaponTransactions);
     }
-    
+
+    // Step 5: Extract and link rules
+    console.log('📋 Extracting and linking rules...');
+    await extractAndLinkRules({
+      armyId: armyMetadata.id,
+      faction: armyMetadata.faction,
+      sourceData: armyMetadata.sourceData,
+      units,
+      models: allModels,
+      weapons: allWeapons
+    });
+
     return {
       armyId: armyMetadata.id,
       unitIds: units.map(u => u.id),
@@ -1201,7 +1213,18 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
       );
       await db.transact(weaponTransactions);
     }
-    
+
+    // Step 5: Extract and link rules
+    console.log('📋 Extracting and linking rules...');
+    await extractAndLinkRules({
+      armyId: gameArmyId,
+      faction: armyMetadata.faction,
+      sourceData: armyMetadata.sourceData,
+      units,
+      models: allModels,
+      weapons: allWeapons
+    });
+
     return {
       armyId: gameArmyId,
       unitIds: units.map(u => u.id),
@@ -1212,7 +1235,7 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
     console.error('Failed to import army for game:', error);
     throw new Error(`Game army import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-} 
+}
 
 /**
  * Duplicate an existing army for a game using the proper query structure
@@ -1351,4 +1374,214 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
     console.error('Failed to duplicate army for game:', error);
     throw new Error(`Game army duplication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-} 
+}
+
+// ============================================================================
+// Phase 5: Rule Extraction and Linking
+// ============================================================================
+
+/**
+ * Extract and link rules from army sourceData
+ * - Creates rule entities (deduplicating by battlescribeId)
+ * - Links rules to armies, units, models, and weapons
+ * - Populates ruleObject for implemented rules
+ */
+export async function extractAndLinkRules(params: {
+  armyId: string;
+  faction: string;
+  sourceData: string;
+  units: UnitData[];
+  models: ModelData[];
+  weapons: WeaponData[];
+}): Promise<{ ruleIds: string[]; unimplementedRules: string[] }> {
+  const { armyId, faction, sourceData, units, models, weapons } = params;
+
+  // Extract all rules from sourceData
+  const extractedRules = extractRulesFromSourceData(sourceData);
+
+  const createdRuleIds: string[] = [];
+  const unimplementedRules: string[] = [];
+  const ruleIdMap = new Map<string, string>(); // battlescribeId -> ruleId
+
+  // Query all existing rules for deduplication
+  const { data: existingRulesData } = await db.queryOnce({
+    rules: {}
+  });
+  const existingRules = existingRulesData?.rules || [];
+  console.log(`📚 Found ${existingRules.length} existing rules in database`);
+
+  try {
+    // Process army-level rules
+    const armyRuleIds: string[] = [];
+    for (const importedRule of extractedRules.armyRules) {
+      const ruleId = await findOrCreateRule(importedRule, faction, existingRules);
+      createdRuleIds.push(ruleId);
+      ruleIdMap.set(importedRule.battlescribeId, ruleId);
+      armyRuleIds.push(ruleId);
+    }
+
+    // Link all army rules at once
+    if (armyRuleIds.length > 0) {
+      await db.transact(
+        armyRuleIds.map(ruleId => db.tx.armies[armyId].link({ armyRules: ruleId }))
+      );
+    }
+
+    // Process unit rules
+    for (const unit of units) {
+      const unitRules = extractedRules.unitRules.get(unit.name) || [];
+      const unitRuleIds: string[] = [];
+
+      for (const importedRule of unitRules) {
+        let ruleId = ruleIdMap.get(importedRule.battlescribeId);
+
+        if (!ruleId) {
+          ruleId = await findOrCreateRule(importedRule, faction, existingRules);
+          createdRuleIds.push(ruleId);
+          ruleIdMap.set(importedRule.battlescribeId, ruleId);
+        }
+
+        unitRuleIds.push(ruleId);
+      }
+
+      // Link all unit rules at once
+      if (unitRuleIds.length > 0) {
+        await db.transact(
+          unitRuleIds.map(ruleId => db.tx.units[unit.id].link({ unitRules: ruleId }))
+        );
+      }
+    }
+
+    // Process model rules
+    for (const model of models) {
+      const modelRules = extractedRules.modelRules.get(model.name) || [];
+      const modelRuleIds: string[] = [];
+
+      for (const importedRule of modelRules) {
+        let ruleId = ruleIdMap.get(importedRule.battlescribeId);
+
+        if (!ruleId) {
+          ruleId = await findOrCreateRule(importedRule, faction, existingRules);
+          createdRuleIds.push(ruleId);
+          ruleIdMap.set(importedRule.battlescribeId, ruleId);
+        }
+
+        modelRuleIds.push(ruleId);
+      }
+
+      // Link all model rules at once
+      if (modelRuleIds.length > 0) {
+        await db.transact(
+          modelRuleIds.map(ruleId => db.tx.models[model.id].link({ modelRules: ruleId }))
+        );
+      }
+    }
+
+    // Process weapon rules (keywords)
+    for (const weapon of weapons) {
+      const weaponRules = extractedRules.weaponRules.get(weapon.name || '') || [];
+      const weaponRuleIds: string[] = [];
+
+      for (const importedRule of weaponRules) {
+        let ruleId = ruleIdMap.get(importedRule.battlescribeId);
+
+        if (!ruleId) {
+          ruleId = await findOrCreateRule(importedRule, faction, existingRules);
+          createdRuleIds.push(ruleId);
+          ruleIdMap.set(importedRule.battlescribeId, ruleId);
+        }
+
+        weaponRuleIds.push(ruleId);
+      }
+
+      // Link all weapon rules at once
+      if (weaponRuleIds.length > 0) {
+        await db.transact(
+          weaponRuleIds.map(ruleId => db.tx.weapons[weapon.id].link({ weaponRules: ruleId }))
+        );
+      }
+    }
+
+    console.log(`✅ Linked ${createdRuleIds.length} rules to army ${armyId}`);
+    if (unimplementedRules.length > 0) {
+      console.log(`⚠️  ${unimplementedRules.length} rules not yet implemented:`, unimplementedRules);
+    }
+
+    return { ruleIds: createdRuleIds, unimplementedRules };
+  } catch (error) {
+    console.error('Failed to extract and link rules:', error);
+    throw new Error(`Rule extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Find or create a rule entity
+ * Returns the rule ID
+ *
+ * Deduplication strategy:
+ * 1. Check battlescribeId match (most specific)
+ * 2. Check name + rawText match (content-based)
+ * 3. Create new rule if no match found
+ */
+async function findOrCreateRule(
+  importedRule: ImportedRule,
+  faction: string,
+  existingRules: any[]
+): Promise<string> {
+  // First, try to find by battlescribeId
+  const byBattlescribeId = existingRules.find(
+    r => r.battlescribeId === importedRule.battlescribeId
+  );
+  if (byBattlescribeId) {
+    console.log(`🔗 Reusing rule by battlescribeId: ${importedRule.name}`);
+    return byBattlescribeId.id;
+  }
+
+  // Second, try to find by name + rawText match
+  const byContent = existingRules.find(
+    r => r.name === importedRule.name && r.rawText === importedRule.rawText
+  );
+  if (byContent) {
+    console.log(`🔗 Reusing rule by content match: ${importedRule.name}`);
+    return byContent.id;
+  }
+
+  // No match found, create new rule
+  const ruleId = id();
+
+  // Try to match against rules-engine implementation
+  const matchedRule = matchRuleToImplementation(importedRule, faction);
+  const ruleObject = matchedRule ? JSON.stringify(matchedRule) : undefined;
+
+  if (!ruleObject) {
+    console.log(`⚠️  Rule not implemented: ${importedRule.name}`);
+  } else {
+    console.log(`✅ Matched rule: ${importedRule.name}`);
+  }
+
+  await db.transact([
+    db.tx.rules[ruleId].update({
+      name: importedRule.name,
+      rawText: importedRule.rawText,
+      battlescribeId: importedRule.battlescribeId,
+      faction,
+      scope: importedRule.scope,
+      createdAt: Date.now(),
+      ruleObject
+    })
+  ]);
+
+  // Add to existing rules cache for subsequent lookups in this session
+  existingRules.push({
+    id: ruleId,
+    name: importedRule.name,
+    rawText: importedRule.rawText,
+    battlescribeId: importedRule.battlescribeId,
+    faction,
+    scope: importedRule.scope,
+    createdAt: Date.now(),
+    ruleObject
+  });
+
+  return ruleId;
+}

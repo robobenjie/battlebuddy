@@ -9,7 +9,7 @@ import { formatUnitForCard, sortUnitsByPriority } from '../lib/unit-utils';
 import DigitalDiceMenu from './DigitalDiceMenu';
 import DiceRollResults from './ui/DiceRollResults';
 import { executeCombatSequence, executeSavePhase, CombatResult, CombatOptions, WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
-import { getRulesForUnit, getOrkArmyRules, getOrkDetachmentRules, Rule, ArmyState, buildCombatContext, evaluateAllRules, getAddedKeywords } from '../lib/rules-engine';
+import { Rule, ArmyState, buildCombatContext, evaluateAllRules, getAddedKeywords } from '../lib/rules-engine';
 
 interface CombatCalculatorPageProps {
   gameId?: string;
@@ -46,10 +46,16 @@ export default function CombatCalculatorPage({
   const { data: unitData } = db.useQuery(
     propUnit ? {} : {
       units: {
+        unitRules: {},
         models: {
-          weapons: {}
+          modelRules: {},
+          weapons: {
+            weaponRules: {}
+          }
         },
-        army: {},
+        army: {
+          armyRules: {}
+        },
         statuses: {},
         $: {
           where: {
@@ -63,13 +69,18 @@ export default function CombatCalculatorPage({
   const unit = propUnit || unitData?.units?.[0];
 
   
-  // Now try the full query, including destroyed units
+  // Now try the full query, including destroyed units and rules
   const { data: enemyUnitData, isLoading, error } = db.useQuery({
     games: {
       armies: {
+        armyRules: {},
         units: {
+          unitRules: {},
           models: {
-            weapons: {}
+            modelRules: {},
+            weapons: {
+              weaponRules: {}
+            }
           },
           statuses: {}
         }
@@ -377,14 +388,39 @@ export default function CombatCalculatorPage({
       keywords: (selectedWeapon as any).keywords || []
     };
 
-    // Load applicable rules for this unit
-    const unitName = unit?.name || '';
-    const unitRules = getRulesForUnit(unitName);
-    const armyRules = getOrkArmyRules();
-    const detachmentRules = getOrkDetachmentRules();
+    // Load applicable rules from database (linked rules)
+    const allRules: Rule[] = [];
 
-    // Combine all applicable rules
-    const allRules: Rule[] = [...unitRules, ...armyRules, ...detachmentRules];
+    // Get army rules from the current army
+    const currentArmy = game?.armies?.find((a: any) => a.id === currentArmyId);
+    if (currentArmy?.armyRules) {
+      for (const rule of currentArmy.armyRules) {
+        if (rule?.ruleObject) {
+          try {
+            const parsedRule = JSON.parse(rule.ruleObject);
+            allRules.push(parsedRule);
+          } catch (e) {
+            console.error('Failed to parse rule:', rule.name, e);
+          }
+        }
+      }
+    }
+
+    // Get unit rules
+    if (unit?.unitRules) {
+      for (const rule of unit.unitRules) {
+        if (rule?.ruleObject) {
+          try {
+            const parsedRule = JSON.parse(rule.ruleObject);
+            allRules.push(parsedRule);
+          } catch (e) {
+            console.error('Failed to parse rule:', rule.name, e);
+          }
+        }
+      }
+    }
+
+    console.log(`📋 Loaded ${allRules.length} implemented rules from database`);
 
     // Get army states from query
     const armyStates: ArmyState[] = armyStatesData?.armyStates || [];
@@ -396,7 +432,7 @@ export default function CombatCalculatorPage({
       armyStatesData,
       armyStates,
       hasWaaagh: armyStates.some(s => s.state === 'waaagh-active'),
-      armyRules: armyRules.map(r => r.id),
+      loadedRules: allRules.length,
       weaponType
     });
 
@@ -497,14 +533,39 @@ export default function CombatCalculatorPage({
       keywords: (selectedWeapon as any).keywords || []
     };
 
-    // Load applicable rules for this unit
-    const unitName = unit?.name || '';
-    const unitRules = getRulesForUnit(unitName);
-    const armyRules = getOrkArmyRules();
-    const detachmentRules = getOrkDetachmentRules();
+    // Load applicable rules from database (linked rules)
+    const allRules: Rule[] = [];
 
-    // Combine all applicable rules
-    const allRules: Rule[] = [...unitRules, ...armyRules, ...detachmentRules];
+    // Get army rules from the current army
+    const currentArmy = game?.armies?.find((a: any) => a.id === currentArmyId);
+    if (currentArmy?.armyRules) {
+      for (const rule of currentArmy.armyRules) {
+        if (rule?.ruleObject) {
+          try {
+            const parsedRule = JSON.parse(rule.ruleObject);
+            allRules.push(parsedRule);
+          } catch (e) {
+            console.error('Failed to parse rule:', rule.name, e);
+          }
+        }
+      }
+    }
+
+    // Get unit rules
+    if (unit?.unitRules) {
+      for (const rule of unit.unitRules) {
+        if (rule?.ruleObject) {
+          try {
+            const parsedRule = JSON.parse(rule.ruleObject);
+            allRules.push(parsedRule);
+          } catch (e) {
+            console.error('Failed to parse rule:', rule.name, e);
+          }
+        }
+      }
+    }
+
+    console.log(`📋 Loaded ${allRules.length} implemented rules from database`);
 
     // Get army states from query
     const armyStates: ArmyState[] = armyStatesData?.armyStates || [];
@@ -516,7 +577,7 @@ export default function CombatCalculatorPage({
       armyStatesData,
       armyStates,
       hasWaaagh: armyStates.some(s => s.state === 'waaagh-active'),
-      armyRules: armyRules.map(r => r.id),
+      loadedRules: allRules.length,
       weaponType
     });
 

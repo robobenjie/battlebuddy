@@ -46,20 +46,56 @@ export function CurrentGames({ user, embedded }: CurrentGamesProps) {
   const deleteGame = async (gameId: string) => {
     setIsDeleting(true);
     try {
-      const gamePlayers = allPlayers.filter((p: any) => p.gameId === gameId);
+      // Query game with all related entities to properly delete them
+      const { data: gameData } = await db.queryOnce({
+        games: {
+          armies: {
+            units: {
+              models: {
+                weapons: {}
+              },
+              statuses: {}
+            },
+            states: {}
+          },
+          $: {
+            where: { id: gameId }
+          }
+        }
+      });
+
+      const game = gameData?.games?.[0];
+      if (!game) {
+        throw new Error('Game not found');
+      }
+
       const transactions = [];
-      
+
+      // Delete all game-specific armies and their nested entities
+      // (units, models, weapons, statuses, states will cascade via schema)
+      if (game.armies) {
+        game.armies.forEach((army: any) => {
+          if (army.gameId === gameId) {
+            // Only delete armies that belong to this game
+            transactions.push(db.tx.armies[army.id].delete());
+          }
+        });
+      }
+
       // Delete players
-      gamePlayers.forEach(player => transactions.push(db.tx.players[player.id].delete()));
-      
-      // Delete the game (armies will be cascade deleted via schema)
+      const gamePlayers = allPlayers.filter((p: any) => p.gameId === gameId);
+      gamePlayers.forEach(player => {
+        transactions.push(db.tx.players[player.id].delete());
+      });
+
+      // Delete the game itself
       transactions.push(db.tx.games[gameId].delete());
-      
+
       await db.transact(transactions);
       setDeleteGameId(null);
     } catch (error) {
       console.error('Error deleting game:', error);
-      alert('Failed to delete game. Please try again.');
+      alert(`Failed to delete game: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsDeleting(false);
     }

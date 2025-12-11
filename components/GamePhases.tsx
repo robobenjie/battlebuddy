@@ -57,53 +57,6 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
-  // Special case: Show choose first player screen
-  if (game.currentPhase === 'choose-first-player') {
-    return (
-      <ChooseFirstPlayerPhase
-        gameId={gameId}
-        game={game}
-        players={players}
-      />
-    );
-  }
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchEndX.current = e.touches[0].clientX; // Initialize to start position
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const swipeDistance = touchStartX.current - touchEndX.current;
-    const minSwipeDistance = 50;
-
-    // Calculate if this was actually a swipe (moved enough distance)
-    const didSwipe = Math.abs(swipeDistance) >= minSwipeDistance;
-
-    if (didSwipe) {
-      // Prevent default to stop click events from firing
-      e.preventDefault();
-
-      // Swipe left (to open panel from right)
-      if (swipeDistance > 0 && !isArmyPanelOpen) {
-        setIsArmyPanelOpen(true);
-      }
-      // Swipe right (to close panel)
-      else if (swipeDistance < 0 && isArmyPanelOpen) {
-        setIsArmyPanelOpen(false);
-      }
-    }
-
-    // If it wasn't a swipe (tap or small movement), let the event through normally
-
-    touchStartX.current = 0;
-    touchEndX.current = 0;
-  };
-
   // Get current player data
   const currentPlayer = players.find(p => p.id === game.activePlayerId);
   const currentPlayerArmy = currentPlayer?.armyId;
@@ -152,6 +105,54 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
   );
 
   const army = armyData?.armies?.[0];
+
+  // Special case: Show choose first player screen
+  // IMPORTANT: This check must come AFTER all hooks are called
+  if (game.currentPhase === 'choose-first-player') {
+    return (
+      <ChooseFirstPlayerPhase
+        gameId={gameId}
+        game={game}
+        players={players}
+      />
+    );
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchEndX.current = e.touches[0].clientX; // Initialize to start position
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const swipeDistance = touchStartX.current - touchEndX.current;
+    const minSwipeDistance = 50;
+
+    // Calculate if this was actually a swipe (moved enough distance)
+    const didSwipe = Math.abs(swipeDistance) >= minSwipeDistance;
+
+    if (didSwipe) {
+      // Prevent default to stop click events from firing
+      e.preventDefault();
+
+      // Swipe left (to open panel from right)
+      if (swipeDistance > 0 && !isArmyPanelOpen) {
+        setIsArmyPanelOpen(true);
+      }
+      // Swipe right (to close panel)
+      else if (swipeDistance < 0 && isArmyPanelOpen) {
+        setIsArmyPanelOpen(false);
+      }
+    }
+
+    // If it wasn't a swipe (tap or small movement), let the event through normally
+
+    touchStartX.current = 0;
+    touchEndX.current = 0;
+  };
 
   // Now we can do conditional logic after all hooks are called
   if (!game.activePlayerId || !currentPlayer) {

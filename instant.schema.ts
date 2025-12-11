@@ -114,15 +114,23 @@ const _schema = i.schema({
       modelId: i.string().indexed(),
     }),
 
-    // Rules engine entities
+    // Rules entity - stores both imported rules and rules-engine implementations
     rules: i.entity({
       id: i.string().unique().indexed(),
       name: i.string().indexed(),
-      description: i.string(),
-      scope: i.string(), // 'weapon', 'unit', 'model', 'detachment', 'army'
-      conditions: i.json(), // array of RuleCondition objects
-      effects: i.json(), // array of RuleEffect objects
-      duration: i.string(), // 'permanent', 'turn', 'phase', 'until-deactivated'
+      // Import data (from BattleScribe/NewRecruit)
+      rawText: i.string().optional(), // Original rule description from import
+      battlescribeId: i.string().optional().indexed(), // BattleScribe unique ID for deduplication
+      faction: i.string().optional().indexed(), // Faction this rule belongs to
+      createdAt: i.number(),
+      // Rules-engine implementation (optional - null if not yet implemented)
+      ruleObject: i.string().optional(), // JSON stringified Rule engine object
+      // Legacy fields (kept for backwards compatibility, can be deprecated)
+      description: i.string().optional(),
+      scope: i.string().optional(), // 'weapon', 'unit', 'model', 'detachment', 'army'
+      conditions: i.json().optional(), // array of RuleCondition objects
+      effects: i.json().optional(), // array of RuleEffect objects
+      duration: i.string().optional(), // 'permanent', 'turn', 'phase', 'until-deactivated'
       activation: i.json().optional(), // RuleActivation object
     }),
 
@@ -136,24 +144,6 @@ const _schema = i.schema({
       expiresPhase: i.string().optional(),
     }),
 
-    // Linking tables for rules to entities
-    unitRules: i.entity({
-      id: i.string().unique().indexed(),
-      unitId: i.string().indexed(),
-      ruleId: i.string().indexed(),
-    }),
-
-    weaponRules: i.entity({
-      id: i.string().unique().indexed(),
-      weaponId: i.string().indexed(),
-      ruleId: i.string().indexed(),
-    }),
-
-    detachmentRules: i.entity({
-      id: i.string().unique().indexed(),
-      armyId: i.string().indexed(), // Detachment rules are army-level
-      ruleId: i.string().indexed(),
-    }),
   },
   
   links: {
@@ -199,32 +189,25 @@ const _schema = i.schema({
       reverse: { on: "games", has: "many", label: "destroyedUnits" },
     },
 
-    // Rule relationships
-    ruleUnit: {
-      forward: { on: "unitRules", has: "one", label: "unit", required: true, onDelete: "cascade" },
-      reverse: { on: "units", has: "many", label: "ruleLinks" },
-    },
-    ruleUnitRule: {
-      forward: { on: "unitRules", has: "one", label: "rule", required: true, onDelete: "cascade" },
-      reverse: { on: "rules", has: "many", label: "unitLinks" },
+    // Rule relationships (many-to-many)
+    armyRules: {
+      forward: { on: "armies", has: "many", label: "armyRules" },
+      reverse: { on: "rules", has: "many", label: "rulesArmies" },
     },
 
-    ruleWeapon: {
-      forward: { on: "weaponRules", has: "one", label: "weapon", required: true, onDelete: "cascade" },
-      reverse: { on: "weapons", has: "many", label: "ruleLinks" },
-    },
-    ruleWeaponRule: {
-      forward: { on: "weaponRules", has: "one", label: "rule", required: true, onDelete: "cascade" },
-      reverse: { on: "rules", has: "many", label: "weaponLinks" },
+    unitRules: {
+      forward: { on: "units", has: "many", label: "unitRules" },
+      reverse: { on: "rules", has: "many", label: "rulesUnits" },
     },
 
-    ruleDetachment: {
-      forward: { on: "detachmentRules", has: "one", label: "army", required: true, onDelete: "cascade" },
-      reverse: { on: "armies", has: "many", label: "detachmentRuleLinks" },
+    modelRules: {
+      forward: { on: "models", has: "many", label: "modelRules" },
+      reverse: { on: "rules", has: "many", label: "rulesModels" },
     },
-    ruleDetachmentRule: {
-      forward: { on: "detachmentRules", has: "one", label: "rule", required: true, onDelete: "cascade" },
-      reverse: { on: "rules", has: "many", label: "detachmentLinks" },
+
+    weaponRules: {
+      forward: { on: "weapons", has: "many", label: "weaponRules" },
+      reverse: { on: "rules", has: "many", label: "rulesWeapons" },
     },
 
     // Army state relationships
