@@ -34,6 +34,121 @@ export const getUnitMovement = (unit: any) => {
   return uniqueMovements.length === 1 ? uniqueMovements[0] : null;
 };
 
+// Helper function to calculate modified movement based on active rules
+export const getModifiedMovement = (unit: any, armyStates?: any[]) => {
+  const baseMovement = getUnitMovement(unit);
+  if (!baseMovement || baseMovement === '-') return baseMovement;
+
+  let modifier = 0;
+  const activeModifiers: { name: string; value: number }[] = [];
+
+  // Check unit rules for movement modifiers
+  if (unit.unitRules && Array.isArray(unit.unitRules)) {
+    for (const rule of unit.unitRules) {
+      if (!rule?.ruleObject) continue;
+
+      try {
+        const parsedRules = JSON.parse(rule.ruleObject);
+        const ruleArray = Array.isArray(parsedRules) ? parsedRules : [parsedRules];
+
+        for (const parsedRule of ruleArray) {
+          // Check if this rule has stat modifiers
+          if (!parsedRule.effects || !Array.isArray(parsedRule.effects)) continue;
+
+          // Check conditions
+          let conditionsMet = true;
+          if (parsedRule.conditions && Array.isArray(parsedRule.conditions)) {
+            for (const condition of parsedRule.conditions) {
+              if (condition.type === 'army-state') {
+                // Check if the required army state is active
+                const hasState = armyStates?.some((state: any) => state.state === condition.state);
+                if (!hasState) {
+                  conditionsMet = false;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (!conditionsMet) continue;
+
+          // Apply movement modifiers
+          for (const effect of parsedRule.effects) {
+            if (effect.type === 'stat-modifier' && effect.stat === 'movement') {
+              const modValue = parseInt(effect.modifier);
+              if (!isNaN(modValue)) {
+                modifier += modValue;
+                activeModifiers.push({ name: parsedRule.name, value: modValue });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse unit rule for movement modifiers:', rule.name, e);
+      }
+    }
+  }
+
+  // Check model rules for movement modifiers
+  if (unit.models && Array.isArray(unit.models)) {
+    for (const model of unit.models) {
+      if (!model.modelRules || !Array.isArray(model.modelRules)) continue;
+
+      for (const rule of model.modelRules) {
+        if (!rule?.ruleObject) continue;
+
+        try {
+          const parsedRules = JSON.parse(rule.ruleObject);
+          const ruleArray = Array.isArray(parsedRules) ? parsedRules : [parsedRules];
+
+          for (const parsedRule of ruleArray) {
+            // Check if this rule has stat modifiers
+            if (!parsedRule.effects || !Array.isArray(parsedRule.effects)) continue;
+
+            // Check conditions
+            let conditionsMet = true;
+            if (parsedRule.conditions && Array.isArray(parsedRule.conditions)) {
+              for (const condition of parsedRule.conditions) {
+                if (condition.type === 'army-state') {
+                  // Check if the required army state is active
+                  const hasState = armyStates?.some((state: any) => state.state === condition.state);
+                  if (!hasState) {
+                    conditionsMet = false;
+                    break;
+                  }
+                }
+              }
+            }
+
+            if (!conditionsMet) continue;
+
+            // Apply movement modifiers
+            for (const effect of parsedRule.effects) {
+              if (effect.type === 'stat-modifier' && effect.stat === 'movement') {
+                const modValue = parseInt(effect.modifier);
+                if (!isNaN(modValue)) {
+                  modifier += modValue;
+                  activeModifiers.push({ name: parsedRule.name, value: modValue });
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Failed to parse model rule for movement modifiers:', rule.name, e);
+        }
+      }
+    }
+  }
+
+  if (modifier === 0) return baseMovement;
+
+  const baseValue = parseInt(baseMovement);
+  if (isNaN(baseValue)) return baseMovement;
+
+  const modifiedValue = baseValue + modifier;
+  return modifiedValue > 0 ? modifiedValue.toString() : baseMovement;
+};
+
 // Helper function to format unit data for ArmyDetailPage (updated for new structure)
 export const formatUnitForCard = (unit: any) => {
   const unitModels = getModelsForUnit(unit);

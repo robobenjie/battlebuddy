@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { db } from '../../lib/db';
 import { id } from '@instantdb/react';
 import UnitCard from '../ui/UnitCard';
-import { formatUnitForCard, getUnitMovement, sortUnitsByPriority } from '../../lib/unit-utils';
+import { formatUnitForCard, getUnitMovement, getModifiedMovement, sortUnitsByPriority } from '../../lib/unit-utils';
 import { getUnitsWithReminders, getUnitReminders } from '../../lib/rules-engine/reminder-utils';
 import ReminderBadge from '../ui/ReminderBadge';
 import { useRulePopup } from '../ui/RulePopup';
@@ -73,8 +73,22 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
     }
   });
 
+  // Query army states to check for conditional modifiers (like WAAAGH!)
+  const { data: armyStatesData } = db.useQuery(
+    army?.id ? {
+      armyStates: {
+        $: {
+          where: {
+            armyId: army.id
+          }
+        }
+      }
+    } : {}
+  );
+
   const allUnits = unitsData?.armies[0]?.units || [];
   const destroyedUnitIds = new Set((unitsData?.games?.[0]?.destroyedUnits || []).map((u: any) => u.id));
+  const armyStates = armyStatesData?.armyStates || [];
 
   // Filter out destroyed units and sort
   const units = sortUnitsByPriority(
@@ -211,7 +225,8 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
       <div className="space-y-4">
         {units.map(unit => {
           const unitData = formatUnitForCard(unit);
-          const movement = getUnitMovement(unit);
+          const baseMovement = getUnitMovement(unit);
+          const movement = getModifiedMovement(unit, armyStates);
           const hasMoved = hasMovedThisTurn(unit.id);
           const hasAdvanced = hasAdvancedThisTurn(unit.id);
           const hasActions = hasActionsThisTurn(unit.id);
