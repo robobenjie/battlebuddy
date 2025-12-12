@@ -981,32 +981,47 @@ function parseWeaponCharacteristics(characteristics: any[]): {
 /**
  * Import a complete army from NewRecruit JSON and store in InstantDB
  */
-export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: string): Promise<{ 
-  armyId: string; 
-  unitIds: string[]; 
-  modelIds: string[]; 
-  weaponIds: string[] 
+export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: string): Promise<{
+  armyId: string;
+  unitIds: string[];
+  modelIds: string[];
+  weaponIds: string[]
 }> {
+  const importStartTime = performance.now();
+  console.log('⏱️  Starting complete army import...');
+
   // Phase 1: Import army metadata
+  const t1 = performance.now();
   const armyMetadata = extractArmyMetadata(jsonData, userId);
-  
+  const t2 = performance.now();
+  console.log(`  Phase 1 (Metadata): ${(t2-t1).toFixed(2)}ms`);
+
   // Phase 2: Extract units
+  const t3 = performance.now();
   const units = extractUnits(jsonData, armyMetadata.id, userId);
-  
+  const t4 = performance.now();
+  console.log(`  Phase 2 (Units): ${(t4-t3).toFixed(2)}ms - ${units.length} units`);
+
   // Phase 3: Extract models from units
+  const t5 = performance.now();
   const allModels: ModelData[] = [];
   for (const unit of units) {
     const unitModels = extractModels(unit);
     allModels.push(...unitModels);
   }
-  
+  const t6 = performance.now();
+  console.log(`  Phase 3 (Models): ${(t6-t5).toFixed(2)}ms - ${allModels.length} models`);
+
   // Phase 4: Extract weapons from units
+  const t7 = performance.now();
   const allWeapons: WeaponData[] = [];
   for (const unit of units) {
     const unitModels = allModels.filter(model => model.unitId === unit.id);
     const unitWeapons = extractWeapons(unit, unitModels);
     allWeapons.push(...unitWeapons);
   }
+  const t8 = performance.now();
+  console.log(`  Phase 4 (Weapons): ${(t8-t7).toFixed(2)}ms - ${allWeapons.length} weapons`);
   
   try {
     // Helper function to batch arrays into chunks
@@ -1018,7 +1033,10 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
       return chunks;
     };
 
+    console.log('  Database transactions:');
+
     // Step 1: Create army first
+    const txArmyStart = performance.now();
     await db.transact([
       db.tx.armies[armyMetadata.id].update({
         name: armyMetadata.name,
@@ -1029,8 +1047,11 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
         createdAt: armyMetadata.createdAt
       }).link({ owner: armyMetadata.ownerId })
     ]);
+    const txArmyTime = performance.now() - txArmyStart;
+    console.log(`    Army transaction: ${txArmyTime.toFixed(2)}ms`);
 
     // Step 2: Batch units into chunks of 10
+    const txUnitsStart = performance.now();
     const unitChunks = chunkArray(units, 10);
     for (const unitChunk of unitChunks) {
       const unitTransactions = unitChunk.map(unit =>
@@ -1044,8 +1065,11 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
       );
       await db.transact(unitTransactions);
     }
+    const txUnitsTime = performance.now() - txUnitsStart;
+    console.log(`    Units transactions: ${txUnitsTime.toFixed(2)}ms (${unitChunks.length} batches)`);
 
     // Step 3: Batch models into chunks of 20
+    const txModelsStart = performance.now();
     const modelChunks = chunkArray(allModels, 20);
     for (const modelChunk of modelChunks) {
       const modelTransactions = modelChunk.map(model =>
@@ -1063,8 +1087,11 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
       );
       await db.transact(modelTransactions);
     }
+    const txModelsTime = performance.now() - txModelsStart;
+    console.log(`    Models transactions: ${txModelsTime.toFixed(2)}ms (${modelChunks.length} batches)`);
 
     // Step 4: Batch weapons into chunks of 30
+    const txWeaponsStart = performance.now();
     const weaponChunks = chunkArray(allWeapons, 30);
     for (const weaponChunk of weaponChunks) {
       const weaponTransactions = weaponChunk.map(weapon =>
@@ -1083,9 +1110,11 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
       );
       await db.transact(weaponTransactions);
     }
+    const txWeaponsTime = performance.now() - txWeaponsStart;
+    console.log(`    Weapons transactions: ${txWeaponsTime.toFixed(2)}ms (${weaponChunks.length} batches)`);
 
     // Step 5: Extract and link rules
-    console.log('📋 Extracting and linking rules...');
+    const txRulesStart = performance.now();
     await extractAndLinkRules({
       armyId: armyMetadata.id,
       faction: armyMetadata.faction,
@@ -1094,6 +1123,19 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
       models: allModels,
       weapons: allWeapons
     });
+    const txRulesTime = performance.now() - txRulesStart;
+    console.log(`    Rules extraction & linking: ${txRulesTime.toFixed(2)}ms`);
+
+    const importEndTime = performance.now();
+    const totalTime = importEndTime - importStartTime;
+    const extractionTime = t2-t1 + t4-t3 + t6-t5 + t8-t7;
+    const txTime = txArmyTime + txUnitsTime + txModelsTime + txWeaponsTime + txRulesTime;
+
+    console.log(`\n📊 Import Summary:`);
+    console.log(`  Total time: ${totalTime.toFixed(2)}ms`);
+    console.log(`  Extraction: ${extractionTime.toFixed(2)}ms (${(extractionTime/totalTime*100).toFixed(1)}%)`);
+    console.log(`  Database: ${txTime.toFixed(2)}ms (${(txTime/totalTime*100).toFixed(1)}%)`);
+    console.log(`  Entities: ${units.length} units, ${allModels.length} models, ${allWeapons.length} weapons\n`);
 
     return {
       armyId: armyMetadata.id,
@@ -1109,33 +1151,58 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
 
 /**
  * Import an army for a specific game (creates game copies instead of user templates)
+ *
+ * @param dbClient - Optional database client for dependency injection (defaults to the React client)
  */
-export async function importArmyForGame(jsonData: NewRecruitRoster, userId: string, gameId: string): Promise<{ 
-  armyId: string; 
-  unitIds: string[]; 
-  modelIds: string[]; 
-  weaponIds: string[] 
+export async function importArmyForGame(
+  jsonData: NewRecruitRoster,
+  userId: string,
+  gameId: string,
+  dbClient: typeof db = db
+): Promise<{
+  armyId: string;
+  unitIds: string[];
+  modelIds: string[];
+  weaponIds: string[]
 }> {
-  // Extract army metadata for game context
+  const importStartTime = performance.now();
+  console.log('⏱️  Starting army import...');
+
+  // Phase 1: Extract army metadata
+  const t1 = performance.now();
   const armyMetadata = extractArmyMetadata(jsonData, userId);
-  
+  const t2 = performance.now();
+  console.log(`  Phase 1 (Metadata): ${(t2-t1).toFixed(2)}ms`);
+
   // Generate new IDs for game-specific copies
   const gameArmyId = id();
-  
-  // Extract units, models, and weapons
+
+  // Phase 2: Extract units
+  const t3 = performance.now();
   const units = extractUnits(jsonData, gameArmyId, userId);
+  const t4 = performance.now();
+  console.log(`  Phase 2 (Units): ${(t4-t3).toFixed(2)}ms - ${units.length} units`);
+
+  // Phase 3: Extract models
+  const t5 = performance.now();
   const allModels: ModelData[] = [];
   for (const unit of units) {
     const unitModels = extractModels(unit);
     allModels.push(...unitModels);
   }
-  
+  const t6 = performance.now();
+  console.log(`  Phase 3 (Models): ${(t6-t5).toFixed(2)}ms - ${allModels.length} models`);
+
+  // Phase 4: Extract weapons
+  const t7 = performance.now();
   const allWeapons: WeaponData[] = [];
   for (const unit of units) {
     const unitModels = allModels.filter(model => model.unitId === unit.id);
     const unitWeapons = extractWeapons(unit, unitModels);
     allWeapons.push(...unitWeapons);
   }
+  const t8 = performance.now();
+  console.log(`  Phase 4 (Weapons): ${(t8-t7).toFixed(2)}ms - ${allWeapons.length} weapons`);
   
   try {
     // Helper function to batch arrays into chunks
@@ -1147,9 +1214,12 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
       return chunks;
     };
 
+    console.log('  Database transactions:');
+
     // Step 1: Create army first
-    await db.transact([
-      db.tx.armies[gameArmyId].update({
+    const txArmyStart = performance.now();
+    await dbClient.transact([
+      dbClient.tx.armies[gameArmyId].update({
         name: armyMetadata.name,
         faction: armyMetadata.faction,
         detachment: armyMetadata.detachment,
@@ -1159,12 +1229,15 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
         gameId: gameId
       }).link({ owner: userId, game: gameId })
     ]);
+    const txArmyTime = performance.now() - txArmyStart;
+    console.log(`    Army transaction: ${txArmyTime.toFixed(2)}ms`);
 
     // Step 2: Batch units into chunks of 10
+    const txUnitsStart = performance.now();
     const unitChunks = chunkArray(units, 10);
     for (const unitChunk of unitChunks) {
       const unitTransactions = unitChunk.map(unit =>
-        db.tx.units[unit.id].update({
+        dbClient.tx.units[unit.id].update({
           name: unit.name,
           categories: unit.categories,
           rules: unit.rules,
@@ -1172,14 +1245,17 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
           armyId: unit.armyId
         }).link({ army: unit.armyId })
       );
-      await db.transact(unitTransactions);
+      await dbClient.transact(unitTransactions);
     }
+    const txUnitsTime = performance.now() - txUnitsStart;
+    console.log(`    Units transactions: ${txUnitsTime.toFixed(2)}ms (${unitChunks.length} batches)`);
 
     // Step 3: Batch models into chunks of 20
+    const txModelsStart = performance.now();
     const modelChunks = chunkArray(allModels, 20);
     for (const modelChunk of modelChunks) {
       const modelTransactions = modelChunk.map(model =>
-        db.tx.models[model.id].update({
+        dbClient.tx.models[model.id].update({
           name: model.name,
           unitId: model.unitId,
           M: model.M,
@@ -1191,14 +1267,17 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
           woundsTaken: model.woundsTaken
         }).link({ unit: model.unitId })
       );
-      await db.transact(modelTransactions);
+      await dbClient.transact(modelTransactions);
     }
+    const txModelsTime = performance.now() - txModelsStart;
+    console.log(`    Models transactions: ${txModelsTime.toFixed(2)}ms (${modelChunks.length} batches)`);
 
     // Step 4: Batch weapons into chunks of 30
+    const txWeaponsStart = performance.now();
     const weaponChunks = chunkArray(allWeapons, 30);
     for (const weaponChunk of weaponChunks) {
       const weaponTransactions = weaponChunk.map(weapon =>
-        db.tx.weapons[weapon.id].update({
+        dbClient.tx.weapons[weapon.id].update({
           name: weapon.name,
           range: weapon.range,
           A: weapon.A,
@@ -1211,19 +1290,35 @@ export async function importArmyForGame(jsonData: NewRecruitRoster, userId: stri
           modelId: weapon.modelId
         }).link({ model: weapon.modelId })
       );
-      await db.transact(weaponTransactions);
+      await dbClient.transact(weaponTransactions);
     }
+    const txWeaponsTime = performance.now() - txWeaponsStart;
+    console.log(`    Weapons transactions: ${txWeaponsTime.toFixed(2)}ms (${weaponChunks.length} batches)`);
 
     // Step 5: Extract and link rules
-    console.log('📋 Extracting and linking rules...');
+    const txRulesStart = performance.now();
     await extractAndLinkRules({
       armyId: gameArmyId,
       faction: armyMetadata.faction,
       sourceData: armyMetadata.sourceData,
       units,
       models: allModels,
-      weapons: allWeapons
+      weapons: allWeapons,
+      dbClient
     });
+    const txRulesTime = performance.now() - txRulesStart;
+    console.log(`    Rules extraction & linking: ${txRulesTime.toFixed(2)}ms`);
+
+    const importEndTime = performance.now();
+    const totalTime = importEndTime - importStartTime;
+    const extractionTime = t2-t1 + t4-t3 + t6-t5 + t8-t7;
+    const txTime = txArmyTime + txUnitsTime + txModelsTime + txWeaponsTime + txRulesTime;
+
+    console.log(`\n📊 Import Summary:`);
+    console.log(`  Total time: ${totalTime.toFixed(2)}ms`);
+    console.log(`  Extraction: ${extractionTime.toFixed(2)}ms (${(extractionTime/totalTime*100).toFixed(1)}%)`);
+    console.log(`  Database: ${txTime.toFixed(2)}ms (${(txTime/totalTime*100).toFixed(1)}%)`);
+    console.log(`  Entities: ${units.length} units, ${allModels.length} models, ${allWeapons.length} weapons\n`);
 
     return {
       armyId: gameArmyId,
@@ -1264,8 +1359,15 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
     // Helper function to create a copy of an object with specific overrides
     const createCopy = (original: any, overrides: any = {}) => {
       const copy = { ...original, ...overrides };
-      // Remove ID fields to let InstantDB generate new ones
+      // Remove ID and relationship fields that shouldn't be in .update()
       delete copy.id;
+      delete copy.units;
+      delete copy.models;
+      delete copy.weapons;
+      delete copy.armyRules;
+      delete copy.unitRules;
+      delete copy.modelRules;
+      delete copy.weaponRules;
       return copy;
     };
 
@@ -1274,8 +1376,6 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
       createdAt: Date.now(),
       gameId: gameId
     });
-
-    delete armyCopy.units;
 
     // Helper function to batch arrays into chunks
     const chunkArray = <T>(array: T[], size: number): T[][] => {
@@ -1298,6 +1398,16 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
     const unitTransactions = [];
     const modelTransactions = [];
     const weaponTransactions = [];
+    const ruleLinks = [];
+
+    // Link army rules
+    console.log(`📊 Duplication - Army has ${armyData.armyRules?.length || 0} army rules`);
+    if (armyData.armyRules && armyData.armyRules.length > 0) {
+      console.log(`  Linking army rules:`, armyData.armyRules.map((r: any) => r.name || r.id));
+      for (const rule of armyData.armyRules) {
+        ruleLinks.push(db.tx.armies[gameArmyId].link({ armyRules: rule.id }));
+      }
+    }
 
     // Duplicate units
     for (const unit of armyData.units || []) {
@@ -1308,11 +1418,17 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
         armyId: gameArmyId
       });
 
-      delete unitCopy.armyId;
-      delete unitCopy.models;
       unitTransactions.push(
         db.tx.units[newUnitId].update(unitCopy).link({ army: gameArmyId })
       );
+
+      // Link unit rules
+      if (unit.unitRules && unit.unitRules.length > 0) {
+        console.log(`  Unit ${unit.name}: ${unit.unitRules.length} rules`);
+        for (const rule of unit.unitRules) {
+          ruleLinks.push(db.tx.units[newUnitId].link({ unitRules: rule.id }));
+        }
+      }
 
       // Duplicate models for this unit
       for (const model of unit.models || []) {
@@ -1323,11 +1439,16 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
           unitId: newUnitId,
           woundsTaken: 0 // Reset for game
         });
-        delete modelCopy.unitId;
-        delete modelCopy.weapons;
         modelTransactions.push(
           db.tx.models[newModelId].update(modelCopy).link({ unit: newUnitId })
         );
+
+        // Link model rules
+        if (model.modelRules && model.modelRules.length > 0) {
+          for (const rule of model.modelRules) {
+            ruleLinks.push(db.tx.models[newModelId].link({ modelRules: rule.id }));
+          }
+        }
 
         // Duplicate weapons for this model
         for (const weapon of model.weapons || []) {
@@ -1338,10 +1459,16 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
             modelId: newModelId,
             turnsFired: [] // Reset for game
           });
-          delete weaponCopy.model;
           weaponTransactions.push(
             db.tx.weapons[newWeaponId].update(weaponCopy).link({ model: newModelId })
           );
+
+          // Link weapon rules
+          if (weapon.weaponRules && weapon.weaponRules.length > 0) {
+            for (const rule of weapon.weaponRules) {
+              ruleLinks.push(db.tx.weapons[newWeaponId].link({ weaponRules: rule.id }));
+            }
+          }
         }
       }
     }
@@ -1362,6 +1489,18 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
     const weaponChunks = chunkArray(weaponTransactions, 30);
     for (const weaponChunk of weaponChunks) {
       await db.transact(weaponChunk);
+    }
+
+    // Step 5: Link all rules in batches
+    console.log(`📊 Total rule links to create: ${ruleLinks.length}`);
+    if (ruleLinks.length > 0) {
+      const ruleLinkChunks = chunkArray(ruleLinks, 50);
+      for (const ruleLinkChunk of ruleLinkChunks) {
+        await db.transact(ruleLinkChunk);
+      }
+      console.log(`✅ Linked ${ruleLinks.length} rules to game army`);
+    } else {
+      console.log(`⚠️  No rules to link!`);
     }
 
     return {
@@ -1393,28 +1532,44 @@ export async function extractAndLinkRules(params: {
   units: UnitData[];
   models: ModelData[];
   weapons: WeaponData[];
+  dbClient?: typeof db;
 }): Promise<{ ruleIds: string[]; unimplementedRules: string[] }> {
-  const { armyId, faction, sourceData, units, models, weapons } = params;
+  const { armyId, faction, sourceData, units, models, weapons, dbClient: client = db } = params;
 
   // Extract all rules from sourceData
+  const extractStart = performance.now();
   const extractedRules = extractRulesFromSourceData(sourceData);
+  const extractTime = performance.now() - extractStart;
+  console.log(`      Rule extraction from source: ${extractTime.toFixed(2)}ms`);
+  console.log(`        Army rules: ${extractedRules.armyRules.length}`);
+  console.log(`        Unit rules: ${Array.from(extractedRules.unitRules.values()).reduce((sum, rules) => sum + rules.length, 0)}`);
+  console.log(`        Model rules: ${Array.from(extractedRules.modelRules.values()).reduce((sum, rules) => sum + rules.length, 0)}`);
+  console.log(`        Weapon rules: ${Array.from(extractedRules.weaponRules.values()).reduce((sum, rules) => sum + rules.length, 0)}`);
 
   const createdRuleIds: string[] = [];
   const unimplementedRules: string[] = [];
   const ruleIdMap = new Map<string, string>(); // battlescribeId -> ruleId
 
   // Query all existing rules for deduplication
-  const { data: existingRulesData } = await db.queryOnce({
+  const queryStart = performance.now();
+  const { data: existingRulesData } = await client.queryOnce({
     rules: {}
   });
   const existingRules = existingRulesData?.rules || [];
-  console.log(`📚 Found ${existingRules.length} existing rules in database`);
+  const queryTime = performance.now() - queryStart;
+  console.log(`      Query existing rules: ${queryTime.toFixed(2)}ms (${existingRules.length} rules)`);
 
   try {
+    const processingStart = performance.now();
+    let linkingTime = 0;
+    let ruleCreationTime = 0;
+
     // Process army-level rules
     const armyRuleIds: string[] = [];
     for (const importedRule of extractedRules.armyRules) {
-      const ruleId = await findOrCreateRule(importedRule, faction, existingRules);
+      const createStart = performance.now();
+      const ruleId = await findOrCreateRule(importedRule, faction, existingRules, client);
+      ruleCreationTime += (performance.now() - createStart);
       createdRuleIds.push(ruleId);
       ruleIdMap.set(importedRule.battlescribeId, ruleId);
       armyRuleIds.push(ruleId);
@@ -1422,85 +1577,98 @@ export async function extractAndLinkRules(params: {
 
     // Link all army rules at once
     if (armyRuleIds.length > 0) {
-      await db.transact(
-        armyRuleIds.map(ruleId => db.tx.armies[armyId].link({ armyRules: ruleId }))
+      const linkStart = performance.now();
+      await client.transact(
+        armyRuleIds.map(ruleId => client.tx.armies[armyId].link({ armyRules: ruleId }))
       );
+      linkingTime += (performance.now() - linkStart);
     }
 
-    // Process unit rules
+    // Process unit rules - collect all links first
+    const allUnitLinks: any[] = [];
     for (const unit of units) {
       const unitRules = extractedRules.unitRules.get(unit.name) || [];
-      const unitRuleIds: string[] = [];
 
       for (const importedRule of unitRules) {
         let ruleId = ruleIdMap.get(importedRule.battlescribeId);
 
         if (!ruleId) {
-          ruleId = await findOrCreateRule(importedRule, faction, existingRules);
+          const createStart = performance.now();
+          ruleId = await findOrCreateRule(importedRule, faction, existingRules, client);
+          ruleCreationTime += (performance.now() - createStart);
           createdRuleIds.push(ruleId);
           ruleIdMap.set(importedRule.battlescribeId, ruleId);
         }
 
-        unitRuleIds.push(ruleId);
-      }
-
-      // Link all unit rules at once
-      if (unitRuleIds.length > 0) {
-        await db.transact(
-          unitRuleIds.map(ruleId => db.tx.units[unit.id].link({ unitRules: ruleId }))
-        );
+        allUnitLinks.push(client.tx.units[unit.id].link({ unitRules: ruleId }));
       }
     }
 
-    // Process model rules
+    // Batch all unit rule links together
+    if (allUnitLinks.length > 0) {
+      const linkStart = performance.now();
+      await client.transact(allUnitLinks);
+      linkingTime += (performance.now() - linkStart);
+    }
+
+    // Process model rules - collect all links first
+    const allModelLinks: any[] = [];
     for (const model of models) {
       const modelRules = extractedRules.modelRules.get(model.name) || [];
-      const modelRuleIds: string[] = [];
 
       for (const importedRule of modelRules) {
         let ruleId = ruleIdMap.get(importedRule.battlescribeId);
 
         if (!ruleId) {
-          ruleId = await findOrCreateRule(importedRule, faction, existingRules);
+          const createStart = performance.now();
+          ruleId = await findOrCreateRule(importedRule, faction, existingRules, client);
+          ruleCreationTime += (performance.now() - createStart);
           createdRuleIds.push(ruleId);
           ruleIdMap.set(importedRule.battlescribeId, ruleId);
         }
 
-        modelRuleIds.push(ruleId);
-      }
-
-      // Link all model rules at once
-      if (modelRuleIds.length > 0) {
-        await db.transact(
-          modelRuleIds.map(ruleId => db.tx.models[model.id].link({ modelRules: ruleId }))
-        );
+        allModelLinks.push(client.tx.models[model.id].link({ modelRules: ruleId }));
       }
     }
 
-    // Process weapon rules (keywords)
+    // Batch all model rule links together
+    if (allModelLinks.length > 0) {
+      const linkStart = performance.now();
+      await client.transact(allModelLinks);
+      linkingTime += (performance.now() - linkStart);
+    }
+
+    // Process weapon rules (keywords) - collect all links first
+    const allWeaponLinks: any[] = [];
     for (const weapon of weapons) {
       const weaponRules = extractedRules.weaponRules.get(weapon.name || '') || [];
-      const weaponRuleIds: string[] = [];
 
       for (const importedRule of weaponRules) {
         let ruleId = ruleIdMap.get(importedRule.battlescribeId);
 
         if (!ruleId) {
-          ruleId = await findOrCreateRule(importedRule, faction, existingRules);
+          const createStart = performance.now();
+          ruleId = await findOrCreateRule(importedRule, faction, existingRules, client);
+          ruleCreationTime += (performance.now() - createStart);
           createdRuleIds.push(ruleId);
           ruleIdMap.set(importedRule.battlescribeId, ruleId);
         }
 
-        weaponRuleIds.push(ruleId);
-      }
-
-      // Link all weapon rules at once
-      if (weaponRuleIds.length > 0) {
-        await db.transact(
-          weaponRuleIds.map(ruleId => db.tx.weapons[weapon.id].link({ weaponRules: ruleId }))
-        );
+        allWeaponLinks.push(client.tx.weapons[weapon.id].link({ weaponRules: ruleId }));
       }
     }
+
+    // Batch all weapon rule links together
+    if (allWeaponLinks.length > 0) {
+      const linkStart = performance.now();
+      await client.transact(allWeaponLinks);
+      linkingTime += (performance.now() - linkStart);
+    }
+
+    const processingTime = performance.now() - processingStart;
+    console.log(`      Rule processing: ${processingTime.toFixed(2)}ms`);
+    console.log(`        Rule creation/lookup: ${ruleCreationTime.toFixed(2)}ms`);
+    console.log(`        Rule linking: ${linkingTime.toFixed(2)}ms`);
 
     console.log(`✅ Linked ${createdRuleIds.length} rules to army ${armyId}`);
     if (unimplementedRules.length > 0) {
@@ -1526,7 +1694,8 @@ export async function extractAndLinkRules(params: {
 async function findOrCreateRule(
   importedRule: ImportedRule,
   faction: string,
-  existingRules: any[]
+  existingRules: any[],
+  dbClient: typeof db = db
 ): Promise<string> {
   // First, try to find by battlescribeId
   const byBattlescribeId = existingRules.find(
@@ -1559,8 +1728,8 @@ async function findOrCreateRule(
     console.log(`✅ Matched rule: ${importedRule.name}`);
   }
 
-  await db.transact([
-    db.tx.rules[ruleId].update({
+  await dbClient.transact([
+    dbClient.tx.rules[ruleId].update({
       name: importedRule.name,
       rawText: importedRule.rawText,
       battlescribeId: importedRule.battlescribeId,

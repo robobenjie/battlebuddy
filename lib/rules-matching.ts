@@ -163,23 +163,43 @@ export function extractRulesFromSourceData(sourceData: string): ExtractedRules {
 
   // Extract unit, model, and weapon rules
   function processSelection(selection: NewRecruitSelection, parentName?: string) {
-    // Unit-level rules
-    if (selection.type === 'unit' && selection.rules) {
+    // Unit-level rules (from rules array and ability profiles)
+    if (selection.type === 'unit') {
       const unitName = selection.name;
       const unitRulesList = result.unitRules.get(unitName) || [];
 
-      selection.rules.forEach(rule => {
-        if (!rule.hidden && !isStandardKeyword(rule.name)) {
-          unitRulesList.push({
-            name: rule.name,
-            rawText: rule.description,
-            battlescribeId: rule.id,
-            scope: 'unit'
-          });
-        }
-      });
+      // Extract from rules array
+      if (selection.rules) {
+        selection.rules.forEach(rule => {
+          if (!rule.hidden && !isStandardKeyword(rule.name)) {
+            unitRulesList.push({
+              name: rule.name,
+              rawText: rule.description,
+              battlescribeId: rule.id,
+              scope: 'unit'
+            });
+          }
+        });
+      }
 
-      result.unitRules.set(unitName, unitRulesList);
+      // Extract from ability profiles
+      if (selection.profiles) {
+        selection.profiles.forEach(profile => {
+          if (profile.typeName === 'Abilities' && !profile.hidden && !isStandardKeyword(profile.name)) {
+            const description = profile.characteristics.find(c => c.name === 'Description')?.$text || '';
+            unitRulesList.push({
+              name: profile.name,
+              rawText: description,
+              battlescribeId: profile.id,
+              scope: 'unit'
+            });
+          }
+        });
+      }
+
+      if (unitRulesList.length > 0) {
+        result.unitRules.set(unitName, unitRulesList);
+      }
     }
 
     // Model-level rules (from profiles with Abilities type)

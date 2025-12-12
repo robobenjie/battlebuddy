@@ -398,7 +398,12 @@ export default function CombatCalculatorPage({
         if (rule?.ruleObject) {
           try {
             const parsedRule = JSON.parse(rule.ruleObject);
-            allRules.push(parsedRule);
+            // Handle both single rules and arrays of rules
+            if (Array.isArray(parsedRule)) {
+              allRules.push(...parsedRule);
+            } else {
+              allRules.push(parsedRule);
+            }
           } catch (e) {
             console.error('Failed to parse rule:', rule.name, e);
           }
@@ -412,9 +417,74 @@ export default function CombatCalculatorPage({
         if (rule?.ruleObject) {
           try {
             const parsedRule = JSON.parse(rule.ruleObject);
-            allRules.push(parsedRule);
+            // Handle both single rules and arrays of rules
+            if (Array.isArray(parsedRule)) {
+              allRules.push(...parsedRule);
+            } else {
+              allRules.push(parsedRule);
+            }
           } catch (e) {
             console.error('Failed to parse rule:', rule.name, e);
+          }
+        }
+      }
+    }
+
+    // Get model rules from all models in the unit
+    console.log('🔍 Unit data for rule loading:', {
+      hasUnit: !!unit,
+      hasModels: !!unit?.models,
+      modelCount: unit?.models?.length || 0,
+      unitKeys: unit ? Object.keys(unit) : [],
+      allModels: unit?.models?.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        hasModelRules: !!m.modelRules,
+        modelRulesCount: m.modelRules?.length || 0,
+        modelRules: m.modelRules
+      }))
+    });
+
+    if (unit?.models) {
+      for (const model of unit.models) {
+        if (model?.modelRules) {
+          for (const rule of model.modelRules) {
+            if (rule?.ruleObject) {
+              try {
+                const parsedRule = JSON.parse(rule.ruleObject);
+                // Handle both single rules and arrays of rules
+                if (Array.isArray(parsedRule)) {
+                  allRules.push(...parsedRule);
+                } else {
+                  allRules.push(parsedRule);
+                }
+              } catch (e) {
+                console.error('Failed to parse model rule:', rule.name, e);
+              }
+            }
+          }
+        }
+
+        // Get weapon rules from this model's weapons
+        if (model?.weapons) {
+          for (const weapon of model.weapons) {
+            if (weapon?.weaponRules) {
+              for (const rule of weapon.weaponRules) {
+                if (rule?.ruleObject) {
+                  try {
+                    const parsedRule = JSON.parse(rule.ruleObject);
+                    // Handle both single rules and arrays of rules
+                    if (Array.isArray(parsedRule)) {
+                      allRules.push(...parsedRule);
+                    } else {
+                      allRules.push(parsedRule);
+                    }
+                  } catch (e) {
+                    console.error('Failed to parse weapon rule:', rule.name, e);
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -543,7 +613,12 @@ export default function CombatCalculatorPage({
         if (rule?.ruleObject) {
           try {
             const parsedRule = JSON.parse(rule.ruleObject);
-            allRules.push(parsedRule);
+            // Handle both single rules and arrays of rules
+            if (Array.isArray(parsedRule)) {
+              allRules.push(...parsedRule);
+            } else {
+              allRules.push(parsedRule);
+            }
           } catch (e) {
             console.error('Failed to parse rule:', rule.name, e);
           }
@@ -557,9 +632,74 @@ export default function CombatCalculatorPage({
         if (rule?.ruleObject) {
           try {
             const parsedRule = JSON.parse(rule.ruleObject);
-            allRules.push(parsedRule);
+            // Handle both single rules and arrays of rules
+            if (Array.isArray(parsedRule)) {
+              allRules.push(...parsedRule);
+            } else {
+              allRules.push(parsedRule);
+            }
           } catch (e) {
             console.error('Failed to parse rule:', rule.name, e);
+          }
+        }
+      }
+    }
+
+    // Get model rules from all models in the unit
+    console.log('🔍 Unit data for rule loading:', {
+      hasUnit: !!unit,
+      hasModels: !!unit?.models,
+      modelCount: unit?.models?.length || 0,
+      unitKeys: unit ? Object.keys(unit) : [],
+      allModels: unit?.models?.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        hasModelRules: !!m.modelRules,
+        modelRulesCount: m.modelRules?.length || 0,
+        modelRules: m.modelRules
+      }))
+    });
+
+    if (unit?.models) {
+      for (const model of unit.models) {
+        if (model?.modelRules) {
+          for (const rule of model.modelRules) {
+            if (rule?.ruleObject) {
+              try {
+                const parsedRule = JSON.parse(rule.ruleObject);
+                // Handle both single rules and arrays of rules
+                if (Array.isArray(parsedRule)) {
+                  allRules.push(...parsedRule);
+                } else {
+                  allRules.push(parsedRule);
+                }
+              } catch (e) {
+                console.error('Failed to parse model rule:', rule.name, e);
+              }
+            }
+          }
+        }
+
+        // Get weapon rules from this model's weapons
+        if (model?.weapons) {
+          for (const weapon of model.weapons) {
+            if (weapon?.weaponRules) {
+              for (const rule of weapon.weaponRules) {
+                if (rule?.ruleObject) {
+                  try {
+                    const parsedRule = JSON.parse(rule.ruleObject);
+                    // Handle both single rules and arrays of rules
+                    if (Array.isArray(parsedRule)) {
+                      allRules.push(...parsedRule);
+                    } else {
+                      allRules.push(parsedRule);
+                    }
+                  } catch (e) {
+                    console.error('Failed to parse weapon rule:', rule.name, e);
+                  }
+                }
+              }
+            }
           }
         }
       }

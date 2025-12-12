@@ -36,9 +36,14 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
   // Query units for this army in the game and destroyed units list
   const { data: unitsData } = db.useQuery({
     armies: {
+      armyRules: {},
       units: {
+        unitRules: {},
         models: {
-          weapons: {}
+          modelRules: {},
+          weapons: {
+            weaponRules: {}
+          }
         },
       },
       $: {

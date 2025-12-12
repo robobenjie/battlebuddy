@@ -64,9 +64,14 @@ export default function GamePage() {
   const { data: userArmiesData } = db.useQuery(
     !game || game.status === 'active' ? {} : {
       armies: {
+        armyRules: {},
         units: {
+          unitRules: {},
           models: {
-            weapons: {}
+            modelRules: {},
+            weapons: {
+              weaponRules: {}
+            }
           }
         }
       }

@@ -36,9 +36,14 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
   const { data: gameData } = db.useQuery({
     games: {
       armies: {
+        armyRules: {},
         units: {
+          unitRules: {},
           models: {
-            weapons: {}
+            modelRules: {},
+            weapons: {
+              weaponRules: {}
+            }
           },
           statuses: {},
         },
