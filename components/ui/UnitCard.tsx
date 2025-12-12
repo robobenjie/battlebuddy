@@ -6,7 +6,9 @@ import { KeywordList, extractFactionKeywords, extractGeneralKeywords } from './K
 import { COMMON_RULES, parseRuleDescription } from './RulePopup';
 import RulePopup, { useRulePopup } from './RulePopup';
 import RuleTip from './RuleTip';
+import ReminderBadge from './ReminderBadge';
 import { getWeaponCount, getModelsForUnit, getWeaponsForUnit } from '../../lib/unit-utils';
+import { getUnitReminders, PhaseType, TurnContext } from '../../lib/rules-engine/reminder-utils';
 
 interface UnitCardProps {
   unit: {
@@ -64,13 +66,17 @@ interface UnitCardProps {
   className?: string;
   expandable?: boolean;
   defaultExpanded?: boolean;
+  currentPhase?: PhaseType;
+  currentTurn?: TurnContext;
 }
 
-export default function UnitCard({ 
-  unit, 
+export default function UnitCard({
+  unit,
   className = '',
   expandable = true,
-  defaultExpanded = false
+  defaultExpanded = false,
+  currentPhase,
+  currentTurn
 }: UnitCardProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const { isOpen, rule, showRule, hideRule } = useRulePopup();
@@ -87,6 +93,11 @@ export default function UnitCard({
   // Get models and weapons from the unit
   const models = getModelsForUnit(unit);
   const weapons = getWeaponsForUnit(unit);
+
+  // Get reminder rules for this unit if phase and turn are provided
+  const reminders = (currentPhase && currentTurn)
+    ? getUnitReminders(unit, currentPhase, currentTurn)
+    : [];
 
   // Helper: group weapons by name+type (optionally add more fields for uniqueness)
   function groupWeapons(weapons: any[]) {
@@ -151,6 +162,18 @@ export default function UnitCard({
               <h3 className="font-medium text-white text-sm">
                 {totalModels > 1 ? `${totalModels} ` : ''}{unit.name}
               </h3>
+              {/* Reminders */}
+              {reminders.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {reminders.map((reminder) => (
+                    <ReminderBadge
+                      key={reminder.id}
+                      rule={reminder}
+                      onClick={() => showRule(reminder.name, reminder.description)}
+                    />
+                  ))}
+                </div>
+              )}
               {/* Model configurations when collapsed */}
               {!isExpanded && models.length > 0 && (
                 <div className="mt-1 space-y-0.5">

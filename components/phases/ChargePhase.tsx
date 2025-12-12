@@ -5,6 +5,7 @@ import { db } from '../../lib/db';
 import { id } from '@instantdb/react';
 import UnitCard from '../ui/UnitCard';
 import { formatUnitForCard, sortUnitsByPriority } from '../../lib/unit-utils';
+import { getUnitsWithReminders } from '../../lib/rules-engine/reminder-utils';
 
 interface ChargePhaseProps {
   gameId: string;
@@ -32,8 +33,12 @@ export default function ChargePhase({ gameId, army, currentPlayer, currentUser, 
   const { data: unitsData } = db.useQuery({
     armies: {
       units: {
+        unitRules: {},
         models: {
-          weapons: {}
+          modelRules: {},
+          weapons: {
+            weaponRules: {}
+          }
         },
         statuses: {},
       },
@@ -45,6 +50,17 @@ export default function ChargePhase({ gameId, army, currentPlayer, currentUser, 
     },
     games: {
       destroyedUnits: {},
+      armies: {
+        units: {
+          unitRules: {},
+          models: {
+            modelRules: {},
+            weapons: {
+              weaponRules: {}
+            }
+          }
+        }
+      },
       $: {
         where: {
           id: gameId
@@ -64,6 +80,16 @@ export default function ChargePhase({ gameId, army, currentPlayer, currentUser, 
 
   // Check if current user is the active player
   const isActivePlayer = currentUser?.id === currentPlayer.userId;
+
+  // Get all armies in the game for reactive abilities
+  const allGameArmies = unitsData?.games?.[0]?.armies || [];
+
+  // Get non-active player armies
+  const nonActiveArmies = allGameArmies.filter((a: any) => a.id !== army.id);
+
+  // Get units with reactive charge abilities (opponent turn)
+  const reactiveUnits = getUnitsWithReminders(nonActiveArmies, 'charge', 'opponent')
+    .filter((unit: any) => !destroyedUnitIds.has(unit.id));
 
   // Helper function to check if unit has charged this player's turn
   const hasChargedThisTurn = (unitId: string) => {
@@ -174,6 +200,8 @@ export default function ChargePhase({ gameId, army, currentPlayer, currentUser, 
                 expandable={true}
                 defaultExpanded={false}
                 className="border-0"
+                currentPhase="charge"
+                currentTurn="own"
               />
 
               {/* Charge Controls */}
@@ -224,6 +252,39 @@ export default function ChargePhase({ gameId, army, currentPlayer, currentUser, 
           );
         })}
       </div>
+
+      {/* Reactive Abilities Section */}
+      {reactiveUnits.length > 0 && (
+        <div className="space-y-4">
+          <div className="bg-gray-800 rounded-lg p-4 border-l-4 border-purple-500">
+            <h3 className="text-lg font-semibold text-purple-300 mb-1">Reactive Abilities</h3>
+            <p className="text-gray-400 text-sm">
+              Opponent units with reactive charge abilities this phase
+            </p>
+          </div>
+
+          {reactiveUnits.map(unit => {
+            const unitData = formatUnitForCard(unit);
+            return (
+              <div key={unit.id} className="bg-gray-800/50 rounded-lg overflow-hidden border border-purple-500/30">
+                <UnitCard
+                  unit={unitData.unit}
+                  expandable={true}
+                  defaultExpanded={false}
+                  className="border-0"
+                  currentPhase="charge"
+                  currentTurn="opponent"
+                />
+                <div className="border-t border-gray-700/50 p-3 bg-gray-900/30">
+                  <p className="text-xs text-gray-400 italic">
+                    {unit.armyName ? `${unit.armyName} - ` : ''}No action buttons for opponent units
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

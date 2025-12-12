@@ -6,6 +6,10 @@ import { id } from '@instantdb/react';
 import UnitCard from '../ui/UnitCard';
 import { formatUnitForCard, sortUnitsByPriority } from '../../lib/unit-utils';
 import CombatCalculatorPage from '../CombatCalculatorPage';
+import ReminderBadge from '../ui/ReminderBadge';
+import { useRulePopup } from '../ui/RulePopup';
+import RulePopup from '../ui/RulePopup';
+import { getUnitReminders } from '../../lib/rules-engine/reminder-utils';
 
 interface FightPhaseProps {
   gameId: string;
@@ -31,6 +35,7 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
   const [showCombatCalculator, setShowCombatCalculator] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState<any>(null);
   const [selectedUnitArmyId, setSelectedUnitArmyId] = useState<string>('');
+  const { isOpen, rule, showRule, hideRule } = useRulePopup();
 
   // Query ALL armies and units in this game, including destroyed units
   const { data: gameData } = db.useQuery({
@@ -209,37 +214,60 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
     const hasFought = hasFoughtThisTurn(unit);
     const isOwner = isMyUnit(armyId);
 
+    // Determine turn context: is this unit's owner the active player?
+    const unitArmy = allArmies.find((a: any) => a.id === armyId);
+    const isActivePlayerUnit = unitArmy?.ownerId === currentPlayer.userId;
+    const turnContext = isActivePlayerUnit ? 'own' : 'opponent';
+
+    // Get fight phase reminders for this unit
+    const unitReminders = getUnitReminders(unit, 'fight', turnContext);
+
     return (
-      <div key={unit.id} className={`flex items-center justify-between py-2 ${!isOwner ? 'opacity-60' : ''}`}>
-        {/* Unit name and status */}
-        <div className="flex items-center space-x-3 flex-1 min-w-0">
-          <span className="text-white font-medium truncate">{unit.name}</span>
-          {hasFought && (
-            <span className="px-2 py-0.5 rounded text-xs bg-red-600 text-red-100 whitespace-nowrap">
-              Fought
-            </span>
-          )}
+      <div key={unit.id} className="py-2">
+        <div className={`flex items-center justify-between ${!isOwner ? 'opacity-60' : ''}`}>
+          {/* Unit name and status */}
+          <div className="flex items-center space-x-3 flex-1 min-w-0">
+            <span className="text-white font-medium truncate">{unit.name}</span>
+            {hasFought && (
+              <span className="px-2 py-0.5 rounded text-xs bg-red-600 text-red-100 whitespace-nowrap">
+                Fought
+              </span>
+            )}
+          </div>
+
+          {/* Fight button and undo */}
+          <div className="flex items-center space-x-2">
+            {hasFought && isOwner && (
+              <button
+                onClick={() => handleUndo(unit)}
+                disabled={isProcessing}
+                className="text-xs text-blue-400 hover:text-blue-300 underline disabled:text-gray-500"
+              >
+                undo
+              </button>
+            )}
+            <button
+              onClick={() => openCombatCalculator(unit, armyId)}
+              disabled={!isOwner || hasFought}
+              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-1.5 px-3 rounded transition-colors text-sm disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              Fight
+            </button>
+          </div>
         </div>
 
-        {/* Fight button and undo */}
-        <div className="flex items-center space-x-2">
-          {hasFought && isOwner && (
-            <button
-              onClick={() => handleUndo(unit)}
-              disabled={isProcessing}
-              className="text-xs text-blue-400 hover:text-blue-300 underline disabled:text-gray-500"
-            >
-              undo
-            </button>
-          )}
-          <button
-            onClick={() => openCombatCalculator(unit, armyId)}
-            disabled={!isOwner || hasFought}
-            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:text-gray-400 text-white font-semibold py-1.5 px-3 rounded transition-colors text-sm disabled:cursor-not-allowed whitespace-nowrap"
-          >
-            Fight
-          </button>
-        </div>
+        {/* Reminders - show below the unit if any exist */}
+        {unitReminders.length > 0 && (
+          <div className="mt-2 ml-1 flex flex-wrap gap-2">
+            {unitReminders.map((reminder) => (
+              <ReminderBadge
+                key={reminder.id}
+                rule={reminder}
+                onClick={() => showRule(reminder.name, reminder.description)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -316,6 +344,13 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
           </div>
         </div>
       )}
+
+      {/* Rule Popup */}
+      <RulePopup
+        isOpen={isOpen}
+        onClose={hideRule}
+        rule={rule}
+      />
     </div>
   );
 }

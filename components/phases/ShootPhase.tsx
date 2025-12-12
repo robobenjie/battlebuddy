@@ -6,6 +6,7 @@ import { db } from '../../lib/db';
 import UnitCard from '../ui/UnitCard';
 import { formatUnitForCard, getWeaponsForUnit, sortUnitsByPriority } from '../../lib/unit-utils';
 import CombatCalculatorPage from '../CombatCalculatorPage';
+import { getUnitsWithReminders } from '../../lib/rules-engine/reminder-utils';
 
 interface ShootPhaseProps {
   gameId: string;
@@ -54,6 +55,17 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
     },
     games: {
       destroyedUnits: {},
+      armies: {
+        units: {
+          unitRules: {},
+          models: {
+            modelRules: {},
+            weapons: {
+              weaponRules: {}
+            }
+          }
+        }
+      },
       $: {
         where: {
           id: gameId
@@ -73,6 +85,16 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
 
   // Check if current user is the active player
   const isActivePlayer = currentUser?.id === currentPlayer.userId;
+
+  // Get all armies in the game for reactive abilities
+  const allGameArmies = unitsData?.games?.[0]?.armies || [];
+
+  // Get non-active player armies
+  const nonActiveArmies = allGameArmies.filter((a: any) => a.id !== army.id);
+
+  // Get units with reactive shooting abilities (opponent turn)
+  const reactiveUnits = getUnitsWithReminders(nonActiveArmies, 'shooting', 'opponent')
+    .filter((unit: any) => !destroyedUnitIds.has(unit.id));
 
   // Open combat calculator
   const openCombatCalculator = (unitId: string, weaponType?: string, weaponName?: string) => {
@@ -187,6 +209,8 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
                 expandable={true}
                 defaultExpanded={false}
                 className="border-0"
+                currentPhase="shooting"
+                currentTurn="own"
               />
               
               {/* Shooting Controls */}
@@ -282,6 +306,39 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
           );
         })}
       </div>
+
+      {/* Reactive Abilities Section */}
+      {reactiveUnits.length > 0 && (
+        <div className="space-y-4">
+          <div className="bg-gray-800 rounded-lg p-4 border-l-4 border-purple-500">
+            <h3 className="text-lg font-semibold text-purple-300 mb-1">Reactive Abilities</h3>
+            <p className="text-gray-400 text-sm">
+              Opponent units with reactive shooting abilities this phase
+            </p>
+          </div>
+
+          {reactiveUnits.map(unit => {
+            const unitData = formatUnitForCard(unit);
+            return (
+              <div key={unit.id} className="bg-gray-800/50 rounded-lg overflow-hidden border border-purple-500/30">
+                <UnitCard
+                  unit={unitData.unit}
+                  expandable={true}
+                  defaultExpanded={false}
+                  className="border-0"
+                  currentPhase="shooting"
+                  currentTurn="opponent"
+                />
+                <div className="border-t border-gray-700/50 p-3 bg-gray-900/30">
+                  <p className="text-xs text-gray-400 italic">
+                    {unit.armyName ? `${unit.armyName} - ` : ''}No action buttons for opponent units
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Combat Calculator Modal */}
       {showCombatCalculator && selectedUnit && (

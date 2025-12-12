@@ -18,7 +18,8 @@ export type RuleDuration = 'permanent' | 'turn' | 'phase' | 'until-deactivated';
 export interface RuleActivation {
   type: 'manual' | 'automatic';
   limit?: 'once-per-battle' | 'once-per-turn' | 'unlimited';
-  phase?: string;
+  phase?: 'command' | 'movement' | 'shooting' | 'charge' | 'fight' | 'before-game-start' | string;
+  turn?: 'own' | 'opponent' | 'both'; // Whose turn the ability activates on
 }
 
 /**

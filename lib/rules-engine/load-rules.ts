@@ -50,6 +50,7 @@ export const ORKS_UNIT_RULES: Record<string, string[]> = {
   'tankbustas': ['tank-hunters'],
   'warboss': ['might-is-right', 'da-biggest-and-da-best'],
   'zogrod': ['super-runts'],
+  'weirdboy': ['da-jump'],
   // Add more units as needed
 };
 
