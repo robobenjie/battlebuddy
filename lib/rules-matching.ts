@@ -163,6 +163,20 @@ export function extractRulesFromSourceData(sourceData: string): ExtractedRules {
 
   // Extract unit, model, and weapon rules
   function processSelection(selection: NewRecruitSelection, parentName?: string) {
+    // Detachment-level rules (from selections with group === "Detachment")
+    if (selection.group === 'Detachment' && selection.rules) {
+      selection.rules.forEach(rule => {
+        if (!rule.hidden && !isStandardKeyword(rule.name)) {
+          result.armyRules.push({
+            name: rule.name,
+            rawText: rule.description,
+            battlescribeId: rule.id,
+            scope: 'army'
+          });
+        }
+      });
+    }
+
     // Unit-level rules (from rules array and ability profiles)
     if (selection.type === 'unit') {
       const unitName = selection.name;
