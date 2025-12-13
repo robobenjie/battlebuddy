@@ -7,7 +7,7 @@ import { COMMON_RULES, parseRuleDescription } from './RulePopup';
 import RulePopup, { useRulePopup } from './RulePopup';
 import RuleTip from './RuleTip';
 import ReminderBadge from './ReminderBadge';
-import { getWeaponCount, getModelsForUnit, getWeaponsForUnit } from '../../lib/unit-utils';
+import { getWeaponCount, getModelsForUnit, getWeaponsForUnit, getUnitDisplayName } from '../../lib/unit-utils';
 import { getUnitReminders, PhaseType, TurnContext } from '../../lib/rules-engine/reminder-utils';
 
 interface UnitCardProps {
@@ -160,7 +160,7 @@ export default function UnitCard({
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="font-medium text-white text-sm">
-                {totalModels > 1 ? `${totalModels} ` : ''}{unit.name}
+                {totalModels > 1 ? `${totalModels} ` : ''}{getUnitDisplayName(unit)}
               </h3>
               {/* Reminders */}
               {reminders.length > 0 && (
@@ -229,7 +229,7 @@ export default function UnitCard({
                     {models[0] && (
                       <>
                         <div className="bg-gray-700 px-1 py-1 text-left border-r border-gray-600">
-                          <div className="text-xs font-mono text-white truncate">{unit.name}</div>
+                          <div className="text-xs font-mono text-white truncate">{getUnitDisplayName(unit)}</div>
                         </div>
                         <div className="bg-gray-700 px-1 py-1 text-center border-r border-gray-600">
                           <div className="text-xs font-mono text-white">

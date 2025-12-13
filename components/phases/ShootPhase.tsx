@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '../../lib/db';
 import UnitCard from '../ui/UnitCard';
-import { formatUnitForCard, getWeaponsForUnit, sortUnitsByPriority } from '../../lib/unit-utils';
+import { formatUnitForCard, getWeaponsForUnit, sortUnitsByPriority, getUnitDisplayName } from '../../lib/unit-utils';
 import CombatCalculatorPage from '../CombatCalculatorPage';
 import { getUnitsWithReminders } from '../../lib/rules-engine/reminder-utils';
+import { UNIT_BASIC_QUERY } from '../../lib/query-fragments';
 
 interface ShootPhaseProps {
   gameId: string;
@@ -39,13 +40,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
     armies: {
       armyRules: {},
       units: {
-        unitRules: {},
-        models: {
-          modelRules: {},
-          weapons: {
-            weaponRules: {}
-          }
-        },
+        ...UNIT_BASIC_QUERY,
       },
       $: {
         where: {
@@ -57,13 +52,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
       destroyedUnits: {},
       armies: {
         units: {
-          unitRules: {},
-          models: {
-            modelRules: {},
-            weapons: {
-              weaponRules: {}
-            }
-          }
+          ...UNIT_BASIC_QUERY,
         }
       },
       $: {

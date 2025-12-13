@@ -146,48 +146,51 @@ export function CurrentGames({ user, embedded }: CurrentGamesProps) {
                   key={game.id}
                   className="bg-gray-800 rounded-lg border border-gray-700 p-6 hover:bg-gray-750 transition-colors"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center flex-wrap gap-3 mb-2">
-                        <h3 className="text-xl font-semibold text-white">
-                          Game {game.code}
-                        </h3>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          game.status === 'active'
-                            ? 'bg-green-600 text-green-100'
-                            : 'bg-yellow-600 text-yellow-100'
-                        }`}>
-                          {game.status === 'active' ? 'In Progress' : 'Waiting'}
+                  <div className="flex flex-col gap-4">
+                    {/* Title and badges row */}
+                    <div className="flex items-center flex-wrap gap-3">
+                      <h3 className="text-xl font-semibold text-white">
+                        Game {game.code}
+                      </h3>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        game.status === 'active'
+                          ? 'bg-green-600 text-green-100'
+                          : 'bg-yellow-600 text-yellow-100'
+                      }`}>
+                        {game.status === 'active' ? 'In Progress' : 'Waiting'}
+                      </span>
+                      {isHost && (
+                        <span className="bg-blue-600 text-blue-100 px-2 py-1 rounded text-xs font-medium">
+                          HOST
                         </span>
-                        {isHost && (
-                          <span className="bg-blue-600 text-blue-100 px-2 py-1 rounded text-xs font-medium">
-                            HOST
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-sm text-gray-400">
-                        <div>
-                          <span className="font-medium">Players:</span>{' '}
-                          {gamePlayers.map((player: any, index: number) => (
-                            <span key={player.id}>
-                              {player.name}
-                              {index < gamePlayers.length - 1 && ', '}
-                            </span>
-                          ))}
-                        </div>
-                        <div>
-                          <span className="font-medium">Created:</span>{' '}
-                          {formatTimeAgo(game.createdAt)}
-                        </div>
-                        {game.status === 'active' && game.currentTurn && (
-                          <div>
-                            <span className="font-medium">Turn:</span>{' '}
-                            {game.currentTurn}
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3 sm:flex-shrink-0">
+
+                    {/* Game info row */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-sm text-gray-400">
+                      <div>
+                        <span className="font-medium">Players:</span>{' '}
+                        {gamePlayers.map((player: any, index: number) => (
+                          <span key={player.id}>
+                            {player.name}
+                            {index < gamePlayers.length - 1 && ', '}
+                          </span>
+                        ))}
+                      </div>
+                      <div>
+                        <span className="font-medium">Created:</span>{' '}
+                        {formatTimeAgo(game.createdAt)}
+                      </div>
+                      {game.status === 'active' && game.currentTurn && (
+                        <div>
+                          <span className="font-medium">Turn:</span>{' '}
+                          {game.currentTurn}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Buttons row */}
+                    <div className="flex items-center gap-4">
                       <button
                         onClick={() => navigateToGame(game.code)}
                         className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"

@@ -6,6 +6,7 @@ import { id } from '@instantdb/react';
 import UnitCard from '../ui/UnitCard';
 import { formatUnitForCard, sortUnitsByPriority } from '../../lib/unit-utils';
 import { getUnitsWithReminders } from '../../lib/rules-engine/reminder-utils';
+import { UNIT_FULL_QUERY, UNIT_BASIC_QUERY } from '../../lib/query-fragments';
 
 interface ChargePhaseProps {
   gameId: string;
@@ -33,14 +34,7 @@ export default function ChargePhase({ gameId, army, currentPlayer, currentUser, 
   const { data: unitsData } = db.useQuery({
     armies: {
       units: {
-        unitRules: {},
-        models: {
-          modelRules: {},
-          weapons: {
-            weaponRules: {}
-          }
-        },
-        statuses: {},
+        ...UNIT_FULL_QUERY,
       },
       $: {
         where: {
@@ -52,13 +46,7 @@ export default function ChargePhase({ gameId, army, currentPlayer, currentUser, 
       destroyedUnits: {},
       armies: {
         units: {
-          unitRules: {},
-          models: {
-            modelRules: {},
-            weapons: {
-              weaponRules: {}
-            }
-          }
+          ...UNIT_BASIC_QUERY,
         }
       },
       $: {

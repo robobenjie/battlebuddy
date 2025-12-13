@@ -43,6 +43,7 @@ const _schema = i.schema({
       isHost: i.boolean(),
       victoryPoints: i.number().optional(), // VP tracking
       commandPoints: i.number().optional(), // CP tracking
+      configReady: i.boolean().optional(), // Ready status for army config phase
     }),
 
     // Core army entity
@@ -214,6 +215,14 @@ const _schema = i.schema({
     armyStateArmy: {
       forward: { on: "armyStates", has: "one", label: "army", required: true, onDelete: "cascade" },
       reverse: { on: "armies", has: "many", label: "states" },
+    },
+
+    // Unit leader attachments (CHARACTER units attached to bodyguard units)
+    // Uses self-referential many-to-many relationship
+    // Automatically scoped per-game since units are copied per-game
+    unitLeaders: {
+      forward: { on: "units", has: "many", label: "leaders" },
+      reverse: { on: "units", has: "many", label: "bodyguardUnits" },
     },
   },
 });

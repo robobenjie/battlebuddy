@@ -95,6 +95,13 @@ export function checkCondition(condition: RuleCondition, context: CombatContext)
       return params.phases.includes(context.combatPhase);
     }
 
+    case 'combat-role': {
+      if (!params.role) return true;
+
+      // Check if the combat role matches
+      return params.role === context.combatRole;
+    }
+
     default:
       console.warn(`Unknown condition type: ${type}`);
       return false;
@@ -102,9 +109,53 @@ export function checkCondition(condition: RuleCondition, context: CombatContext)
 }
 
 /**
+ * Check if an effect should be applied based on appliesTo field
+ */
+function shouldApplyEffect(effect: RuleEffect, context: CombatContext): boolean {
+  const appliesTo = effect.appliesTo || 'all'; // Default to 'all'
+
+  console.log(`   🎯 Checking appliesTo for effect type "${effect.type}": appliesTo="${appliesTo}", attacker.isLeader=${context.attacker.isLeader}`);
+
+  if (appliesTo === 'all') {
+    console.log(`      ✅ Applies to all - effect will be applied`);
+    return true;
+  }
+
+  // For effects that modify attacker stats (hit, wound when attacking)
+  if (appliesTo === 'leader') {
+    const applies = context.attacker.isLeader === true;
+    console.log(`      ${applies ? '✅' : '❌'} Leader-only effect, attacker isLeader=${context.attacker.isLeader}`);
+    return applies;
+  }
+
+  if (appliesTo === 'bodyguard') {
+    const applies = context.attacker.isLeader === false;
+    console.log(`      ${applies ? '✅' : '❌'} Bodyguard-only effect, attacker isLeader=${context.attacker.isLeader}`);
+    return applies;
+  }
+
+  return true;
+}
+
+/**
  * Apply an effect to the combat context
  */
 export function applyEffect(effect: RuleEffect, context: CombatContext, ruleId: string): void {
+  // Check if effect should be applied based on appliesTo field
+  if (!shouldApplyEffect(effect, context)) {
+    return;
+  }
+
+  // Check effect-level conditions (if any)
+  if (effect.conditions && effect.conditions.length > 0) {
+    const conditionsMet = effect.conditions.every(condition =>
+      checkCondition(condition, context)
+    );
+    if (!conditionsMet) {
+      return; // Skip this effect if conditions aren't met
+    }
+  }
+
   const { type, target, params } = effect;
 
   switch (type) {

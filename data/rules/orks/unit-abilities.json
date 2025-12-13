@@ -93,28 +93,66 @@
   {
     "id": "super-runts",
     "name": "Super Runts",
-    "description": "While this model is leading a unit: Each time a model in that unit makes an attack, add 1 to the Hit roll and add 1 to the Wound roll.",
+    "description": "While this model is leading a unit: Models in that unit have the Scouts 9\" ability. Each time a model in that unit makes an attack, add 1 to the Hit roll and add 1 to the Wound roll. Each time an attack targets that unit, subtract 1 from the Wound roll.",
     "scope": "unit",
-    "conditions": [
-      {
-        "type": "being-led",
-        "params": {}
-      }
-    ],
+    "conditions": [],
     "effects": [
+      {
+        "type": "add-keyword",
+        "target": "unit",
+        "params": {
+          "keyword": "Scouts",
+          "keywordValue": 9
+        },
+        "appliesTo": "bodyguard"
+      },
       {
         "type": "modify-hit",
         "target": "self",
         "params": {
           "modifier": 1
-        }
+        },
+        "appliesTo": "bodyguard",
+        "conditions": [
+          {
+            "type": "combat-role",
+            "params": {
+              "role": "attacker"
+            }
+          }
+        ]
       },
       {
         "type": "modify-wound",
         "target": "self",
         "params": {
           "modifier": 1
-        }
+        },
+        "appliesTo": "bodyguard",
+        "conditions": [
+          {
+            "type": "combat-role",
+            "params": {
+              "role": "attacker"
+            }
+          }
+        ]
+      },
+      {
+        "type": "modify-wound",
+        "target": "self",
+        "params": {
+          "modifier": -1
+        },
+        "appliesTo": "bodyguard",
+        "conditions": [
+          {
+            "type": "combat-role",
+            "params": {
+              "role": "defender"
+            }
+          }
+        ]
       }
     ],
     "duration": "permanent"

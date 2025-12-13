@@ -5,11 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '../lib/db';
 import UnitCard from './ui/UnitCard';
 import WeaponProfileDisplay from './ui/WeaponProfileDisplay';
-import { formatUnitForCard, sortUnitsByPriority } from '../lib/unit-utils';
+import { formatUnitForCard, sortUnitsByPriority, getUnitDisplayName } from '../lib/unit-utils';
 import DigitalDiceMenu from './DigitalDiceMenu';
 import DiceRollResults from './ui/DiceRollResults';
 import { executeCombatSequence, executeSavePhase, CombatResult, CombatOptions, WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
-import { Rule, ArmyState, buildCombatContext, evaluateAllRules, getAddedKeywords } from '../lib/rules-engine';
+import { Rule, ArmyState, buildCombatContext, evaluateAllRules, getAddedKeywords, getAllUnitRules } from '../lib/rules-engine';
+import { UNIT_FULL_QUERY, UNIT_BASIC_QUERY } from '../lib/query-fragments';
 
 interface CombatCalculatorPageProps {
   gameId?: string;
@@ -46,17 +47,10 @@ export default function CombatCalculatorPage({
   const { data: unitData } = db.useQuery(
     propUnit ? {} : {
       units: {
-        unitRules: {},
-        models: {
-          modelRules: {},
-          weapons: {
-            weaponRules: {}
-          }
-        },
+        ...UNIT_FULL_QUERY,
         army: {
           armyRules: {}
         },
-        statuses: {},
         $: {
           where: {
             id: unitId
@@ -68,21 +62,14 @@ export default function CombatCalculatorPage({
 
   const unit = propUnit || unitData?.units?.[0];
 
-  
+
   // Now try the full query, including destroyed units and rules
   const { data: enemyUnitData, isLoading, error } = db.useQuery({
     games: {
       armies: {
         armyRules: {},
         units: {
-          unitRules: {},
-          models: {
-            modelRules: {},
-            weapons: {
-              weaponRules: {}
-            }
-          },
-          statuses: {}
+          ...UNIT_FULL_QUERY,
         }
       },
       destroyedUnits: {},
@@ -418,71 +405,31 @@ export default function CombatCalculatorPage({
       }
     }
 
-    // Get unit rules
-    if (unit?.unitRules) {
-      for (const rule of unit.unitRules) {
-        if (rule?.ruleObject) {
-          try {
-            const parsedRule = JSON.parse(rule.ruleObject);
-            addRules(parsedRule);
-          } catch (e) {
-            console.error('Failed to parse rule:', rule.name, e);
-          }
-        }
-      }
-    }
+    // Get all unit rules (includes unit rules, leader rules, model rules, and weapon rules)
+    const unitRules = getAllUnitRules(unit);
+    console.log(`📋 getAllUnitRules returned ${unitRules.length} rules for unit:`, unit.name);
 
-    // Get model rules from all models in the unit
-    console.log('🔍 Unit data for rule loading:', {
-      hasUnit: !!unit,
-      hasModels: !!unit?.models,
-      modelCount: unit?.models?.length || 0,
-      unitKeys: unit ? Object.keys(unit) : [],
-      allModels: unit?.models?.map((m: any) => ({
-        id: m.id,
-        name: m.name,
-        hasModelRules: !!m.modelRules,
-        modelRulesCount: m.modelRules?.length || 0,
-        modelRules: m.modelRules
-      }))
+    // Filter to only include rules relevant to the current combat phase
+    const currentCombatPhase = weaponType === 'melee' ? 'fight' : 'shooting';
+    const combatRelevantRules = unitRules.filter((rule: Rule) => {
+      // If rule has a phase constraint, check if it matches current combat phase
+      if (rule.activation?.phase) {
+        const matches = rule.activation.phase === currentCombatPhase;
+        console.log(`   Rule "${rule.name}" has phase "${rule.activation.phase}",current phase "${currentCombatPhase}": ${matches ? '✅ included' : '❌ filtered out'}`);
+        return matches;
+      }
+
+      // Include rules without phase constraints (always-on abilities)
+      console.log(`   Rule "${rule.name}" has no phase constraint: ✅ included`);
+      return true;
     });
 
-    if (unit?.models) {
-      for (const model of unit.models) {
-        if (model?.modelRules) {
-          for (const rule of model.modelRules) {
-            if (rule?.ruleObject) {
-              try {
-                const parsedRule = JSON.parse(rule.ruleObject);
-                addRules(parsedRule);
-              } catch (e) {
-                console.error('Failed to parse model rule:', rule.name, e);
-              }
-            }
-          }
-        }
+    console.log(`📋 After phase filter: ${combatRelevantRules.length} combat-relevant rules`);
+    combatRelevantRules.forEach(r => console.log(`   - ${r.name} (${r.id})`));
 
-        // Get weapon rules from this model's weapons
-        if (model?.weapons) {
-          for (const weapon of model.weapons) {
-            if (weapon?.weaponRules) {
-              for (const rule of weapon.weaponRules) {
-                if (rule?.ruleObject) {
-                  try {
-                    const parsedRule = JSON.parse(rule.ruleObject);
-                    addRules(parsedRule);
-                  } catch (e) {
-                    console.error('Failed to parse weapon rule:', rule.name, e);
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+    addRules(combatRelevantRules);
 
-    console.log(`📋 Loaded ${allRules.length} implemented rules from database`);
+    console.log(`📋 Total rules in context: ${allRules.length}`);
 
     // Get army states from query
     const armyStates: ArmyState[] = armyStatesData?.armyStates || [];
@@ -625,71 +572,31 @@ export default function CombatCalculatorPage({
       }
     }
 
-    // Get unit rules
-    if (unit?.unitRules) {
-      for (const rule of unit.unitRules) {
-        if (rule?.ruleObject) {
-          try {
-            const parsedRule = JSON.parse(rule.ruleObject);
-            addRules(parsedRule);
-          } catch (e) {
-            console.error('Failed to parse rule:', rule.name, e);
-          }
-        }
-      }
-    }
+    // Get all unit rules (includes unit rules, leader rules, model rules, and weapon rules)
+    const unitRules = getAllUnitRules(unit);
+    console.log(`📋 getAllUnitRules returned ${unitRules.length} rules for unit:`, unit.name);
 
-    // Get model rules from all models in the unit
-    console.log('🔍 Unit data for rule loading:', {
-      hasUnit: !!unit,
-      hasModels: !!unit?.models,
-      modelCount: unit?.models?.length || 0,
-      unitKeys: unit ? Object.keys(unit) : [],
-      allModels: unit?.models?.map((m: any) => ({
-        id: m.id,
-        name: m.name,
-        hasModelRules: !!m.modelRules,
-        modelRulesCount: m.modelRules?.length || 0,
-        modelRules: m.modelRules
-      }))
+    // Filter to only include rules relevant to the current combat phase
+    const currentCombatPhase = weaponType === 'melee' ? 'fight' : 'shooting';
+    const combatRelevantRules = unitRules.filter((rule: Rule) => {
+      // If rule has a phase constraint, check if it matches current combat phase
+      if (rule.activation?.phase) {
+        const matches = rule.activation.phase === currentCombatPhase;
+        console.log(`   Rule "${rule.name}" has phase "${rule.activation.phase}",current phase "${currentCombatPhase}": ${matches ? '✅ included' : '❌ filtered out'}`);
+        return matches;
+      }
+
+      // Include rules without phase constraints (always-on abilities)
+      console.log(`   Rule "${rule.name}" has no phase constraint: ✅ included`);
+      return true;
     });
 
-    if (unit?.models) {
-      for (const model of unit.models) {
-        if (model?.modelRules) {
-          for (const rule of model.modelRules) {
-            if (rule?.ruleObject) {
-              try {
-                const parsedRule = JSON.parse(rule.ruleObject);
-                addRules(parsedRule);
-              } catch (e) {
-                console.error('Failed to parse model rule:', rule.name, e);
-              }
-            }
-          }
-        }
+    console.log(`📋 After phase filter: ${combatRelevantRules.length} combat-relevant rules`);
+    combatRelevantRules.forEach(r => console.log(`   - ${r.name} (${r.id})`));
 
-        // Get weapon rules from this model's weapons
-        if (model?.weapons) {
-          for (const weapon of model.weapons) {
-            if (weapon?.weaponRules) {
-              for (const rule of weapon.weaponRules) {
-                if (rule?.ruleObject) {
-                  try {
-                    const parsedRule = JSON.parse(rule.ruleObject);
-                    addRules(parsedRule);
-                  } catch (e) {
-                    console.error('Failed to parse weapon rule:', rule.name, e);
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+    addRules(combatRelevantRules);
 
-    console.log(`📋 Loaded ${allRules.length} implemented rules from database`);
+    console.log(`📋 Total rules in context: ${allRules.length}`);
 
     // Get army states from query
     const armyStates: ArmyState[] = armyStatesData?.armyStates || [];
@@ -958,7 +865,7 @@ export default function CombatCalculatorPage({
               <option value="">Choose a target...</option>
               {enemyUnits.map((enemyUnit: any) => (
                 <option key={enemyUnit.id} value={enemyUnit.id}>
-                  {enemyUnit.name}
+                  {getUnitDisplayName(enemyUnit)}
                 </option>
               ))}
             </select>

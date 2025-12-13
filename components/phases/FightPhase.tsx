@@ -4,12 +4,13 @@ import { useState } from 'react';
 import { db } from '../../lib/db';
 import { id } from '@instantdb/react';
 import UnitCard from '../ui/UnitCard';
-import { formatUnitForCard, sortUnitsByPriority } from '../../lib/unit-utils';
+import { formatUnitForCard, sortUnitsByPriority, getUnitDisplayName } from '../../lib/unit-utils';
 import CombatCalculatorPage from '../CombatCalculatorPage';
 import ReminderBadge from '../ui/ReminderBadge';
 import { useRulePopup } from '../ui/RulePopup';
 import RulePopup from '../ui/RulePopup';
 import { getUnitReminders } from '../../lib/rules-engine/reminder-utils';
+import { UNIT_FULL_QUERY } from '../../lib/query-fragments';
 
 interface FightPhaseProps {
   gameId: string;
@@ -43,14 +44,7 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
       armies: {
         armyRules: {},
         units: {
-          unitRules: {},
-          models: {
-            modelRules: {},
-            weapons: {
-              weaponRules: {}
-            }
-          },
-          statuses: {},
+          ...UNIT_FULL_QUERY,
         },
       },
       destroyedUnits: {},
@@ -171,7 +165,28 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
   const handleUndo = async (unit: any) => {
     setIsProcessing(true);
     try {
+      // Delete fought status
       await deleteFoughtStatusForTurn(unit);
+
+      // Reset melee weapons (remove current turn from turnsFired)
+      const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
+      const meleeWeapons = (unit.models || []).flatMap((model: any) =>
+        (model.weapons || []).filter((weapon: any) => weapon.range === 0)
+      );
+
+      // Remove this turn from each weapon's turnsFired array
+      const weaponUpdates = meleeWeapons
+        .filter((weapon: any) => weapon.turnsFired && weapon.turnsFired.includes(turnPlayerId))
+        .map((weapon: any) => {
+          const newTurnsFired = weapon.turnsFired.filter((t: string) => t !== turnPlayerId);
+          return db.tx.weapons[weapon.id].update({
+            turnsFired: newTurnsFired
+          });
+        });
+
+      if (weaponUpdates.length > 0) {
+        await db.transact(weaponUpdates);
+      }
     } catch (error) {
       console.error('Error undoing fight:', error);
     } finally {
@@ -227,7 +242,7 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
         <div className={`flex items-center justify-between ${!isOwner ? 'opacity-60' : ''}`}>
           {/* Unit name and status */}
           <div className="flex items-center space-x-3 flex-1 min-w-0">
-            <span className="text-white font-medium truncate">{unit.name}</span>
+            <span className="text-white font-medium truncate">{getUnitDisplayName(unit)}</span>
             {hasFought && (
               <span className="px-2 py-0.5 rounded text-xs bg-red-600 text-red-100 whitespace-nowrap">
                 Fought

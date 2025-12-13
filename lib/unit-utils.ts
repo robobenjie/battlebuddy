@@ -2,6 +2,8 @@
  * Shared utilities for unit data transformation and manipulation
  */
 
+import { getAllUnitRules } from './rules-engine/load-rules';
+
 // Helper function to get models for a specific unit (now models are nested in unit)
 export const getModelsForUnit = (unit: any) => {
   return unit.models || [];
@@ -42,99 +44,38 @@ export const getModifiedMovement = (unit: any, armyStates?: any[]) => {
   let modifier = 0;
   const activeModifiers: { name: string; value: number }[] = [];
 
-  // Check unit rules for movement modifiers
-  if (unit.unitRules && Array.isArray(unit.unitRules)) {
-    for (const rule of unit.unitRules) {
-      if (!rule?.ruleObject) continue;
+  // Get all rules for this unit (including leaders, models, weapons)
+  const allRules = getAllUnitRules(unit);
 
-      try {
-        const parsedRules = JSON.parse(rule.ruleObject);
-        const ruleArray = Array.isArray(parsedRules) ? parsedRules : [parsedRules];
+  // Check each rule for movement modifiers
+  for (const rule of allRules) {
+    // Check if this rule has stat modifiers
+    if (!rule.effects || !Array.isArray(rule.effects)) continue;
 
-        for (const parsedRule of ruleArray) {
-          // Check if this rule has stat modifiers
-          if (!parsedRule.effects || !Array.isArray(parsedRule.effects)) continue;
-
-          // Check conditions
-          let conditionsMet = true;
-          if (parsedRule.conditions && Array.isArray(parsedRule.conditions)) {
-            for (const condition of parsedRule.conditions) {
-              if (condition.type === 'army-state') {
-                // Check if the required army state is active
-                const hasState = armyStates?.some((state: any) => state.state === condition.state);
-                if (!hasState) {
-                  conditionsMet = false;
-                  break;
-                }
-              }
-            }
-          }
-
-          if (!conditionsMet) continue;
-
-          // Apply movement modifiers
-          for (const effect of parsedRule.effects) {
-            if (effect.type === 'stat-modifier' && effect.stat === 'movement') {
-              const modValue = parseInt(effect.modifier);
-              if (!isNaN(modValue)) {
-                modifier += modValue;
-                activeModifiers.push({ name: parsedRule.name, value: modValue });
-              }
-            }
+    // Check conditions
+    let conditionsMet = true;
+    if (rule.conditions && Array.isArray(rule.conditions)) {
+      for (const condition of rule.conditions) {
+        if (condition.type === 'army-state') {
+          // Check if the required army state is active
+          const hasState = armyStates?.some((state: any) => state.state === condition.state);
+          if (!hasState) {
+            conditionsMet = false;
+            break;
           }
         }
-      } catch (e) {
-        console.error('Failed to parse unit rule for movement modifiers:', rule.name, e);
       }
     }
-  }
 
-  // Check model rules for movement modifiers
-  if (unit.models && Array.isArray(unit.models)) {
-    for (const model of unit.models) {
-      if (!model.modelRules || !Array.isArray(model.modelRules)) continue;
+    if (!conditionsMet) continue;
 
-      for (const rule of model.modelRules) {
-        if (!rule?.ruleObject) continue;
-
-        try {
-          const parsedRules = JSON.parse(rule.ruleObject);
-          const ruleArray = Array.isArray(parsedRules) ? parsedRules : [parsedRules];
-
-          for (const parsedRule of ruleArray) {
-            // Check if this rule has stat modifiers
-            if (!parsedRule.effects || !Array.isArray(parsedRule.effects)) continue;
-
-            // Check conditions
-            let conditionsMet = true;
-            if (parsedRule.conditions && Array.isArray(parsedRule.conditions)) {
-              for (const condition of parsedRule.conditions) {
-                if (condition.type === 'army-state') {
-                  // Check if the required army state is active
-                  const hasState = armyStates?.some((state: any) => state.state === condition.state);
-                  if (!hasState) {
-                    conditionsMet = false;
-                    break;
-                  }
-                }
-              }
-            }
-
-            if (!conditionsMet) continue;
-
-            // Apply movement modifiers
-            for (const effect of parsedRule.effects) {
-              if (effect.type === 'stat-modifier' && effect.stat === 'movement') {
-                const modValue = parseInt(effect.modifier);
-                if (!isNaN(modValue)) {
-                  modifier += modValue;
-                  activeModifiers.push({ name: parsedRule.name, value: modValue });
-                }
-              }
-            }
-          }
-        } catch (e) {
-          console.error('Failed to parse model rule for movement modifiers:', rule.name, e);
+    // Apply movement modifiers
+    for (const effect of rule.effects) {
+      if (effect.type === 'stat-modifier' && effect.stat === 'movement') {
+        const modValue = parseInt(effect.modifier);
+        if (!isNaN(modValue)) {
+          modifier += modValue;
+          activeModifiers.push({ name: rule.name, value: modValue });
         }
       }
     }
@@ -149,11 +90,29 @@ export const getModifiedMovement = (unit: any, armyStates?: any[]) => {
   return modifiedValue > 0 ? modifiedValue.toString() : baseMovement;
 };
 
+// Helper function to get display name for a unit with attached leaders
+// Returns format: "Unit Name (Leader1, Leader2)" or just "Unit Name" if no leaders
+export const getUnitDisplayName = (unit: any): string => {
+  if (!unit) return '';
+
+  const baseName = unit.nickname || unit.name;
+
+  // Check if unit has leaders attached
+  if (unit.leaders && Array.isArray(unit.leaders) && unit.leaders.length > 0) {
+    const leaderNames = unit.leaders
+      .map((leader: any) => leader.nickname || leader.name)
+      .join(', ');
+    return `${baseName} (${leaderNames})`;
+  }
+
+  return baseName;
+};
+
 // Helper function to format unit data for ArmyDetailPage (updated for new structure)
 export const formatUnitForCard = (unit: any) => {
   const unitModels = getModelsForUnit(unit);
   const unitWeapons = getWeaponsForUnit(unit);
-  
+
   return {
     unit: unit,
     models: unitModels,
@@ -276,7 +235,8 @@ export const getPrimaryCategory = (unit: any): string => {
  * @returns Sorted array of units
  */
 export const sortUnitsByPriority = (units: any[], destroyedUnitIds?: Set<string>): any[] => {
-  return [...units].sort((a, b) => {
+  // First, do the standard sort
+  const sorted = [...units].sort((a, b) => {
     // First, sort by destroyed status (undestroyed first) if destroyedUnitIds is provided
     if (destroyedUnitIds) {
       const aDestroyed = destroyedUnitIds.has(a.id) ? 1 : 0;
@@ -295,4 +255,33 @@ export const sortUnitsByPriority = (units: any[], destroyedUnitIds?: Set<string>
     // Finally, alphabetically by name
     return a.name.localeCompare(b.name);
   });
+
+  // Then, reorganize to group bodyguards with their leaders
+  // CHARACTERs should be followed immediately by units they lead
+  const result: any[] = [];
+  const processed = new Set<string>();
+
+  for (const unit of sorted) {
+    if (processed.has(unit.id)) continue;
+
+    result.push(unit);
+    processed.add(unit.id);
+
+    // If this is a CHARACTER, find and add any bodyguard units it leads
+    const isCharacter = unit.categories && Array.isArray(unit.categories) &&
+      unit.categories.some((cat: string) => cat.toLowerCase() === 'character');
+
+    if (isCharacter && unit.bodyguardUnits && Array.isArray(unit.bodyguardUnits)) {
+      // Find bodyguard units in the sorted list and add them right after this CHARACTER
+      for (const bodyguard of unit.bodyguardUnits) {
+        const bodyguardUnit = sorted.find((u: any) => u.id === bodyguard.id);
+        if (bodyguardUnit && !processed.has(bodyguardUnit.id)) {
+          result.push(bodyguardUnit);
+          processed.add(bodyguardUnit.id);
+        }
+      }
+    }
+  }
+
+  return result;
 }; 

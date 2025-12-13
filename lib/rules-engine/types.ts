@@ -33,7 +33,8 @@ export type ConditionType =
   | 'army-state'           // Army has specific state (waaagh-active, etc.)
   | 'is-leading'           // Model is leading a unit
   | 'being-led'            // Unit is being led by a model
-  | 'combat-phase';        // Specific combat phase (shooting, melee)
+  | 'combat-phase'         // Specific combat phase (shooting, melee)
+  | 'combat-role';         // Unit's role in combat (attacker or defender)
 
 /**
  * Effect types that can be applied
@@ -82,6 +83,9 @@ export interface RuleConditionParams {
 
   // For combat-phase
   phases?: string[];
+
+  // For combat-role
+  role?: 'attacker' | 'defender';
 }
 
 /**
@@ -118,12 +122,19 @@ export interface RuleEffectParams {
 }
 
 /**
+ * Who the effect applies to (for leader/bodyguard distinction)
+ */
+export type EffectAppliesTo = 'all' | 'leader' | 'bodyguard';
+
+/**
  * An effect that is applied when a rule's conditions are met
  */
 export interface RuleEffect {
   type: EffectType;
   target: EffectTarget;
   params: RuleEffectParams;
+  appliesTo?: EffectAppliesTo; // Optional, defaults to 'all'
+  conditions?: RuleCondition[]; // Optional effect-level conditions
 }
 
 /**

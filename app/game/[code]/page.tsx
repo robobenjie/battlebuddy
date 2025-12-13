@@ -5,6 +5,7 @@ import { duplicateArmyForGame } from '../../../lib/army-import';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import GamePhases from '../../../components/GamePhases';
+import ArmyConfigPage from '../../../components/ArmyConfigPage';
 
 export default function GamePage() {
   const params = useParams();
@@ -183,13 +184,13 @@ export default function GamePage() {
         console.log(`Current player ${currentPlayer.name} has no army selected`);
       }
 
-      // Start the game with choose-first-player phase
+      // Start the game with army-config phase
       await db.transact([
         db.tx.games[game.id].update({
-          status: 'active',
+          status: 'army-config',
           currentTurn: 1,
-          currentPhase: 'choose-first-player',
-          activePlayerId: null, // Will be set by player choice
+          currentPhase: 'army-config',
+          activePlayerId: null,
           phaseHistory: []
         })
       ]);
@@ -199,6 +200,7 @@ export default function GamePage() {
       setIsStartingGame(false);
     }
   };
+
 
   // Handle army selection
   const selectArmy = async (armyId: string) => {
@@ -218,6 +220,30 @@ export default function GamePage() {
       console.error('Error selecting army:', error);
     }
   };
+
+  // If game is in army-config phase, show army config for current player
+  if (game.status === 'army-config') {
+    const currentPlayerArmy = allArmies.find(a => a.gameId === game.id && a.ownerId === user?.id);
+
+    if (!currentPlayerArmy) {
+      return (
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-400 mb-4">Waiting for your army to be set up...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <ArmyConfigPage
+        gameId={game.id}
+        armyId={currentPlayerArmy.id}
+        currentUserId={user?.id || ''}
+      />
+    );
+  }
 
   // If game is active, show the game phases
   if (game.status === 'active') {

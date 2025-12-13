@@ -9,6 +9,7 @@ import { getUnitsWithReminders, getUnitReminders } from '../../lib/rules-engine/
 import ReminderBadge from '../ui/ReminderBadge';
 import { useRulePopup } from '../ui/RulePopup';
 import RulePopup from '../ui/RulePopup';
+import { UNIT_FULL_QUERY, UNIT_BASIC_QUERY } from '../../lib/query-fragments';
 
 interface MovementPhaseProps {
   gameId: string;
@@ -37,14 +38,7 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
   const { data: unitsData } = db.useQuery({
     armies: {
       units: {
-        unitRules: {},
-        models: {
-          modelRules: {},
-          weapons: {
-            weaponRules: {}
-          }
-        },
-        statuses: {},
+        ...UNIT_FULL_QUERY,
       },
       $: {
         where: {
@@ -56,13 +50,7 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
       destroyedUnits: {},
       armies: {
         units: {
-          unitRules: {},
-          models: {
-            modelRules: {},
-            weapons: {
-              weaponRules: {}
-            }
-          }
+          ...UNIT_BASIC_QUERY,
         }
       },
       $: {
@@ -90,9 +78,34 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
   const destroyedUnitIds = new Set((unitsData?.games?.[0]?.destroyedUnits || []).map((u: any) => u.id));
   const armyStates = armyStatesData?.armyStates || [];
 
-  // Filter out destroyed units and sort
+  // Helper to check if unit is a CHARACTER
+  const isCharacter = (unit: any) => {
+    return unit.categories && Array.isArray(unit.categories) &&
+      unit.categories.some((cat: string) => cat.toLowerCase() === 'character');
+  };
+
+  // Helper to check if CHARACTER is attached to a non-destroyed bodyguard
+  const isAttachedToLiveBodyguard = (characterUnit: any) => {
+    if (!isCharacter(characterUnit)) return false;
+
+    // Check if this character is leading any units
+    if (!characterUnit.bodyguardUnits || !Array.isArray(characterUnit.bodyguardUnits)) return false;
+
+    // Check if any of those bodyguard units are alive
+    return characterUnit.bodyguardUnits.some((bodyguard: any) => !destroyedUnitIds.has(bodyguard.id));
+  };
+
+  // Filter out destroyed units and CHARACTERs attached to live bodyguards
   const units = sortUnitsByPriority(
-    allUnits.filter((unit: any) => !destroyedUnitIds.has(unit.id)),
+    allUnits.filter((unit: any) => {
+      // Remove destroyed units
+      if (destroyedUnitIds.has(unit.id)) return false;
+
+      // Remove CHARACTERs that are attached to live bodyguards
+      if (isAttachedToLiveBodyguard(unit)) return false;
+
+      return true;
+    }),
     destroyedUnitIds
   );
 

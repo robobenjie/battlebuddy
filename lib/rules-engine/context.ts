@@ -13,6 +13,7 @@ export interface CombatContext extends CombatOptions {
     armyId: string;
     categories: string[];
     leaderId?: string;      // If unit is being led
+    isLeader?: boolean;     // If this unit is itself a leader (CHARACTER)
   };
 
   defender: {
@@ -23,6 +24,7 @@ export interface CombatContext extends CombatOptions {
     T: number;
     SV: number;
     INV?: number;
+    isLeader?: boolean;     // If this unit is itself a leader (CHARACTER)
   };
 
   weapon: WeaponStats;
@@ -36,6 +38,9 @@ export interface CombatContext extends CombatOptions {
 
   // Combat phase
   combatPhase: 'shooting' | 'melee';
+
+  // Combat role - whose rules are being evaluated
+  combatRole: 'attacker' | 'defender';
 
   // Active rules
   activeRules: Rule[];
@@ -56,6 +61,7 @@ export function buildCombatContext(params: {
   weapon: WeaponStats;
   game: any;
   combatPhase: 'shooting' | 'melee';
+  combatRole?: 'attacker' | 'defender'; // Defaults to 'attacker'
   options: CombatOptions;
   rules: Rule[];
   armyStates: ArmyState[];
@@ -66,6 +72,7 @@ export function buildCombatContext(params: {
     weapon,
     game,
     combatPhase,
+    combatRole = 'attacker', // Default to attacker
     options,
     rules,
     armyStates
@@ -75,6 +82,11 @@ export function buildCombatContext(params: {
   const attackerArmyStates = armyStates.filter(
     state => state.armyId === attacker.armyId
   );
+
+  // Helper to check if unit is a CHARACTER (leader)
+  const isCharacter = (unit: any) => {
+    return unit.categories?.some((cat: string) => cat.toLowerCase() === 'character');
+  };
 
   return {
     // Spread options (modelsFiring, withinHalfRange, etc.)
@@ -86,6 +98,7 @@ export function buildCombatContext(params: {
       armyId: attacker.armyId,
       categories: attacker.categories || [],
       leaderId: attacker.leaderId,
+      isLeader: isCharacter(attacker),
     },
 
     defender: {
@@ -96,6 +109,7 @@ export function buildCombatContext(params: {
       T: defender.models?.[0]?.T || 0,
       SV: defender.models?.[0]?.SV || 0,
       INV: defender.models?.[0]?.INV,
+      isLeader: isCharacter(defender),
     },
 
     weapon,
@@ -108,6 +122,8 @@ export function buildCombatContext(params: {
     },
 
     combatPhase,
+
+    combatRole,
 
     // Active rules
     activeRules: rules,
