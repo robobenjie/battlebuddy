@@ -5,11 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '../lib/db';
 import UnitCard from './ui/UnitCard';
 import WeaponProfileDisplay from './ui/WeaponProfileDisplay';
+import ActiveRulesDisplay from './ui/ActiveRulesDisplay';
 import { formatUnitForCard, sortUnitsByPriority, getUnitDisplayName } from '../lib/unit-utils';
 import DigitalDiceMenu from './DigitalDiceMenu';
 import DiceRollResults from './ui/DiceRollResults';
 import { executeCombatSequence, executeSavePhase, CombatResult, CombatOptions, WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
-import { Rule, ArmyState, buildCombatContext, evaluateAllRules, getAddedKeywords, getAllUnitRules } from '../lib/rules-engine';
+import { Rule, ArmyState, buildCombatContext, evaluateAllRules, getAddedKeywords, getAllUnitRules, checkCondition } from '../lib/rules-engine';
 import { UNIT_FULL_QUERY, UNIT_BASIC_QUERY } from '../lib/query-fragments';
 
 interface CombatCalculatorPageProps {
@@ -466,8 +467,30 @@ export default function CombatCalculatorPage({
     // Evaluate rules to see which ones apply
     const appliedRules = evaluateAllRules(allRules, context);
 
+    // Also include rules that have userInput (conditional rules that will activate with user input)
+    const conditionalRules = allRules.filter(rule => {
+      // Skip if already applied
+      if (appliedRules.some(r => r.id === rule.id)) return false;
+
+      // Include if the rule has a userInput field
+      if (rule.userInput) {
+        // Check if all non-user-input conditions are met
+        const nonUserInputConditions = rule.conditions.filter(c => c.type !== 'user-input');
+        const allNonUserInputConditionsMet = nonUserInputConditions.every(condition =>
+          checkCondition(condition, context)
+        );
+        return allNonUserInputConditionsMet;
+      }
+
+      return false;
+    });
+
+    // Combine applied rules with conditional rules for display
+    const displayRules = [...appliedRules, ...conditionalRules];
+
     // Debug: log applied rules
     console.log('✅ Applied Rules:', appliedRules.map(r => r.id));
+    console.log('🔀 Conditional Rules (with user input):', conditionalRules.map(r => r.id));
     console.log('📊 Context modifiers:', context.modifiers.getAllModifiers());
 
     // Extract modifiers
@@ -500,7 +523,7 @@ export default function CombatCalculatorPage({
     }
 
     // Save for display
-    setActiveRules(appliedRules);
+    setActiveRules(displayRules);
     setHitModifier(hitMod);
     setWoundModifier(woundMod);
     setWeaponStatModifiers({ A: aMod, S: sMod, AP: apMod, D: dMod });
@@ -894,6 +917,13 @@ export default function CombatCalculatorPage({
                 activeRules={activeRules}
                 modifierSources={modifierSources}
               />
+            </div>
+          )}
+
+          {/* Active Rules Display */}
+          {activeRules.length > 0 && (
+            <div className="mb-6">
+              <ActiveRulesDisplay rules={activeRules} />
             </div>
           )}
 
