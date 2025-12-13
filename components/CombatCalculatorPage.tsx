@@ -352,8 +352,8 @@ export default function CombatCalculatorPage({
 
   // Calculate modifiers when weapon or target changes
   useEffect(() => {
-    if (!selectedWeaponId || !selectedTarget || !unit || !game) {
-      // Reset modifiers if no weapon/target selected
+    if (!selectedWeaponId || !unit || !game) {
+      // Reset modifiers if no weapon/unit/game
       setActiveRules([]);
       setHitModifier(0);
       setWoundModifier(0);
@@ -362,7 +362,16 @@ export default function CombatCalculatorPage({
     }
 
     // selectedWeapon is computed from selectedWeaponId
-    if (!selectedWeapon || !targetStats) return;
+    if (!selectedWeapon) return;
+
+    // Use actual target stats if available, otherwise use placeholder
+    const effectiveTargetStats: TargetStats = targetStats || {
+      T: 4,
+      SV: 3,
+      INV: undefined,
+      modelCount: 10,
+      categories: []
+    };
 
     // Convert weapon to WeaponStats format
     const weaponStats: WeaponStats = {
@@ -415,7 +424,8 @@ export default function CombatCalculatorPage({
     const combatRelevantRules = unitRules.filter((rule: Rule) => {
       // If rule has a phase constraint, check if it matches current combat phase
       if (rule.activation?.phase) {
-        const matches = rule.activation.phase === currentCombatPhase;
+        // "any" phase matches all combat phases
+        const matches = rule.activation.phase === 'any' || rule.activation.phase === currentCombatPhase;
         console.log(`   Rule "${rule.name}" has phase "${rule.activation.phase}",current phase "${currentCombatPhase}": ${matches ? '✅ included' : '❌ filtered out'}`);
         return matches;
       }
@@ -449,7 +459,7 @@ export default function CombatCalculatorPage({
     // Build context to evaluate which rules apply
     const context = buildCombatContext({
       attacker: { ...unit, armyId: currentArmyId },
-      defender: targetStats,
+      defender: effectiveTargetStats,
       weapon: weaponStats,
       game: game,
       combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
@@ -604,7 +614,8 @@ export default function CombatCalculatorPage({
     const combatRelevantRules = unitRules.filter((rule: Rule) => {
       // If rule has a phase constraint, check if it matches current combat phase
       if (rule.activation?.phase) {
-        const matches = rule.activation.phase === currentCombatPhase;
+        // "any" phase matches all combat phases
+        const matches = rule.activation.phase === 'any' || rule.activation.phase === currentCombatPhase;
         console.log(`   Rule "${rule.name}" has phase "${rule.activation.phase}",current phase "${currentCombatPhase}": ${matches ? '✅ included' : '❌ filtered out'}`);
         return matches;
       }
