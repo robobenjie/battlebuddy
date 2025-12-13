@@ -48,6 +48,9 @@ export interface CombatContext extends CombatOptions {
   // Army states (Waaagh!, etc.) - scoped to attacking army
   armyStates: ArmyState[];
 
+  // User-provided input values for conditional rules
+  userInputs: Record<string, any>;
+
   // Modifier stack
   modifiers: ModifierStack;
 }
@@ -130,6 +133,9 @@ export function buildCombatContext(params: {
 
     // Army states (filtered to attacking army)
     armyStates: attackerArmyStates,
+
+    // User inputs
+    userInputs: options.userInputs || {},
 
     // Modifier stack
     modifiers: new ModifierStack(),

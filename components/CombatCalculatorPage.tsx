@@ -636,6 +636,12 @@ export default function CombatCalculatorPage({
     const woundMod = context.modifiers.get('wound');
     const keywords = getAddedKeywords(context);
 
+    // Extract weapon stat modifiers
+    const aMod = context.modifiers.get('A') || 0;
+    const sMod = context.modifiers.get('S') || 0;
+    const apMod = context.modifiers.get('AP') || 0;
+    const dMod = context.modifiers.get('D') || 0;
+
     // Extract modifier sources (which rules provided each modifier)
     const hitSources = context.modifiers.getModifiers('hit').map(m => m.source);
     const woundSources = context.modifiers.getModifiers('wound').map(m => m.source);
@@ -658,6 +664,7 @@ export default function CombatCalculatorPage({
     setHitModifier(hitMod);
     setWoundModifier(woundMod);
     setAddedKeywords(keywords);
+    setWeaponStatModifiers({ A: aMod, S: sMod, AP: apMod, D: dMod });
     setModifierSources({
       hit: hitSources,
       wound: woundSources,
@@ -938,6 +945,7 @@ export default function CombatCalculatorPage({
           totalWeaponCount={totalWeaponCount}
           unitHasCharged={unitHasCharged}
           unitHasMovedOrAdvanced={unitHasMovedOrAdvanced}
+          activeRules={activeRules}
           onRollAttacks={handleRollAttacks}
           onClose={() => setShowDigitalDiceMenu(false)}
         />
@@ -962,16 +970,7 @@ export default function CombatCalculatorPage({
             <div className="flex-1 overflow-hidden">
               <DiceRollResults
                 combatResult={combatResult}
-                weapon={{
-                  name: (selectedWeapon as any).name,
-                  range: (selectedWeapon as any).range,
-                  A: (selectedWeapon as any).A,
-                  WS: (selectedWeapon as any).WS,
-                  S: (selectedWeapon as any).S,
-                  AP: (selectedWeapon as any).AP,
-                  D: (selectedWeapon as any).D,
-                  keywords: (selectedWeapon as any).keywords || []
-                }}
+                weapon={applyWeaponModifiers(selectedWeapon, weaponStatModifiers)}
                 target={targetStats}
                 onRollSaves={handleRollSaves}
                 showSavePhase={showSavePhase}

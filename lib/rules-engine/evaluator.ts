@@ -102,6 +102,21 @@ export function checkCondition(condition: RuleCondition, context: CombatContext)
       return params.role === context.combatRole;
     }
 
+    case 'user-input': {
+      if (!params.inputId) return true;
+
+      // Get the user-provided value for this input
+      const userValue = context.userInputs[params.inputId];
+
+      // If no user input provided, condition fails
+      if (userValue === undefined || userValue === null) {
+        return false;
+      }
+
+      // Check if the user value matches the expected value
+      return userValue === params.inputValue;
+    }
+
     default:
       console.warn(`Unknown condition type: ${type}`);
       return false;

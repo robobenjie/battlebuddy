@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { WeaponStats, TargetStats, CombatOptions, parseKeywords } from '../lib/combat-calculator-engine';
+import { Rule } from '../lib/rules-engine/types';
 
 interface DigitalDiceMenuProps {
   weapon: WeaponStats;
@@ -11,6 +12,7 @@ interface DigitalDiceMenuProps {
   totalWeaponCount: number;
   unitHasCharged: boolean;
   unitHasMovedOrAdvanced: boolean;
+  activeRules?: Rule[]; // Rules with conditional inputs
   onRollAttacks: (options: CombatOptions) => void;
   onClose: () => void;
 }
@@ -21,6 +23,7 @@ export default function DigitalDiceMenu({
   totalWeaponCount,
   unitHasCharged,
   unitHasMovedOrAdvanced,
+  activeRules = [],
   onRollAttacks,
   onClose
 }: DigitalDiceMenuProps) {
@@ -35,6 +38,22 @@ export default function DigitalDiceMenu({
   );
   const [unitRemainedStationary, setUnitRemainedStationary] = useState(!unitHasMovedOrAdvanced);
 
+  // State for user inputs from conditional rules
+  const [userInputs, setUserInputs] = useState<Record<string, any>>(() => {
+    const initial: Record<string, any> = {};
+    activeRules
+      .filter(rule => rule.userInput)
+      .forEach(rule => {
+        if (rule.userInput) {
+          initial[rule.userInput.id] = rule.userInput.defaultValue;
+        }
+      });
+    return initial;
+  });
+
+  // Get rules that require user input
+  const rulesWithInput = activeRules.filter(rule => rule.userInput);
+
   // Update blast bonus when target model count changes
   useEffect(() => {
     if (keywords.blast) {
@@ -48,7 +67,8 @@ export default function DigitalDiceMenu({
       withinHalfRange,
       blastBonusAttacks,
       unitHasCharged,
-      unitRemainedStationary
+      unitRemainedStationary,
+      userInputs
     };
     onRollAttacks(options);
   };
@@ -195,6 +215,62 @@ export default function DigitalDiceMenu({
               </label>
             </div>
           )}
+
+          {/* Conditional Rule Inputs */}
+          {rulesWithInput.map(rule => {
+            const input = rule.userInput!;
+
+            if (input.type === 'toggle') {
+              return (
+                <div key={input.id} className="bg-gray-800 rounded p-3 border-l-4 border-purple-500">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <div>
+                      <p className="text-white font-semibold">{input.label}</p>
+                      <p className="text-xs text-gray-400 mt-1">{rule.name}</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={userInputs[input.id] || false}
+                      onChange={(e) => setUserInputs(prev => ({
+                        ...prev,
+                        [input.id]: e.target.checked
+                      }))}
+                      className="w-6 h-6 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500"
+                    />
+                  </label>
+                </div>
+              );
+            }
+
+            if (input.type === 'radio' && input.options) {
+              return (
+                <div key={input.id} className="bg-gray-800 rounded p-3 border-l-4 border-purple-500">
+                  <p className="text-white font-semibold mb-2">{input.label}</p>
+                  <p className="text-xs text-gray-400 mb-3">{rule.name}</p>
+                  <div className="space-y-2">
+                    {input.options.map(option => (
+                      <label key={option.value} className="flex items-start cursor-pointer hover:bg-gray-700 p-2 rounded transition-colors">
+                        <input
+                          type="radio"
+                          name={input.id}
+                          value={option.value}
+                          checked={userInputs[input.id] === option.value}
+                          onChange={(e) => setUserInputs(prev => ({
+                            ...prev,
+                            [input.id]: option.value
+                          }))}
+                          className="mt-1 w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500"
+                        />
+                        <span className="ml-3 text-sm text-gray-300">{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            return null;
+          })}
 
           {/* Active Keywords Display */}
           {weapon.keywords.length > 0 && (

@@ -50,6 +50,7 @@ export interface CombatOptions {
   blastBonusAttacks: number;
   unitHasCharged: boolean;
   unitRemainedStationary: boolean;
+  userInputs?: Record<string, any>; // User-provided input values for conditional rules
 }
 
 export interface KeywordModifiers {

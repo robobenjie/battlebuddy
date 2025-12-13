@@ -34,7 +34,8 @@ export type ConditionType =
   | 'is-leading'           // Model is leading a unit
   | 'being-led'            // Unit is being led by a model
   | 'combat-phase'         // Specific combat phase (shooting, melee)
-  | 'combat-role';         // Unit's role in combat (attacker or defender)
+  | 'combat-role'          // Unit's role in combat (attacker or defender)
+  | 'user-input';          // Check user-provided input value
 
 /**
  * Effect types that can be applied
@@ -86,6 +87,10 @@ export interface RuleConditionParams {
 
   // For combat-role
   role?: 'attacker' | 'defender';
+
+  // For user-input
+  inputId?: string;      // ID of the user input to check
+  inputValue?: any;      // Expected value (can be boolean, string, number, etc.)
 }
 
 /**
@@ -138,6 +143,20 @@ export interface RuleEffect {
 }
 
 /**
+ * User input configuration for conditional rules
+ */
+export interface RuleUserInput {
+  type: 'toggle' | 'radio' | 'select';
+  id: string;
+  label: string;
+  defaultValue?: any;
+  options?: Array<{
+    value: any;
+    label: string;
+  }>;
+}
+
+/**
  * A complete rule definition
  */
 export interface Rule {
@@ -149,6 +168,7 @@ export interface Rule {
   effects: RuleEffect[];
   duration: RuleDuration;
   activation?: RuleActivation;
+  userInput?: RuleUserInput; // Optional user input requirement
 }
 
 /**
