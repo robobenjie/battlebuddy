@@ -153,6 +153,7 @@ export interface RuleUserInput {
   options?: Array<{
     value: any;
     label: string;
+    effects?: RuleEffect[]; // NEW: Effects applied when this option is selected
   }>;
 }
 

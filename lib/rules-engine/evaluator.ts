@@ -80,12 +80,12 @@ export function checkCondition(condition: RuleCondition, context: CombatContext)
     }
 
     case 'is-leading': {
-      // Check if the attacker has a leader
-      return !!context.attacker.leaderId;
+      // Check if the attacker IS a leader (CHARACTER)
+      return !!context.attacker.isLeader;
     }
 
     case 'being-led': {
-      // Check if the attacker is being led
+      // Check if the attacker is being led (has a leader)
       return !!context.attacker.leaderId;
     }
 
@@ -304,9 +304,22 @@ export function evaluateRule(rule: Rule, context: CombatContext): boolean {
     return false;
   }
 
-  // Apply all effects
+  // Apply all effects from the main effects array
   for (const effect of rule.effects) {
     applyEffect(effect, context, rule.id);
+  }
+
+  // NEW: Apply effects from selected userInput option (if any)
+  if (rule.userInput && rule.userInput.options) {
+    const selectedValue = context.userInputs[rule.userInput.id];
+    if (selectedValue !== undefined && selectedValue !== null) {
+      const selectedOption = rule.userInput.options.find(opt => opt.value === selectedValue);
+      if (selectedOption && selectedOption.effects) {
+        for (const effect of selectedOption.effects) {
+          applyEffect(effect, context, rule.id);
+        }
+      }
+    }
   }
 
   return true;

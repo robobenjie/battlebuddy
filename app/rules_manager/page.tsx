@@ -71,6 +71,51 @@ export default function RulesManagerPage() {
     setError(null);
   };
 
+  const handleDownloadAll = () => {
+    try {
+      // Collect all implemented rules
+      const rulesData = implementedRules.map(rule => {
+        try {
+          // Parse the ruleObject JSON
+          const ruleObj = JSON.parse(rule.ruleObject || '{}');
+          return {
+            id: rule.id,
+            name: rule.name,
+            faction: rule.faction,
+            scope: rule.scope,
+            battlescribeId: rule.battlescribeId,
+            rawText: rule.rawText,
+            ...ruleObj
+          };
+        } catch (err) {
+          console.error(`Failed to parse rule ${rule.name}:`, err);
+          return {
+            id: rule.id,
+            name: rule.name,
+            error: 'Failed to parse JSON'
+          };
+        }
+      });
+
+      // Create JSON string
+      const jsonString = JSON.stringify(rulesData, null, 2);
+
+      // Create blob and download
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `battlebuddy-rules-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download rules:', err);
+      alert('Failed to download rules. Check console for details.');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 p-8">
@@ -87,7 +132,16 @@ export default function RulesManagerPage() {
   return (
     <div className="min-h-screen bg-gray-900 p-8">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-red-500 mb-8">Rules Manager</h1>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold text-red-500">Rules Manager</h1>
+          <button
+            onClick={handleDownloadAll}
+            disabled={implementedRules.length === 0}
+            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold px-6 py-2 rounded-lg transition-colors"
+          >
+            Download All ({implementedRules.length})
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Implemented Rules */}

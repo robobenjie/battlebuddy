@@ -1,0 +1,880 @@
+[
+  {
+    "0": {
+      "id": "waaagh-strength-bonus",
+      "name": "Waaagh! - Strength Bonus",
+      "description": "While the Waaagh! is active, add 1 to the Strength characteristic of melee weapons equipped by models from your army.",
+      "scope": "army",
+      "conditions": [
+        {
+          "type": "army-state",
+          "params": {
+            "armyStates": [
+              "waaagh-active"
+            ]
+          }
+        },
+        {
+          "type": "weapon-type",
+          "params": {
+            "weaponTypes": [
+              "melee"
+            ]
+          }
+        }
+      ],
+      "effects": [
+        {
+          "type": "modify-characteristic",
+          "target": "weapon",
+          "params": {
+            "stat": "S",
+            "modifier": 1
+          }
+        }
+      ],
+      "duration": "until-deactivated"
+    },
+    "1": {
+      "id": "waaagh-attacks-bonus",
+      "name": "Waaagh! - Attacks Bonus",
+      "description": "While the Waaagh! is active, add 1 to the Attacks characteristic of melee weapons equipped by models from your army.",
+      "scope": "army",
+      "conditions": [
+        {
+          "type": "army-state",
+          "params": {
+            "armyStates": [
+              "waaagh-active"
+            ]
+          }
+        },
+        {
+          "type": "weapon-type",
+          "params": {
+            "weaponTypes": [
+              "melee"
+            ]
+          }
+        }
+      ],
+      "effects": [
+        {
+          "type": "modify-characteristic",
+          "target": "weapon",
+          "params": {
+            "stat": "A",
+            "modifier": 1
+          }
+        }
+      ],
+      "duration": "until-deactivated"
+    },
+    "2": {
+      "id": "waaagh-invuln-save",
+      "name": "Waaagh! - Invulnerable Save",
+      "description": "While the Waaagh! is active, models from your army have a 5+ invulnerable save.",
+      "scope": "army",
+      "conditions": [
+        {
+          "type": "army-state",
+          "params": {
+            "armyStates": [
+              "waaagh-active"
+            ]
+          }
+        }
+      ],
+      "effects": [
+        {
+          "type": "modify-save",
+          "target": "unit",
+          "params": {
+            "stat": "INV",
+            "modifier": 5
+          }
+        }
+      ],
+      "duration": "until-deactivated"
+    },
+    "3": {
+      "id": "waaagh-charge-after-advance",
+      "name": "Waaagh! - Charge After Advance",
+      "description": "While the Waaagh! is active, units from your army are eligible to declare a charge in a turn in which they Advanced.",
+      "scope": "army",
+      "conditions": [
+        {
+          "type": "army-state",
+          "params": {
+            "armyStates": [
+              "waaagh-active"
+            ]
+          }
+        }
+      ],
+      "effects": [
+        {
+          "type": "grant-ability",
+          "target": "unit",
+          "params": {
+            "ability": "charge-after-advance"
+          }
+        }
+      ],
+      "duration": "until-deactivated"
+    },
+    "id": "3870a6e9-cf2b-4b43-bcb0-f22a615ccf02",
+    "name": "Waaagh!",
+    "faction": "Orks",
+    "scope": "army",
+    "battlescribeId": "37c-6ef9-277-9091",
+    "rawText": "If your Army Faction is **^^Orks^^**, once per battle, at the start of your Command phase, you can call a Waaagh! If you do, until the start of your next Command phase, the Waaagh! is active for your army and:\n- Units from your army with this ability are eligible to declare a charge in a turn in which they Advanced.\n- Add 1 to the Strength and Attacks characteristics of melee weapons equipped by models from your army with this ability.\n- Models from your army with this ability have a 5+ invulnerable save."
+  },
+  {
+    "id": "super-runts",
+    "name": "Super Runts",
+    "faction": "Orks",
+    "scope": "unit",
+    "battlescribeId": "950a-82f7-79fd-342a",
+    "rawText": "While this model is leading a unit:\n- Models in that unit have the Scouts 9\" ability.\n- Each time a model in that unit makes an attack, add 1 to the Hit roll and add 1 to the Wound roll.\n- Each time an attack targets that unit, subtract 1 from the Wound roll.",
+    "description": "While this model is leading a unit: Models in that unit have the Scouts 9\" ability. Each time a model in that unit makes an attack, add 1 to the Hit roll and add 1 to the Wound roll. Each time an attack targets that unit, subtract 1 from the Wound roll.",
+    "conditions": [],
+    "effects": [
+      {
+        "type": "add-keyword",
+        "target": "unit",
+        "params": {
+          "keyword": "Scouts",
+          "keywordValue": 9
+        },
+        "appliesTo": "bodyguard"
+      },
+      {
+        "type": "modify-hit",
+        "target": "self",
+        "params": {
+          "modifier": 1
+        },
+        "appliesTo": "bodyguard",
+        "conditions": [
+          {
+            "type": "combat-role",
+            "params": {
+              "role": "attacker"
+            }
+          }
+        ]
+      },
+      {
+        "type": "modify-wound",
+        "target": "self",
+        "params": {
+          "modifier": 1
+        },
+        "appliesTo": "bodyguard",
+        "conditions": [
+          {
+            "type": "combat-role",
+            "params": {
+              "role": "attacker"
+            }
+          }
+        ]
+      },
+      {
+        "type": "modify-wound",
+        "target": "self",
+        "params": {
+          "modifier": -1
+        },
+        "appliesTo": "bodyguard",
+        "conditions": [
+          {
+            "type": "combat-role",
+            "params": {
+              "role": "defender"
+            }
+          }
+        ]
+      }
+    ],
+    "duration": "permanent"
+  },
+  {
+    "id": "special-dose",
+    "name": "Special Dose",
+    "faction": "Orks",
+    "scope": "model",
+    "battlescribeId": "d247-c00f-3a26-192e",
+    "rawText": "While the Waaagh! is active for your army, add 6\" to the Move characteristic of models in this model’s unit.",
+    "description": "While the Waaagh! is active for your army, add 6\" to the Move characteristic of models in this model's unit.",
+    "conditions": [
+      {
+        "type": "army-state",
+        "state": "waaagh-active"
+      }
+    ],
+    "effects": [
+      {
+        "type": "stat-modifier",
+        "stat": "movement",
+        "modifier": "+6",
+        "appliesTo": "unit"
+      }
+    ],
+    "duration": "permanent",
+    "activation": {
+      "type": "automatic",
+      "phase": "movement",
+      "turn": "own"
+    }
+  },
+  {
+    "id": "might-is-right",
+    "name": "Might is Right",
+    "faction": "Orks",
+    "scope": "model",
+    "battlescribeId": "b69d-41f0-d640-64",
+    "rawText": "While this model is leading a unit, each time a model in that unit makes a melee attack, add 1 to the Hit roll.",
+    "description": "While this model is leading a unit, each time a model in that unit makes a melee attack, add 1 to the Hit roll.",
+    "conditions": [],
+    "effects": [
+      {
+        "type": "modify-hit",
+        "target": "self",
+        "params": {
+          "modifier": 1
+        },
+        "appliesTo": "bodyguard",
+        "conditions": [
+          {
+            "type": "weapon-type",
+            "params": {
+              "weaponTypes": [
+                "melee"
+              ]
+            }
+          },
+          {
+            "type": "combat-role",
+            "params": {
+              "role": "attacker"
+            }
+          }
+        ]
+      }
+    ],
+    "duration": "permanent"
+  },
+  {
+    "0": {
+      "id": "da-biggest-and-da-best",
+      "name": "Da Biggest and da Best",
+      "description": "While the Waaagh! is active for your army, add 4 to the Attacks characteristic of this model's melee weapons.",
+      "scope": "model",
+      "conditions": [
+        {
+          "type": "army-state",
+          "params": {
+            "armyStates": [
+              "waaagh-active"
+            ]
+          }
+        },
+        {
+          "type": "weapon-type",
+          "params": {
+            "weaponTypes": [
+              "melee"
+            ]
+          }
+        }
+      ],
+      "effects": [
+        {
+          "type": "modify-characteristic",
+          "target": "weapon",
+          "params": {
+            "stat": "A",
+            "modifier": 4
+          }
+        }
+      ],
+      "duration": "permanent"
+    },
+    "id": "1907d9cb-80af-4409-bdf2-aeac1e9a063c",
+    "name": "Da Biggest and da Best",
+    "faction": "Orks",
+    "scope": "model",
+    "battlescribeId": "a22d-294f-6401-5dfe",
+    "rawText": "While the Waaagh! is active for your army, add 4 to the Attacks characteristic of this model’s melee weapons."
+  },
+  {
+    "id": "grot-riggers",
+    "name": "Grot Riggers",
+    "faction": "Orks",
+    "scope": "model",
+    "battlescribeId": "5fdb-9e2f-88df-12cf",
+    "rawText": "At the start of your Command phase, this model regains 1 lost wound.",
+    "description": "At the start of your Command phase, this model regains 1 lost wound.",
+    "conditions": [],
+    "effects": [],
+    "duration": "permanent",
+    "activation": {
+      "type": "manual",
+      "phase": "command",
+      "turn": "own",
+      "limit": "unlimited"
+    }
+  },
+  {
+    "id": "get-da-good-bitz",
+    "name": "Get Da Good Bitz",
+    "faction": "Orks",
+    "scope": "unit",
+    "battlescribeId": "ab60-c8c9-453a-2345",
+    "rawText": "At the end of your Command phase, if this unit is within range of an objective marker you control, that objective marker remains under your control, even if you have no models within range of it, until your opponent controls it at the start or end of any turn.",
+    "description": "At the end of your Command phase, if this unit is within range of an objective marker you control, that objective marker remains under your control, even if you have no models within range of it, until your opponent controls it at the start or end of any turn.",
+    "conditions": [],
+    "effects": [],
+    "duration": "permanent",
+    "activation": {
+      "type": "automatic",
+      "phase": "command",
+      "turn": "own"
+    }
+  },
+  {
+    "id": "objective-cp-gain",
+    "name": "Objective Secured CP",
+    "faction": "Orks",
+    "scope": {
+      "type": "unit",
+      "appliesTo": "all"
+    },
+    "battlescribeId": "f1f6-dbea-fe70-ee9d",
+    "rawText": "At the start of your Movement phase, roll one D6 for each objective marker you control that has one or more units from your army with this ability within range of it (excluding Battle-shocked units). If one or more of those rolls is a 4+, you gain 1CP.",
+    "description": "At the start of your Movement phase, roll one D6 for each objective marker you control that has one or more units from your army with this ability within range of it (excluding Battle-shocked units). If one or more of those rolls is a 4+, you gain 1CP.",
+    "conditions": [],
+    "effects": [],
+    "duration": {
+      "type": "permanent"
+    },
+    "activation": {
+      "phase": "command",
+      "trigger": "automatic"
+    },
+    "userInput": null
+  },
+  {
+    "0": {
+      "id": "tank-hunters",
+      "name": "Tank Hunters",
+      "description": "Each time a model in this unit makes an attack that targets a MONSTER or VEHICLE unit, add 1 to the Hit roll and add 1 to the Wound roll.",
+      "scope": "unit",
+      "conditions": [
+        {
+          "type": "target-category",
+          "params": {
+            "categories": [
+              "MONSTER",
+              "VEHICLE"
+            ]
+          },
+          "operator": "OR"
+        }
+      ],
+      "effects": [
+        {
+          "type": "modify-hit",
+          "target": "self",
+          "params": {
+            "modifier": 1
+          }
+        },
+        {
+          "type": "modify-wound",
+          "target": "self",
+          "params": {
+            "modifier": 1
+          }
+        }
+      ],
+      "duration": "permanent"
+    },
+    "id": "16e3ac4e-22ad-4f5e-9119-c33339b0dc3d",
+    "name": "Tank Hunters",
+    "faction": "Orks",
+    "scope": "unit",
+    "battlescribeId": "3cc7-9354-9886-729",
+    "rawText": "Each time a model in this unit makes an attack that targets a MONSTER or VEHICLE unit, add 1 to the Hit roll and add 1 to the Wound roll."
+  },
+  {
+    "id": "bomb-squigs",
+    "name": "Bomb Squigs",
+    "faction": "Orks",
+    "scope": "unit",
+    "battlescribeId": "1e29-7605-a22c-2eab",
+    "rawText": "Once per battle, for each bomb squig this unit has, after this unit ends a Normal move, you can use one Bomb Squig. If you do, select one enemy unit within 12\" and visible to this unit and roll one D6: on a 3+, that enemy unit suffers D3 mortal wounds.\n\n**Designer's Note:** *Place two Bomb Squig tokens next to the unit, removing one each time this unit uses this ability.*",
+    "description": "Once per battle, for each bomb squig this unit has, after this unit ends a Normal move, you can use one Bomb Squig. If you do, select one enemy unit within 12\" and visible to this unit and roll one D6: on a 3+, that enemy unit suffers D3 mortal wounds. **Designer's Note:** Place two Bomb Squig tokens next to the unit, removing one each time this unit uses this ability.",
+    "conditions": [],
+    "effects": [],
+    "duration": "permanent",
+    "activation": {
+      "type": "manual",
+      "phase": "movement",
+      "turn": "own",
+      "limit": "once-per-battle"
+    }
+  },
+  {
+    "id": "drive-by-dakka",
+    "name": "Drive-by Dakka",
+    "faction": "Orks",
+    "scope": {
+      "type": "unit",
+      "appliesTo": "all"
+    },
+    "battlescribeId": "97fb-dd9a-9db6-c77f",
+    "rawText": "Each time a model in this unit makes a ranged attack that targets a unit within 9\", improve the Armour Penetration characteristic of that attack by 1.",
+    "description": "Each time a model in this unit makes a ranged attack that targets a unit within 9\", improve the Armour Penetration characteristic of that attack by 1.",
+    "conditions": [
+      {
+        "type": "weapon-type",
+        "params": {
+          "weaponTypes": [
+            "ranged"
+          ]
+        }
+      },
+      {
+        "type": "user-input",
+        "params": {
+          "inputId": "within-9",
+          "inputValue": true
+        }
+      }
+    ],
+    "effects": [
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "AP",
+          "modifier": -1
+        }
+      }
+    ],
+    "duration": {
+      "type": "permanent"
+    },
+    "activation": {
+      "phase": "any",
+      "trigger": "automatic"
+    },
+    "userInput": {
+      "type": "toggle",
+      "id": "within-9",
+      "label": "Target within 9\"",
+      "defaultValue": false
+    }
+  },
+  {
+    "id": "shooty-power-trip",
+    "name": "Shooty Power Trip",
+    "faction": "Orks",
+    "scope": "unit",
+    "battlescribeId": "2d69-8e7f-9d12-c775",
+    "rawText": "Each time this unit is selected to shoot, you can roll one D6:\n- On a 1-2, this unit suffers D3 mortal wounds.\n- On a 3-4, until the end of the phase, add 1 to the Strength characteristic of ranged weapons equipped by models in this unit.\n- On a 5-6, until the end of the phase, add 1 to the Attacks characteristic of ranged weapons equipped by models in this unit.",
+    "description": "Each time this unit is selected to shoot, you can roll one D6: On a 1-2, this unit suffers D3 mortal wounds. On a 3-4, until the end of the phase, add 1 to the Strength characteristic of ranged weapons.  On a 5-6, until the end of the phase, add 1 to the Attacks characteristic of ranged weapons.",
+    "conditions": [],
+    "effects": [
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "S",
+          "modifier": 1
+        },
+        "conditions": [
+          {
+            "type": "weapon-type",
+            "params": {
+              "weaponTypes": [
+                "ranged"
+              ]
+            }
+          },
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "power-trip-roll",
+              "inputValue": "3-4"
+            }
+          }
+        ]
+      },
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "A",
+          "modifier": 1
+        },
+        "conditions": [
+          {
+            "type": "weapon-type",
+            "params": {
+              "weaponTypes": [
+                "ranged"
+              ]
+            }
+          },
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "power-trip-roll",
+              "inputValue": "5-6"
+            }
+          }
+        ]
+      }
+    ],
+    "userInput": {
+      "type": "radio",
+      "id": "power-trip-roll",
+      "label": "Power Trip Roll Result",
+      "options": [
+        {
+          "value": "1-2",
+          "label": "1-2: This unit suffers D3 mortal wounds"
+        },
+        {
+          "value": "3-4",
+          "label": "3-4: +1 Strength"
+        },
+        {
+          "value": "5-6",
+          "label": "5-6: +1 Attacks"
+        }
+      ],
+      "defaultValue": null
+    },
+    "duration": "permanent"
+  },
+  {
+    "id": "fix-dat-armour-up",
+    "name": "Fix Dat Armour Up",
+    "faction": "Orks",
+    "scope": "model",
+    "battlescribeId": "73aa-1756-23b1-2a0f",
+    "rawText": "While this model is leading a unit, in your Command phase, you can return 1 destroyed Bodyguard model to that unit.",
+    "description": "While this model is leading a unit, in your Command phase, you can return 1 destroyed Bodyguard model to that unit.",
+    "conditions": [],
+    "effects": [],
+    "duration": "permanent",
+    "activation": {
+      "type": "manual",
+      "phase": "command",
+      "turn": "own"
+    }
+  },
+  {
+    "id": "da-jump",
+    "name": "Da Jump",
+    "faction": "Orks",
+    "scope": "unit",
+    "battlescribeId": "868c-1a68-5e06-694f",
+    "rawText": "Once per turn, at the end of your Movement phase, one WEIRDBOY from your army can use this ability. If it does, roll one D6: on a 1, that WEIRDBOY’s unit suffers D6 mortal wounds; on a 2+, remove this WEIRDBOY’s unit from the battlefield and set it up again anywhere on the battlefield that is more than 9\" horizontally away from all enemy models.",
+    "description": "Once per turn, at the end of your Movement phase, one WEIRDBOY from your army can use this ability. If it does, roll one D6: on a 1, that WEIRDBOY's unit suffers D6 mortal wounds; on a 2+, remove this WEIRDBOY's unit from the battlefield and set it up again anywhere on the battlefield that is more than 9\" horizontally away from all enemy models.",
+    "conditions": [],
+    "effects": [],
+    "duration": "permanent",
+    "activation": {
+      "type": "manual",
+      "phase": "movement",
+      "turn": "own",
+      "limit": "once-per-turn"
+    }
+  },
+  {
+    "id": "waaagh-energy",
+    "name": "Waaagh! Energy",
+    "faction": "Orks",
+    "scope": {
+      "type": "model",
+      "appliesTo": "leader"
+    },
+    "battlescribeId": "3d7-ae1b-665a-9b15",
+    "rawText": "While this model is leading a unit, add 1 to the Strength and Damage characteristics of this model’s ’Eadbanger weapon for every 5 models in that unit (rounding down), but while that unit contains 10 or more models, that weapon has the [HAZARDOUS] ability.",
+    "description": "While this model is leading a unit, add 1 to the Strength and Damage characteristics of this model's 'Eadbanger weapon for every 5 models in that unit (rounding down), but while that unit contains 10 or more models, that weapon has the [HAZARDOUS] ability.",
+    "conditions": [
+      {
+        "type": "is-leading",
+        "params": {}
+      }
+    ],
+    "effects": [
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "S",
+          "modifier": 1
+        },
+        "conditions": [
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "unit-size",
+              "inputValue": "5-9"
+            }
+          }
+        ],
+        "appliesTo": "leader"
+      },
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "D",
+          "modifier": 1
+        },
+        "conditions": [
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "unit-size",
+              "inputValue": "5-9"
+            }
+          }
+        ],
+        "appliesTo": "leader"
+      },
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "S",
+          "modifier": 2
+        },
+        "conditions": [
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "unit-size",
+              "inputValue": "10-14"
+            }
+          }
+        ],
+        "appliesTo": "leader"
+      },
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "D",
+          "modifier": 2
+        },
+        "conditions": [
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "unit-size",
+              "inputValue": "10-14"
+            }
+          }
+        ],
+        "appliesTo": "leader"
+      },
+      {
+        "type": "add-keyword",
+        "target": "weapon",
+        "params": {
+          "keyword": "Hazardous"
+        },
+        "conditions": [
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "unit-size",
+              "inputValue": "10-14"
+            }
+          }
+        ],
+        "appliesTo": "leader"
+      },
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "S",
+          "modifier": 3
+        },
+        "conditions": [
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "unit-size",
+              "inputValue": "15-19"
+            }
+          }
+        ],
+        "appliesTo": "leader"
+      },
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "D",
+          "modifier": 3
+        },
+        "conditions": [
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "unit-size",
+              "inputValue": "15-19"
+            }
+          }
+        ],
+        "appliesTo": "leader"
+      },
+      {
+        "type": "add-keyword",
+        "target": "weapon",
+        "params": {
+          "keyword": "Hazardous"
+        },
+        "conditions": [
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "unit-size",
+              "inputValue": "15-19"
+            }
+          }
+        ],
+        "appliesTo": "leader"
+      },
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "S",
+          "modifier": 4
+        },
+        "conditions": [
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "unit-size",
+              "inputValue": "20+"
+            }
+          }
+        ],
+        "appliesTo": "leader"
+      },
+      {
+        "type": "modify-characteristic",
+        "target": "weapon",
+        "params": {
+          "stat": "D",
+          "modifier": 4
+        },
+        "conditions": [
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "unit-size",
+              "inputValue": "20+"
+            }
+          }
+        ],
+        "appliesTo": "leader"
+      },
+      {
+        "type": "add-keyword",
+        "target": "weapon",
+        "params": {
+          "keyword": "Hazardous"
+        },
+        "conditions": [
+          {
+            "type": "user-input",
+            "params": {
+              "inputId": "unit-size",
+              "inputValue": "20+"
+            }
+          }
+        ],
+        "appliesTo": "leader"
+      }
+    ],
+    "duration": {
+      "type": "permanent"
+    },
+    "activation": {
+      "phase": "any",
+      "trigger": "automatic"
+    },
+    "userInput": {
+      "type": "radio",
+      "id": "unit-size",
+      "label": "Unit size (models in led unit)",
+      "defaultValue": "0-4",
+      "options": [
+        {
+          "value": "0-4",
+          "label": "0-4 models (+0)"
+        },
+        {
+          "value": "5-9",
+          "label": "5-9 models (+1 S/D)"
+        },
+        {
+          "value": "10-14",
+          "label": "10-14 models (+2 S/D, HAZARDOUS)"
+        },
+        {
+          "value": "15-19",
+          "label": "15-19 models (+3 S/D, HAZARDOUS)"
+        },
+        {
+          "value": "20+",
+          "label": "20+ models (+4 S/D, HAZARDOUS)"
+        }
+      ]
+    }
+  },
+  {
+    "id": "get-stuck-in",
+    "name": "Get Stuck In",
+    "faction": "Orks",
+    "scope": "detachment",
+    "battlescribeId": "7d88-fb67-ac56-ec9",
+    "rawText": "Melee weapons equipped by ORKS models from your army have the [SUSTAINED HITS 1] ability.",
+    "description": "Melee weapons equipped by ORKS models from your army have the [SUSTAINED HITS 1] ability.",
+    "conditions": [
+      {
+        "type": "weapon-type",
+        "params": {
+          "weaponTypes": [
+            "melee"
+          ]
+        }
+      }
+    ],
+    "effects": [
+      {
+        "type": "add-keyword",
+        "target": "weapon",
+        "params": {
+          "keyword": "SUSTAINED HITS",
+          "keywordValue": 1
+        }
+      }
+    ],
+    "duration": "permanent"
+  }
+]
