@@ -65,11 +65,12 @@ export default function RulesManagerPage() {
 
       const result = await response.json();
 
-      if (result.success && result.rule) {
-        // Format the rule nicely
-        setRuleObjectText(JSON.stringify(result.rule, null, 2));
+      if (result.success && result.rules) {
+        // Format the rules array nicely
+        setRuleObjectText(JSON.stringify(result.rules, null, 2));
         setEditingRule(rule);
-        setAiMessage(result.message || 'Rule implemented by AI. Please review before saving.');
+        const ruleCount = result.rules.length;
+        setAiMessage(result.message || `AI generated ${ruleCount} rule${ruleCount > 1 ? 's' : ''}. Please review before saving.`);
       } else {
         // AI declined to implement - show modal with explanation
         setAiDeclineMessage({

@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { OpenAIResponseSchema } from '@/lib/rules-engine/rule-schema';
-import { EXAMPLE_RULES } from '@/lib/rules-engine/example-rules';
+import { EXAMPLE_RULES, EXAMPLE_EXPLANATIONS } from '@/lib/rules-engine/example-rules';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -23,7 +23,7 @@ interface ImplementRequest {
 
 interface ImplementResponse {
   success: boolean;
-  rule?: any;
+  rules?: any[];
   message?: string;
 }
 
@@ -83,11 +83,11 @@ If this rule cannot be implemented as a reminder in a particular phase or can af
       });
     }
 
-    // Rule is already validated by OpenAI structured outputs
+    // Rules are already validated by OpenAI structured outputs
     // Our schema now uses explicit nulls everywhere, so no conversion needed
     return NextResponse.json({
       success: true,
-      rule: result.rule,
+      rules: result.rules,
       message: result.message
     });
 
@@ -104,28 +104,58 @@ If this rule cannot be implemented as a reminder in a particular phase or can af
 }
 
 function buildSystemPrompt(): string {
+  // Group rules by name to show multi-rule examples
+  const groupedExamples: { name: string; rules: any[]; }[] = [];
+  let currentGroup: { name: string; rules: any[]; } | null = null;
+
+  for (const rule of EXAMPLE_RULES) {
+    if (!currentGroup || currentGroup.name !== rule.name) {
+      // Start new group
+      currentGroup = { name: rule.name, rules: [rule] };
+      groupedExamples.push(currentGroup);
+    } else {
+      // Add to existing group
+      currentGroup.rules.push(rule);
+    }
+  }
+
   // Format examples for the prompt
-  const exampleTexts = EXAMPLE_RULES.map((rule, index) => {
+  const exampleTexts = groupedExamples.map((group, index) => {
     const exampleNumber = index + 1;
-    const ruleJson = JSON.stringify(rule, null, 2);
-    const factionLine = rule.faction ? 'Faction: ' + rule.faction : '';
+    const firstRule = group.rules[0];
+    const factionLine = firstRule.faction ? 'Faction: ' + firstRule.faction : '';
+
+    // Get explanations for all rules in group
+    const explanations = group.rules
+      .map(r => EXAMPLE_EXPLANATIONS[r.id])
+      .filter(e => e)
+      .join(' ');
+
+    // Create rules array JSON
+    const rulesArrayJson = JSON.stringify(group.rules, null, 2);
 
     const lines = [
-      '=== EXAMPLE ' + exampleNumber + ': ' + rule.name + ' ===',
+      '=== EXAMPLE ' + exampleNumber + ': ' + group.name + (group.rules.length > 1 ? ` (${group.rules.length} rules)` : '') + ' ===',
+      explanations ? 'WHY: ' + explanations : null,
+      '',
       'INPUT:',
-      'Name: ' + rule.name,
+      'Name: ' + group.name,
       factionLine,
-      'Scope: ' + rule.scope,
+      'Scope: ' + firstRule.scope,
       '',
       'Rule Text:',
-      rule.description,
+      firstRule.description,
       '',
       'OUTPUT:',
-      ruleJson,
+      '{',
+      '  "implementable": true,',
+      '  "message": "",',
+      '  "rules": ' + rulesArrayJson,
+      '}',
       ''
     ];
 
-    return lines.filter(line => line !== undefined).join('\n');
+    return lines.filter(line => line !== null && line !== undefined).join('\n');
   }).join('\n');
 
   // Add the non-implementable example
@@ -139,7 +169,8 @@ function buildSystemPrompt(): string {
     'OUTPUT:',
     '{',
     '  "implementable": false,',
-    '  "message": "This rule affects roster building and unit attachment. It should be handled during army list creation."',
+    '  "message": "This rule affects roster building and unit attachment. It should be handled during army list creation.",',
+    '  "rules": null',
     '}',
     ''
   ].join('\n');
@@ -151,7 +182,12 @@ function buildSystemPrompt(): string {
     '1. Most rules are just reminders that show up at the appropriate time (e.g. an ability that triggers after they move).',
     '2. The app also support automatic rolling of combat, so rules that affect combat calculations should be implemented modifying attributes and keywords for combat (and movement speed).',
     '3. Be precise - only extract explicitly stated rules, do not infer',
-    '4. If it is not clear how a rule should be implemented, respond with a message explaining why it cannot be implemented in the combat rules engine.',
+    '4. If the rule does not modify dice rolls in combat, and it is not clear how to represent it in the schema, it should probably be implemented as a reminder in a particular phase, even if it modifies other attributes or has other rule effects.',
+    '5. If it is not clear how a rule can be implemented in the schema, respond with a message explaining why it cannot be implemented in the combat rules engine.',
+    '6. IMPORTANT: A single written rule often needs MULTIPLE rule objects. Return an array with multiple rules when:',
+    '   - The rule has multiple independent effects (e.g., Waaagh! grants +1 Strength AND +1 Attacks AND 5+ invuln)',
+    '   - The rule activates in multiple phases (e.g., Wild Ride applies in both movement and charge phases)',
+    '   - Each independent effect or phase activation should be a separate rule object in the array',
     '',
     'KEY SCHEMA CONCEPTS:',
     '',

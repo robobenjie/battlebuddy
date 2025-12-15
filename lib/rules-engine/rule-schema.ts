@@ -136,7 +136,7 @@ export const RuleSchema = z.object({
 export const OpenAIResponseSchema = z.object({
   implementable: z.boolean(),
   message: z.string(),
-  rule: z.union([RuleSchema, z.null()])
+  rules: z.union([z.array(RuleSchema).min(1), z.null()])
 }).strict();
 
 // ===== TYPE EXPORTS =====

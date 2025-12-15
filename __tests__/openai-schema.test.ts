@@ -20,7 +20,7 @@ describe('OpenAI Schema Compatibility', () => {
     // Check all required fields are listed
     expect(jsonSchema.required).toContain('implementable');
     expect(jsonSchema.required).toContain('message');
-    expect(jsonSchema.required).toContain('rule');
+    expect(jsonSchema.required).toContain('rules');
 
     // Check additionalProperties is false
     expect(jsonSchema.additionalProperties).toBe(false);
@@ -29,7 +29,7 @@ describe('OpenAI Schema Compatibility', () => {
     expect(jsonSchema.properties).toBeDefined();
     expect(jsonSchema.properties.implementable).toBeDefined();
     expect(jsonSchema.properties.message).toBeDefined();
-    expect(jsonSchema.properties.rule).toBeDefined();
+    expect(jsonSchema.properties.rules).toBeDefined();
   });
 
   it('should not contain unsupported keywords', () => {
