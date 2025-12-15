@@ -164,6 +164,7 @@ export interface Rule {
   id: string;
   name: string;
   description: string;
+  faction?: string; // Optional faction (Orks, Space Marines, etc.)
   scope: RuleScope;
   conditions: RuleCondition[];
   effects: RuleEffect[];

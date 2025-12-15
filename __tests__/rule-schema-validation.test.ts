@@ -12,429 +12,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { Rule, RuleEffect, RuleCondition } from '../lib/rules-engine/types';
-
-// Collection of validated, working rule implementations
-export const EXAMPLE_RULES: Rule[] = [
-  // Example 1: Simple conditional damage boost with toggle
-  {
-    id: 'waaagh-energy',
-    name: "Waaagh! Energy",
-    description: "While this model is leading a unit, add 1 to the Strength and Damage characteristics of this model's 'Eadbanger weapon for every 5 models in that unit (rounding down), but while that unit contains 10 or more models, that weapon has the [HAZARDOUS] ability.",
-    faction: 'Orks',
-    scope: 'model',
-    conditions: [
-      {
-        type: 'is-leading',
-        params: {}
-      }
-    ],
-    effects: [], // All effects are in userInput options
-    userInput: {
-      type: 'radio',
-      id: 'unit-size',
-      label: 'Unit size (models in led unit)',
-      defaultValue: '0-4',
-      options: [
-        {
-          value: '0-4',
-          label: '0-4 models (+0)',
-          effects: []
-        },
-        {
-          value: '5-9',
-          label: '5-9 models (+1 S/D)',
-          effects: [
-            {
-              type: 'modify-characteristic',
-              target: 'weapon',
-              params: { stat: 'S', modifier: 1 },
-              appliesTo: 'leader'
-            },
-            {
-              type: 'modify-characteristic',
-              target: 'weapon',
-              params: { stat: 'D', modifier: 1 },
-              appliesTo: 'leader'
-            }
-          ]
-        },
-        {
-          value: '10-14',
-          label: '10-14 models (+2 S/D, HAZARDOUS)',
-          effects: [
-            {
-              type: 'modify-characteristic',
-              target: 'weapon',
-              params: { stat: 'S', modifier: 2 },
-              appliesTo: 'leader'
-            },
-            {
-              type: 'modify-characteristic',
-              target: 'weapon',
-              params: { stat: 'D', modifier: 2 },
-              appliesTo: 'leader'
-            },
-            {
-              type: 'add-keyword',
-              target: 'weapon',
-              params: { keyword: 'Hazardous' },
-              appliesTo: 'leader'
-            }
-          ]
-        },
-        {
-          value: '15-19',
-          label: '15-19 models (+3 S/D, HAZARDOUS)',
-          effects: [
-            {
-              type: 'modify-characteristic',
-              target: 'weapon',
-              params: { stat: 'S', modifier: 3 },
-              appliesTo: 'leader'
-            },
-            {
-              type: 'modify-characteristic',
-              target: 'weapon',
-              params: { stat: 'D', modifier: 3 },
-              appliesTo: 'leader'
-            },
-            {
-              type: 'add-keyword',
-              target: 'weapon',
-              params: { keyword: 'Hazardous' },
-              appliesTo: 'leader'
-            }
-          ]
-        },
-        {
-          value: '20+',
-          label: '20+ models (+4 S/D, HAZARDOUS)',
-          effects: [
-            {
-              type: 'modify-characteristic',
-              target: 'weapon',
-              params: { stat: 'S', modifier: 4 },
-              appliesTo: 'leader'
-            },
-            {
-              type: 'modify-characteristic',
-              target: 'weapon',
-              params: { stat: 'D', modifier: 4 },
-              appliesTo: 'leader'
-            },
-            {
-              type: 'add-keyword',
-              target: 'weapon',
-              params: { keyword: 'Hazardous' },
-              appliesTo: 'leader'
-            }
-          ]
-        }
-      ]
-    },
-    duration: 'permanent',
-    activation: {
-      type: 'automatic',
-      phase: 'any'
-    }
-  },
-
-  // Example 2: Simple toggle-based ability
-  {
-    id: 'drive-by-dakka',
-    name: 'Drive-by Dakka',
-    description: 'Each time this model makes a ranged attack, if it Advanced this turn, improve the Armour Penetration characteristic of that attack by 1.',
-    faction: 'Orks',
-    scope: 'model',
-    conditions: [
-      {
-        type: 'weapon-type',
-        params: { weaponTypes: ['ranged'] }
-      }
-    ],
-    effects: [],
-    userInput: {
-      type: 'toggle',
-      id: 'advanced-this-turn',
-      label: 'Advanced this turn?',
-      defaultValue: false,
-      options: [
-        {
-          value: false,
-          label: 'No',
-          effects: []
-        },
-        {
-          value: true,
-          label: 'Yes',
-          effects: [
-            {
-              type: 'modify-characteristic',
-              target: 'weapon',
-              params: { stat: 'AP', modifier: -1 }
-            }
-          ]
-        }
-      ]
-    },
-    duration: 'turn',
-    activation: {
-      type: 'automatic',
-      phase: 'any'
-    }
-  },
-
-  // Example 3: Conditional hit modifier
-  {
-    id: 'dakka-dakka-dakka',
-    name: 'Dakka Dakka Dakka',
-    description: 'Each time a model in this unit makes a ranged attack, an unmodified hit roll of 6 automatically wounds the target.',
-    faction: 'Orks',
-    scope: 'unit',
-    conditions: [
-      {
-        type: 'weapon-type',
-        params: { weaponTypes: ['ranged'] }
-      }
-    ],
-    effects: [
-      {
-        type: 'add-keyword',
-        target: 'weapon',
-        params: { keyword: 'Lethal Hits' }
-      }
-    ],
-    duration: 'permanent',
-    activation: {
-      type: 'automatic',
-      phase: 'shooting'
-    }
-  },
-
-  // Example 4: Target-category dependent ability
-  {
-    id: 'tank-hunter',
-    name: 'Tank Hunter',
-    description: 'Each time this model makes a ranged attack that targets a VEHICLE unit, re-roll a Wound roll of 1.',
-    faction: 'Space Marines',
-    scope: 'model',
-    conditions: [
-      {
-        type: 'weapon-type',
-        params: { weaponTypes: ['ranged'] }
-      },
-      {
-        type: 'target-category',
-        params: { categories: ['VEHICLE'] }
-      }
-    ],
-    effects: [
-      {
-        type: 'reroll',
-        target: 'weapon',
-        params: {
-          rerollPhase: 'wound',
-          rerollType: 'ones'
-        }
-      }
-    ],
-    duration: 'permanent',
-    activation: {
-      type: 'automatic',
-      phase: 'shooting'
-    }
-  },
-
-  // Example 5: Simple stat modifier without user input
-  {
-    id: 'furious-charge',
-    name: 'Furious Charge',
-    description: 'Each time this unit makes a Charge move, until the end of the turn, add 1 to the Strength characteristic of melee weapons equipped by models in this unit.',
-    faction: 'Orks',
-    scope: 'unit',
-    conditions: [
-      {
-        type: 'weapon-type',
-        params: { weaponTypes: ['melee'] }
-      },
-      {
-        type: 'unit-status',
-        params: { statuses: ['charged'] }
-      }
-    ],
-    effects: [
-      {
-        type: 'modify-characteristic',
-        target: 'weapon',
-        params: { stat: 'S', modifier: 1 }
-      }
-    ],
-    duration: 'turn',
-    activation: {
-      type: 'automatic',
-      phase: 'charge'
-    }
-  },
-
-  // Example 6: Multiple effects with effect-level conditions and appliesTo
-  {
-    id: 'super-runts',
-    name: 'Super Runts',
-    description: "While this model is leading a unit: Models in that unit have the Scouts 9\" ability. Each time a model in that unit makes an attack, add 1 to the Hit roll and add 1 to the Wound roll. Each time an attack targets that unit, subtract 1 from the Wound roll.",
-    faction: 'Orks',
-    scope: 'unit',
-    conditions: [
-      {
-        type: 'is-leading',
-        params: {}
-      }
-    ],
-    effects: [
-      {
-        type: 'add-keyword',
-        target: 'unit',
-        params: {
-          keyword: 'Scouts',
-          keywordValue: 9
-        },
-        appliesTo: 'bodyguard'
-      },
-      {
-        type: 'modify-hit',
-        target: 'self',
-        params: {
-          modifier: 1
-        },
-        appliesTo: 'bodyguard',
-        conditions: [
-          {
-            type: 'combat-role',
-            params: {
-              role: 'attacker'
-            }
-          }
-        ]
-      },
-      {
-        type: 'modify-wound',
-        target: 'self',
-        params: {
-          modifier: 1
-        },
-        appliesTo: 'bodyguard',
-        conditions: [
-          {
-            type: 'combat-role',
-            params: {
-              role: 'attacker'
-            }
-          }
-        ]
-      },
-      {
-        type: 'modify-wound',
-        target: 'self',
-        params: {
-          modifier: -1
-        },
-        appliesTo: 'bodyguard',
-        conditions: [
-          {
-            type: 'combat-role',
-            params: {
-              role: 'defender'
-            }
-          }
-        ]
-      }
-    ],
-    duration: 'permanent',
-    activation: {
-      type: 'automatic',
-      phase: 'any'
-    }
-  },
-
-  // Example 7: Reminder-only rule with no effects (just tracking)
-  {
-    id: 'bomb-squigs',
-    name: 'Bomb Squigs',
-    description: "Once per battle, for each bomb squig this unit has, after this unit ends a Normal move, you can use one Bomb Squig. If you do, select one enemy unit within 12\" and visible to this unit and roll one D6: on a 3+, that enemy unit suffers D3 mortal wounds. **Designer's Note:** Place two Bomb Squig tokens next to the unit, removing one each time this unit uses this ability.",
-    faction: 'Orks',
-    scope: 'unit',
-    conditions: [],
-    effects: [],
-    duration: 'permanent',
-    activation: {
-      type: 'manual',
-      phase: 'movement',
-      turn: 'own',
-      limit: 'once-per-battle'
-    }
-  },
-
-  // Example 8: Multi-outcome radio with different stat modifications
-  {
-    id: 'shooty-power-trip',
-    name: 'Shooty Power Trip',
-    description: 'Each time this unit is selected to shoot, you can roll one D6: On a 1-2, this unit suffers D3 mortal wounds. On a 3-4, until the end of the phase, add 1 to the Strength characteristic of ranged weapons equipped by models in this unit. On a 5-6, until the end of the phase, add 1 to the Attacks characteristic of ranged weapons equipped by models in this unit.',
-    faction: 'Orks',
-    scope: 'unit',
-    conditions: [
-      {
-        type: 'weapon-type',
-        params: { weaponTypes: ['ranged'] }
-      }
-    ],
-    effects: [],
-    userInput: {
-      type: 'radio',
-      id: 'power-trip-roll',
-      label: 'D6 Roll Result',
-      defaultValue: 'no-roll',
-      options: [
-        {
-          value: 'no-roll',
-          label: 'Not activated',
-          effects: []
-        },
-        {
-          value: '1-2',
-          label: '1-2 (D3 mortal wounds)',
-          effects: []  // Mortal wounds not implemented in combat calculator
-        },
-        {
-          value: '3-4',
-          label: '3-4 (+1 Strength)',
-          effects: [
-            {
-              type: 'modify-characteristic',
-              target: 'weapon',
-              params: { stat: 'S', modifier: 1 }
-            }
-          ]
-        },
-        {
-          value: '5-6',
-          label: '5-6 (+1 Attacks)',
-          effects: [
-            {
-              type: 'modify-characteristic',
-              target: 'weapon',
-              params: { stat: 'A', modifier: 1 }
-            }
-          ]
-        }
-      ]
-    },
-    duration: 'phase',
-    activation: {
-      type: 'manual',
-      phase: 'shooting',
-      turn: 'own'
-    }
-  }
-];
+import { RuleSchema, validateRule, parseRule } from '../lib/rules-engine/rule-schema';
+import { EXAMPLE_RULES } from '../lib/rules-engine/example-rules';
 
 describe('Rule Schema Validation', () => {
   describe('Required Fields', () => {
@@ -849,6 +428,130 @@ describe('Rule Schema Validation', () => {
     it('should have examples with empty effects (reminder rules)', () => {
       const emptyEffectsRules = EXAMPLE_RULES.filter(r => r.effects.length === 0);
       expect(emptyEffectsRules.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Zod Schema Validation', () => {
+    describe('Individual Rule Validation', () => {
+      EXAMPLE_RULES.forEach(rule => {
+        it(`should validate ${rule.name} against Zod schema`, () => {
+          const result = validateRule(rule);
+
+          // If validation failed, log the error for debugging
+          if (!result.success) {
+            console.error(`Validation failed for ${rule.name}:`, result.error?.format());
+          }
+
+          expect(result.success).toBe(true);
+          expect(result.data).toBeDefined();
+        });
+      });
+    });
+
+    it('should validate all example rules without throwing', () => {
+      // Test that parseRule doesn't throw for any example
+      expect(() => {
+        EXAMPLE_RULES.forEach(rule => parseRule(rule));
+      }).not.toThrow();
+    });
+
+    it('should reject invalid rules', () => {
+      const invalidRule = {
+        id: 'test',
+        name: 'Test Rule',
+        description: 'Test',
+        scope: 'invalid-scope', // Invalid scope
+        conditions: [],
+        effects: [],
+        duration: 'permanent'
+      };
+
+      const result = validateRule(invalidRule);
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+
+    it('should reject rules with invalid effect types', () => {
+      const invalidRule = {
+        id: 'test',
+        name: 'Test Rule',
+        description: 'Test',
+        scope: 'unit',
+        conditions: [],
+        effects: [
+          {
+            type: 'invalid-type', // Invalid effect type
+            target: 'weapon',
+            params: {}
+          }
+        ],
+        duration: 'permanent'
+      };
+
+      const result = validateRule(invalidRule);
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject rules with invalid condition types', () => {
+      const invalidRule = {
+        id: 'test',
+        name: 'Test Rule',
+        description: 'Test',
+        scope: 'unit',
+        conditions: [
+          {
+            type: 'invalid-condition', // Invalid condition type
+            params: {}
+          }
+        ],
+        effects: [],
+        duration: 'permanent'
+      };
+
+      const result = validateRule(invalidRule);
+      expect(result.success).toBe(false);
+    });
+
+    it('should validate rules with nested userInput effects', () => {
+      const ruleWithUserInput = EXAMPLE_RULES.find(r => r.userInput);
+      expect(ruleWithUserInput).toBeDefined();
+
+      const result = validateRule(ruleWithUserInput!);
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate rules with effect-level conditions', () => {
+      const ruleWithEffectConditions = EXAMPLE_RULES.find(r =>
+        r.effects.some(e => e.conditions && e.conditions.length > 0)
+      );
+      expect(ruleWithEffectConditions).toBeDefined();
+
+      const result = validateRule(ruleWithEffectConditions!);
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate rules with appliesTo field', () => {
+      const ruleWithAppliesTo = EXAMPLE_RULES.find(r =>
+        r.effects.some(e => e.appliesTo)
+      );
+      expect(ruleWithAppliesTo).toBeDefined();
+
+      const result = validateRule(ruleWithAppliesTo!);
+      expect(result.success).toBe(true);
+    });
+
+    it('Zod schema should be compatible with TypeScript Rule type', () => {
+      // This test ensures that Zod schema and TypeScript types are aligned
+      // If this test passes, it means the schema is compatible
+      EXAMPLE_RULES.forEach(rule => {
+        const parsed = parseRule(rule);
+
+        // Check that parsed data has the same structure
+        expect(parsed.id).toBe(rule.id);
+        expect(parsed.name).toBe(rule.name);
+        expect(parsed.scope).toBe(rule.scope);
+        expect(parsed.duration).toBe(rule.duration);
+      });
     });
   });
 });

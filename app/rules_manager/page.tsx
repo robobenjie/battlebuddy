@@ -18,7 +18,10 @@ export default function RulesManagerPage() {
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
   const [ruleObjectText, setRuleObjectText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isImplementing, setIsImplementing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiMessage, setAiMessage] = useState<string | null>(null);
+  const [aiDeclineMessage, setAiDeclineMessage] = useState<{ ruleName: string; message: string } | null>(null);
 
   // Query all rules
   const { data, isLoading } = db.useQuery({
@@ -35,6 +38,46 @@ export default function RulesManagerPage() {
     setEditingRule(rule);
     setRuleObjectText(rule.ruleObject || '');
     setError(null);
+    setAiMessage(null);
+  };
+
+  const handleAiImplement = async (rule: Rule) => {
+    if (!rule.rawText) {
+      setError('No rule text available for AI implementation');
+      return;
+    }
+
+    setIsImplementing(true);
+    setError(null);
+    setAiMessage(null);
+
+    try {
+      const response = await fetch('/api/rules/implement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ruleName: rule.name,
+          ruleText: rule.rawText,
+          faction: rule.faction,
+          scope: rule.scope
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.rule) {
+        // Format the rule nicely
+        setRuleObjectText(JSON.stringify(result.rule, null, 2));
+        setEditingRule(rule);
+        setAiMessage(result.message || 'Rule implemented by AI. Please review before saving.');
+      } else {
+        setError(result.message || 'Failed to implement rule');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to call AI implementation API');
+    } finally {
+      setIsImplementing(false);
+    }
   };
 
   const handleSave = async () => {
@@ -69,6 +112,7 @@ export default function RulesManagerPage() {
     setEditingRule(null);
     setRuleObjectText('');
     setError(null);
+    setAiMessage(null);
   };
 
   const handleDownloadAll = () => {
@@ -143,6 +187,24 @@ export default function RulesManagerPage() {
           </button>
         </div>
 
+        {/* Global error display */}
+        {error && !editingRule && (
+          <div className="mb-6 p-4 bg-red-900/30 rounded-lg border border-red-700">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="text-sm font-medium text-red-300 mb-1">Error</div>
+                <div className="text-sm text-red-200">{error}</div>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="ml-3 text-red-400 hover:text-red-300"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Implemented Rules */}
           <div className="bg-gray-800 rounded-lg border border-green-700 p-6">
@@ -204,12 +266,22 @@ export default function RulesManagerPage() {
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleEdit(rule)}
-                    className="ml-3 bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded transition-colors flex-shrink-0"
-                  >
-                    Implement
-                  </button>
+                  <div className="ml-3 flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleAiImplement(rule)}
+                      disabled={isImplementing || !rule.rawText}
+                      className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm px-3 py-1 rounded transition-colors"
+                      title={!rule.rawText ? 'No rule text available' : 'Use AI to implement'}
+                    >
+                      {isImplementing ? '...' : 'AI'}
+                    </button>
+                    <button
+                      onClick={() => handleEdit(rule)}
+                      className="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded transition-colors"
+                    >
+                      Manual
+                    </button>
+                  </div>
                 </div>
               ))}
               {notImplementedRules.length === 0 && (
@@ -237,6 +309,13 @@ export default function RulesManagerPage() {
                   <div className="mb-4 p-3 bg-gray-900 rounded border border-gray-700">
                     <div className="text-xs text-gray-400 mb-1">Rule Text:</div>
                     <div className="text-sm text-gray-300">{editingRule.rawText}</div>
+                  </div>
+                )}
+
+                {aiMessage && (
+                  <div className="mb-4 p-3 bg-purple-900/30 rounded border border-purple-700">
+                    <div className="text-xs text-purple-400 mb-1">AI Note:</div>
+                    <div className="text-sm text-purple-300">{aiMessage}</div>
                   </div>
                 )}
 
