@@ -348,16 +348,21 @@ export function isVariableDamage(damageString: string): boolean {
 export function rollSingleDamage(damageString: string): { value: number; sides?: number } {
   const cleaned = damageString.trim().toUpperCase();
 
-  // D6 or D3
-  if (cleaned === 'D6') return { value: rollDie(6), sides: 6 };
-  if (cleaned === 'D3') return { value: rollDie(3), sides: 3 };
+  // D6 or D3 with optional modifier: "D6", "D6+2", "D3-1"
+  const singleDiceMatch = cleaned.match(/^D([36])([\+\-]\d+)?$/);
+  if (singleDiceMatch) {
+    const sides = parseInt(singleDiceMatch[1], 10);
+    const modifier = singleDiceMatch[2] ? parseInt(singleDiceMatch[2], 10) : 0;
+    return { value: rollDie(sides) + modifier, sides };
+  }
 
-  // Multiple dice: "2D6"
-  const multipleDiceMatch = cleaned.match(/^(\d+)D([36])$/);
+  // Multiple dice: "2D6", "2D6+3"
+  const multipleDiceMatch = cleaned.match(/^(\d+)D([36])([\+\-]\d+)?$/);
   if (multipleDiceMatch) {
     const count = parseInt(multipleDiceMatch[1], 10);
     const sides = parseInt(multipleDiceMatch[2], 10);
-    const total = rollDice(count, sides).reduce((sum, val) => sum + val, 0);
+    const modifier = multipleDiceMatch[3] ? parseInt(multipleDiceMatch[3], 10) : 0;
+    const total = rollDice(count, sides).reduce((sum, val) => sum + val, 0) + modifier;
     return { value: total, sides };
   }
 
@@ -453,16 +458,21 @@ export function parseDamageValue(damageString: string): number {
     return parseInt(cleaned, 10);
   }
 
-  // D6 or D3
-  if (cleaned === 'D6') return rollDie(6);
-  if (cleaned === 'D3') return rollDie(3);
+  // D6 or D3 with optional modifier: "D6", "D6+2", "D3-1"
+  const singleDiceMatch = cleaned.match(/^D([36])([\+\-]\d+)?$/);
+  if (singleDiceMatch) {
+    const sides = parseInt(singleDiceMatch[1], 10);
+    const modifier = singleDiceMatch[2] ? parseInt(singleDiceMatch[2], 10) : 0;
+    return rollDie(sides) + modifier;
+  }
 
-  // Multiple dice: "2D6"
-  const multipleDiceMatch = cleaned.match(/^(\d+)D([36])$/);
+  // Multiple dice: "2D6", "2D6+3"
+  const multipleDiceMatch = cleaned.match(/^(\d+)D([36])([\+\-]\d+)?$/);
   if (multipleDiceMatch) {
     const count = parseInt(multipleDiceMatch[1], 10);
     const sides = parseInt(multipleDiceMatch[2], 10);
-    return rollDice(count, sides).reduce((sum, val) => sum + val, 0);
+    const modifier = multipleDiceMatch[3] ? parseInt(multipleDiceMatch[3], 10) : 0;
+    return rollDice(count, sides).reduce((sum, val) => sum + val, 0) + modifier;
   }
 
   // Default to 1

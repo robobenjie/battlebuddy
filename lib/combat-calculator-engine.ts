@@ -72,6 +72,7 @@ export interface CombatResult {
   woundPhase: WoundResult;
   savePhase?: SaveResult;
   keywords: KeywordModifiers;
+  modifiedWeapon: WeaponStats; // The weapon with all modifiers applied
   summary: {
     totalAttacks: number;
     totalHits: number;
@@ -248,12 +249,33 @@ export function executeCombatSequence(
       }
     }
 
+    // Modify damage properly (handle string parsing)
+    let modifiedD = weapon.D;
+    if (dMod !== 0) {
+      const parsed = parseAttackCount(weapon.D); // Reuse attack parser - same format
+      if (parsed.dice > 0) {
+        // Dice notation: add to modifier (e.g., "d6" → "d6+2")
+        const newMod = parsed.modifier + dMod;
+        if (newMod > 0) {
+          modifiedD = `D${parsed.dice}+${newMod}`;
+        } else if (newMod < 0) {
+          modifiedD = `D${parsed.dice}${newMod}`;
+        } else {
+          modifiedD = `D${parsed.dice}`;
+        }
+      } else {
+        // Fixed damage: add to fixed value (e.g., "3" → "5")
+        const newFixed = parsed.fixed + parsed.modifier + dMod;
+        modifiedD = Math.max(1, newFixed).toString();
+      }
+    }
+
     weapon = {
       ...weapon,
       A: modifiedA,
       S: weapon.S + sMod,
       AP: weapon.AP + apMod,
-      D: weapon.D + dMod
+      D: modifiedD
     };
 
     console.log('⚔️ Applied weapon modifiers:', { A: aMod, S: sMod, AP: apMod, D: dMod });
@@ -349,6 +371,7 @@ export function executeCombatSequence(
     attackPhase,
     woundPhase,
     keywords,
+    modifiedWeapon: weapon, // Return the modified weapon
     summary,
     options
   };
@@ -362,8 +385,11 @@ export function executeSavePhase(
   weapon: WeaponStats,
   target: TargetStats
 ): CombatResult {
+  // Use the modified weapon from combat result (which has all modifiers applied)
+  const effectiveWeapon = combatResult.modifiedWeapon;
+
   // Calculate save threshold
-  const saveCalc = calculateSaveThreshold(target.SV, weapon.AP, target.INV);
+  const saveCalc = calculateSaveThreshold(target.SV, effectiveWeapon.AP, target.INV);
 
   // Calculate Melta bonus
   const meltaBonus = (combatResult.keywords.meltaValue && combatResult.options.withinHalfRange)
@@ -374,7 +400,7 @@ export function executeSavePhase(
   const savePhase = rollSaves(
     combatResult.woundPhase.wounds.length,
     saveCalc.threshold,
-    weapon.D,
+    effectiveWeapon.D,
     meltaBonus
   );
 

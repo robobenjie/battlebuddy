@@ -44,7 +44,10 @@ export default function DiceRollResults({
   addedKeywords = [],
   modifierSources
 }: DiceRollResultsProps) {
-  const { attackPhase, woundPhase, savePhase, keywords, summary, options } = combatResult;
+  const { attackPhase, woundPhase, savePhase, keywords, summary, options, modifiedWeapon } = combatResult;
+
+  // Use modified weapon for all calculations (has rule modifiers applied)
+  const effectiveWeapon = modifiedWeapon;
 
   // Calculate percentages
   const hitPercentage = summary.totalAttacks > 0
@@ -56,15 +59,15 @@ export default function DiceRollResults({
     : 0;
 
   // Check if weapon has variable attacks (contains D for dice)
-  const hasVariableAttacks = weapon.A.toUpperCase().includes('D');
+  const hasVariableAttacks = effectiveWeapon.A.toUpperCase().includes('D');
 
   // Check if we can skip save rolling:
   // - Save is impossible (worse than 6+)
   // - Damage is not variable (fixed number)
-  const modifiedSave = target.SV - weapon.AP;
+  const modifiedSave = target.SV - effectiveWeapon.AP;
   const usingInvuln = target.INV && (target.INV < modifiedSave || modifiedSave <= 1);
   const saveThreshold = usingInvuln ? target.INV : (modifiedSave <= 1 ? 7 : modifiedSave);
-  const hasVariableDamage = weapon.D.toUpperCase().includes('D');
+  const hasVariableDamage = effectiveWeapon.D.toUpperCase().includes('D');
   const canSkipSaveRolling = saveThreshold >= 7 && !hasVariableDamage;
 
   // If we can skip save rolling and saves haven't been shown yet, calculate damage directly
@@ -72,7 +75,7 @@ export default function DiceRollResults({
 
   // Calculate melta bonus for direct damage
   const meltaBonus = (keywords.meltaValue && options.withinHalfRange) ? keywords.meltaValue : 0;
-  const damagePerWound = parseInt(weapon.D, 10) + meltaBonus;
+  const damagePerWound = parseInt(effectiveWeapon.D, 10) + meltaBonus;
   const directTotalDamage = shouldShowDirectDamage ? summary.totalWounds * damagePerWound : 0;
 
   return (
@@ -102,7 +105,7 @@ export default function DiceRollResults({
               <div className="text-sm space-y-1">
                 <p>
                   <span className="text-gray-400">Attack characteristic:</span>{' '}
-                  <span className="text-white font-semibold">{weapon.A}</span>
+                  <span className="text-white font-semibold">{effectiveWeapon.A}</span>
                 </p>
                 {options.modelsFiring > 1 && (
                   <p className="text-xs text-gray-400">
@@ -171,7 +174,7 @@ export default function DiceRollResults({
                 <span className="text-gray-400">Hit on:</span>{' '}
                 {/* Show EFFECTIVE hit value (after applying modifiers) */}
                 <span className="text-white">
-                  {getEffectiveHitValue(weapon.WS, hitModifier).display}
+                  {getEffectiveHitValue(effectiveWeapon.WS, hitModifier).display}
                 </span>
                 {(() => {
                   const sources = formatModifierSources(modifierSources?.hit || [], activeRules);
@@ -280,7 +283,7 @@ export default function DiceRollResults({
                 <span className="text-gray-400">Wound on:</span>{' '}
                 <span className="text-white">
                   {getEffectiveWoundValue(
-                    weapon.S,
+                    effectiveWeapon.S,
                     target.T,
                     woundModifier,
                     keywords.lance || false,
@@ -296,7 +299,7 @@ export default function DiceRollResults({
                     </span>
                   ) : null;
                 })()}
-                <span className="text-xs text-gray-400"> (S{weapon.S} vs T{target.T})</span>
+                <span className="text-xs text-gray-400"> (S{effectiveWeapon.S} vs T{target.T})</span>
               </p>
 
               {keywords.lance && options.unitHasCharged && (
@@ -376,7 +379,7 @@ export default function DiceRollResults({
                   <span className="text-gray-400">Save on:</span>{' '}
                   <span className="text-white">
                     {(() => {
-                      const modifiedSave = target.SV - weapon.AP;
+                      const modifiedSave = target.SV - effectiveWeapon.AP;
                       const usingInvuln = target.INV && (target.INV < modifiedSave || modifiedSave <= 1);
                       if (usingInvuln) {
                         return `${target.INV}+ (invuln)`;
@@ -388,13 +391,13 @@ export default function DiceRollResults({
                     })()}
                   </span>
                   <span className="text-xs text-gray-400">
-                    {' '}({target.SV}+ save, {Math.abs(weapon.AP)} AP)
+                    {' '}({target.SV}+ save, {Math.abs(effectiveWeapon.AP)} AP)
                   </span>
                 </p>
 
                 <p>
                   <span className="text-gray-400">Damage per wound:</span>{' '}
-                  <span className="text-white">{weapon.D}</span>
+                  <span className="text-white">{effectiveWeapon.D}</span>
                   {keywords.meltaValue && options.withinHalfRange && (
                     <span className="text-xs text-gray-400">
                       {' '}(+{keywords.meltaValue} from Melta)
@@ -445,7 +448,7 @@ export default function DiceRollResults({
                 </p>
                 <p>
                   <span className="text-gray-400">Damage characteristic:</span>{' '}
-                  <span className="text-white">{weapon.D}</span>
+                  <span className="text-white">{effectiveWeapon.D}</span>
                   {keywords.meltaValue && options.withinHalfRange && (
                     <span className="text-xs text-gray-400">
                       {' '}(+{keywords.meltaValue} from Melta)
@@ -472,7 +475,7 @@ export default function DiceRollResults({
               <span className="text-red-500">TOTAL DAMAGE: {summary.totalDamage}</span>
             </p>
             <p className="text-xs text-gray-400 text-center mt-2">
-              {summary.failedSaves} failed saves × {weapon.D}
+              {summary.failedSaves} failed saves × {effectiveWeapon.D}
               {keywords.meltaValue && options.withinHalfRange && ` (+${keywords.meltaValue} Melta)`} damage
             </p>
           </div>
@@ -492,12 +495,12 @@ export default function DiceRollResults({
                 <span className="text-gray-400">Save required:</span>{' '}
                 <span className="text-white">No save possible</span>
                 <span className="text-xs text-gray-400">
-                  {' '}({target.SV}+ save, {Math.abs(weapon.AP)} AP)
+                  {' '}({target.SV}+ save, {Math.abs(effectiveWeapon.AP)} AP)
                 </span>
               </p>
               <p>
                 <span className="text-gray-400">Damage per wound:</span>{' '}
-                <span className="text-white font-semibold">{weapon.D}</span>
+                <span className="text-white font-semibold">{effectiveWeapon.D}</span>
                 {keywords.meltaValue && options.withinHalfRange && (
                   <span className="text-xs text-gray-400">
                     {' '}(+{keywords.meltaValue} from Melta)
@@ -510,7 +513,7 @@ export default function DiceRollResults({
                 <span className="text-red-500">TOTAL DAMAGE: {directTotalDamage}</span>
               </p>
               <p className="text-xs text-gray-400 text-center mt-2">
-                {summary.totalWounds} wounds × {weapon.D}
+                {summary.totalWounds} wounds × {effectiveWeapon.D}
                 {keywords.meltaValue && options.withinHalfRange && ` (+${keywords.meltaValue} Melta)`} damage
               </p>
             </div>
@@ -548,13 +551,13 @@ export default function DiceRollResults({
                     })()}
                   </span>
                   <span className="text-xs text-gray-400">
-                    {' '}({target.SV}+ save, {Math.abs(weapon.AP)} AP)
+                    {' '}({target.SV}+ save, {Math.abs(effectiveWeapon.AP)} AP)
                   </span>
                 </p>
 
                 <p>
                   <span className="text-gray-400">Damage per failed save:</span>{' '}
-                  <span className="text-white font-semibold">{weapon.D}</span>
+                  <span className="text-white font-semibold">{effectiveWeapon.D}</span>
                   {keywords.meltaValue && options.withinHalfRange && (
                     <span className="text-xs text-gray-400">
                       {' '}(+{keywords.meltaValue} from Melta)
