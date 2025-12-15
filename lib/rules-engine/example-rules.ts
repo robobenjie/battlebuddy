@@ -539,7 +539,7 @@ export const EXAMPLE_RULES: Rule[] = [
     "scope": "unit",
     "conditions": [
       {
-        "type": "is-leading",
+        "type": "being-led",
         "params": {
           "categories": null,
           "weaponTypes": null,
