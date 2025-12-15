@@ -28,44 +28,67 @@ vi.mock('../lib/db', () => ({
       mockTransactions.push(...transactions);
       return Promise.resolve();
     },
+    queryOnce: async (query: any) => {
+      // Return empty rules array for tests (rules not relevant to model count tests)
+      return Promise.resolve({ data: { rules: [] } });
+    },
     tx: {
       armies: new Proxy({}, {
         get: (target, prop) => ({
           update: (data: any) => ({
-            type: 'army-update', 
-            id: prop, 
+            type: 'army-update',
+            id: prop,
             data,
             link: (links: any) => ({ type: 'army-update', id: prop, data, links })
-          })
+          }),
+          link: (links: any) => ({ type: 'army-link', id: prop, links })
         })
       }),
       units: new Proxy({}, {
         get: (target, prop) => ({
           update: (data: any) => ({
-            type: 'unit-update', 
-            id: prop, 
+            type: 'unit-update',
+            id: prop,
             data,
             link: (links: any) => ({ type: 'unit-update', id: prop, data, links })
+          }),
+          link: (links: any) => ({ type: 'unit-link', id: prop, links
           })
         })
       }),
       models: new Proxy({}, {
         get: (target, prop) => ({
           update: (data: any) => ({
-            type: 'model-update', 
-            id: prop, 
+            type: 'model-update',
+            id: prop,
             data,
             link: (links: any) => ({ type: 'model-update', id: prop, data, links })
+          }),
+          link: (links: any) => ({ type: 'model-link', id: prop, links
           })
         })
       }),
       weapons: new Proxy({}, {
         get: (target, prop) => ({
           update: (data: any) => ({
-            type: 'weapon-update', 
-            id: prop, 
+            type: 'weapon-update',
+            id: prop,
             data,
             link: (links: any) => ({ type: 'weapon-update', id: prop, data, links })
+          }),
+          link: (links: any) => ({ type: 'weapon-link', id: prop, links
+          })
+        })
+      }),
+      rules: new Proxy({}, {
+        get: (target, prop) => ({
+          update: (data: any) => ({
+            type: 'rule-update',
+            id: prop,
+            data,
+            link: (links: any) => ({ type: 'rule-update', id: prop, data, links })
+          }),
+          link: (links: any) => ({ type: 'rule-link', id: prop, links
           })
         })
       })
