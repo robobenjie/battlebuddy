@@ -71,7 +71,11 @@ export default function RulesManagerPage() {
         setEditingRule(rule);
         setAiMessage(result.message || 'Rule implemented by AI. Please review before saving.');
       } else {
-        setError(result.message || 'Failed to implement rule');
+        // AI declined to implement - show modal with explanation
+        setAiDeclineMessage({
+          ruleName: rule.name,
+          message: result.message || 'This rule cannot be implemented in the combat calculator.'
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to call AI implementation API');
@@ -360,6 +364,61 @@ export default function RulesManagerPage() {
                     className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white px-6 py-2 rounded transition-colors"
                   >
                     {isSaving ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* AI Decline Modal */}
+        {aiDeclineMessage && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+            <div className="bg-gray-800 rounded-lg border border-orange-700 max-w-2xl w-full">
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-orange-400 mb-1">Cannot Implement Rule</h2>
+                    <p className="text-lg text-white">{aiDeclineMessage.ruleName}</p>
+                  </div>
+                  <button
+                    onClick={() => setAiDeclineMessage(null)}
+                    className="text-gray-400 hover:text-gray-300 text-2xl leading-none"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="bg-orange-900/20 rounded-lg border border-orange-700/50 p-4 mb-6">
+                  <div className="text-sm font-medium text-orange-300 mb-2">AI Explanation:</div>
+                  <div className="text-sm text-orange-100 whitespace-pre-wrap">{aiDeclineMessage.message}</div>
+                </div>
+
+                <div className="text-sm text-gray-400 mb-6">
+                  This rule cannot be automatically implemented in the combat calculator.
+                  You may still implement it manually if you believe it affects combat calculations,
+                  or you can use it as a reminder in the rules list.
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setAiDeclineMessage(null)}
+                    className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Find the rule and open manual implementation
+                      const rule = allRules.find(r => r.name === aiDeclineMessage.ruleName);
+                      if (rule) {
+                        handleEdit(rule);
+                        setAiDeclineMessage(null);
+                      }
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded transition-colors"
+                  >
+                    Implement Manually
                   </button>
                 </div>
               </div>
