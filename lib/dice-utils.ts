@@ -31,6 +31,12 @@ export interface SaveResult {
   totalDamage: number;
 }
 
+export interface FNPResult {
+  fnpRolls: DiceRoll[];
+  damageNegated: number;  // Number of wounds negated
+  finalDamage: number;     // Damage after FNP
+}
+
 /**
  * Parse attack count string like "3", "D6", "2d6", "D6+3"
  */
@@ -444,6 +450,34 @@ export function rollSaves(
     failedSaves,
     damageRolls: isVariable ? damageRolls : undefined,
     totalDamage
+  };
+}
+
+/**
+ * Roll Feel No Pain saves
+ * This happens AFTER damage is rolled, and each point of damage can be negated
+ */
+export function rollFeelNoPain(
+  damageAmount: number,
+  fnpThreshold: number
+): FNPResult {
+  // Roll one die for each point of damage
+  const fnpRolls = rollDice(damageAmount).map(value => ({ value }));
+
+  // Count successful FNP saves (saves that meet or exceed threshold)
+  let damageNegated = 0;
+  fnpRolls.forEach(roll => {
+    if (roll.value >= fnpThreshold) {
+      damageNegated++;
+    }
+  });
+
+  const finalDamage = damageAmount - damageNegated;
+
+  return {
+    fnpRolls,
+    damageNegated,
+    finalDamage
   };
 }
 

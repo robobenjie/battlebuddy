@@ -9,7 +9,7 @@ import ActiveRulesDisplay from './ui/ActiveRulesDisplay';
 import { formatUnitForCard, sortUnitsByPriority, getUnitDisplayName } from '../lib/unit-utils';
 import DigitalDiceMenu from './DigitalDiceMenu';
 import DiceRollResults from './ui/DiceRollResults';
-import { executeCombatSequence, executeSavePhase, CombatResult, CombatOptions, WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
+import { executeCombatSequence, executeSavePhase, executeFNPPhase, CombatResult, CombatOptions, WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
 import { Rule, ArmyState, buildCombatContext, evaluateAllRules, getAddedKeywords, getAllUnitRules, checkCondition } from '../lib/rules-engine';
 import { UNIT_FULL_QUERY, UNIT_BASIC_QUERY } from '../lib/query-fragments';
 
@@ -64,11 +64,12 @@ export default function CombatCalculatorPage({
   const unit = propUnit || unitData?.units?.[0];
 
 
-  // Now try the full query, including destroyed units and rules
+  // Now try the full query, including destroyed units, rules, and army states
   const { data: enemyUnitData, isLoading, error } = db.useQuery({
     games: {
       armies: {
         armyRules: {},
+        states: {}, // Note: the link label is "states", not "armyStates"
         units: {
           ...UNIT_FULL_QUERY,
         }
@@ -187,18 +188,6 @@ export default function CombatCalculatorPage({
     } : {}
   );
 
-  // Query army states for the current army
-  const { data: armyStatesData } = db.useQuery(
-    currentArmyId ? {
-      armyStates: {
-        $: {
-          where: {
-            armyId: currentArmyId
-          }
-        }
-      }
-    } : {}
-  );
 
   // Get all weapons from the queried unit (this will update when weapons are fired)
   const queriedUnit = weaponsData?.units?.[0];
@@ -329,8 +318,10 @@ export default function CombatCalculatorPage({
     T: selectedTarget.models[0].T,
     SV: selectedTarget.models[0].SV,
     INV: selectedTarget.models[0].INV,
+    FNP: selectedTarget.models[0].FNP,
     modelCount: selectedTarget.models?.length || 0,
-    categories: selectedTarget.categories || []
+    categories: selectedTarget.categories || [],
+    keywords: selectedTarget.keywords || []
   } : undefined;
 
   // Check if the attacking unit charged this turn (for lance keyword)
@@ -440,16 +431,43 @@ export default function CombatCalculatorPage({
 
     addRules(combatRelevantRules);
 
+    // Get all unit rules for defender (target) - includes defensive abilities like FNP
+    if (selectedTarget) {
+      const defenderRules = getAllUnitRules(selectedTarget);
+      console.log(`📋 getAllUnitRules returned ${defenderRules.length} rules for defender:`, selectedTarget.name);
+
+      const defenderCombatRelevantRules = defenderRules.filter((rule: Rule) => {
+        // If rule has a phase constraint, check if it matches current combat phase
+        if (rule.activation?.phase) {
+          const matches = rule.activation.phase === 'any' || rule.activation.phase === currentCombatPhase;
+          console.log(`   Defender Rule "${rule.name}" has phase "${rule.activation.phase}": ${matches ? '✅ included' : '❌ filtered out'}`);
+          return matches;
+        }
+        console.log(`   Defender Rule "${rule.name}" has no phase constraint: ✅ included`);
+        return true;
+      });
+
+      console.log(`📋 Defender: After phase filter: ${defenderCombatRelevantRules.length} combat-relevant rules`);
+      defenderCombatRelevantRules.forEach(r => console.log(`   - ${r.name} (${r.id})`));
+
+      addRules(defenderCombatRelevantRules);
+    }
+
     console.log(`📋 Total rules in context: ${allRules.length}`);
 
-    // Get army states from query
-    const armyStates: ArmyState[] = armyStatesData?.armyStates || [];
+    // Get army states from query (flatten from all armies in the game)
+    console.log('🔍 game?.armies:', game?.armies);
+    if (game?.armies) {
+      game.armies.forEach((army: any, idx: number) => {
+        console.log(`🔍 army[${idx}] id=${army.id}, states:`, army.states);
+      });
+    }
+    const armyStates: ArmyState[] = game?.armies?.flatMap((army: any) => army.states || []) || [];
 
     // Debug logging
     console.log('🔍 WAAAGH Debug:', {
       currentArmyId,
       unitArmyId: unit?.armyId,
-      armyStatesData,
       armyStates,
       hasWaaagh: armyStates.some(s => s.state === 'waaagh-active'),
       loadedRules: allRules.length,
@@ -457,9 +475,10 @@ export default function CombatCalculatorPage({
     });
 
     // Build context to evaluate which rules apply
+    console.log('🔍 Building context with armyStates:', armyStates, 'length:', armyStates.length);
     const context = buildCombatContext({
       attacker: { ...unit, armyId: currentArmyId },
-      defender: effectiveTargetStats,
+      defender: selectedTarget || effectiveTargetStats,
       weapon: weaponStats,
       game: game,
       combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
@@ -473,6 +492,7 @@ export default function CombatCalculatorPage({
       rules: allRules,
       armyStates: armyStates
     });
+    console.log('🔍 Context created with armyStates:', context.armyStates, 'length:', context.armyStates.length);
 
     // Evaluate rules to see which ones apply
     const appliedRules = evaluateAllRules(allRules, context);
@@ -630,16 +650,43 @@ export default function CombatCalculatorPage({
 
     addRules(combatRelevantRules);
 
+    // Get all unit rules for defender (target) - includes defensive abilities like FNP
+    if (selectedTarget) {
+      const defenderRules = getAllUnitRules(selectedTarget);
+      console.log(`📋 getAllUnitRules returned ${defenderRules.length} rules for defender:`, selectedTarget.name);
+
+      const defenderCombatRelevantRules = defenderRules.filter((rule: Rule) => {
+        // If rule has a phase constraint, check if it matches current combat phase
+        if (rule.activation?.phase) {
+          const matches = rule.activation.phase === 'any' || rule.activation.phase === currentCombatPhase;
+          console.log(`   Defender Rule "${rule.name}" has phase "${rule.activation.phase}": ${matches ? '✅ included' : '❌ filtered out'}`);
+          return matches;
+        }
+        console.log(`   Defender Rule "${rule.name}" has no phase constraint: ✅ included`);
+        return true;
+      });
+
+      console.log(`📋 Defender: After phase filter: ${defenderCombatRelevantRules.length} combat-relevant rules`);
+      defenderCombatRelevantRules.forEach(r => console.log(`   - ${r.name} (${r.id})`));
+
+      addRules(defenderCombatRelevantRules);
+    }
+
     console.log(`📋 Total rules in context: ${allRules.length}`);
 
-    // Get army states from query
-    const armyStates: ArmyState[] = armyStatesData?.armyStates || [];
+    // Get army states from query (flatten from all armies in the game)
+    console.log('🔍 game?.armies:', game?.armies);
+    if (game?.armies) {
+      game.armies.forEach((army: any, idx: number) => {
+        console.log(`🔍 army[${idx}] id=${army.id}, states:`, army.states);
+      });
+    }
+    const armyStates: ArmyState[] = game?.armies?.flatMap((army: any) => army.states || []) || [];
 
     // Debug logging
     console.log('🔍 WAAAGH Debug:', {
       currentArmyId,
       unitArmyId: unit?.armyId,
-      armyStatesData,
       armyStates,
       hasWaaagh: armyStates.some(s => s.state === 'waaagh-active'),
       loadedRules: allRules.length,
@@ -649,7 +696,7 @@ export default function CombatCalculatorPage({
     // Build context to evaluate which rules apply
     const context = buildCombatContext({
       attacker: { ...unit, armyId: currentArmyId },
-      defender: targetStats,
+      defender: selectedTarget || targetStats,
       weapon: weaponStats,
       game: game,
       combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
@@ -734,7 +781,11 @@ export default function CombatCalculatorPage({
       keywords: (selectedWeapon as any).keywords || []
     };
 
-    const updatedResult = executeSavePhase(combatResult, weaponStats, targetStats);
+    let updatedResult = executeSavePhase(combatResult, weaponStats, targetStats);
+
+    // Execute FNP phase after saves
+    updatedResult = executeFNPPhase(updatedResult, targetStats);
+
     setCombatResult(updatedResult);
     setShowSavePhase(true);
   };

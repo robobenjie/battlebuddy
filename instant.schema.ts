@@ -48,7 +48,6 @@ const _schema = i.schema({
 
     // Core army entity
     armies: i.entity({
-      id: i.string().unique().indexed(),
       createdAt: i.number(),
       faction: i.string(),
       name: i.string(),
@@ -60,7 +59,6 @@ const _schema = i.schema({
 
     // Core unit entity
     units: i.entity({
-      id: i.string().unique().indexed(),
       armyId: i.string().indexed(),
       name: i.string(),
       nickname: i.string().optional(),
@@ -71,7 +69,6 @@ const _schema = i.schema({
 
     // Unit status tracking for game state
     unitStatuses: i.entity({
-      id: i.string().unique().indexed(),
       unitId: i.string().indexed(),
       turns: i.json(), // list of turns for which the status is applicable
       name: i.string(),
@@ -80,14 +77,12 @@ const _schema = i.schema({
 
     // Shared abilities table
     abilities: i.entity({
-      id: i.string().unique().indexed(),
       name: i.string().unique().indexed(),
       description: i.string(),
     }),
 
     // Core model entity
     models: i.entity({
-      id: i.string().unique().indexed(),
       name: i.string(),
       unitId: i.string().indexed(),
       M: i.number(), // movement in inches
@@ -102,7 +97,6 @@ const _schema = i.schema({
 
     // Core weapon entity
     weapons: i.entity({
-      id: i.string().unique().indexed(),
       name: i.string().optional(), // weapon name
       range: i.number(), // range in inches, 0 for melee
       A: i.string(), // attacks (number or dice representation like "d6 + 3")
@@ -117,7 +111,6 @@ const _schema = i.schema({
 
     // Rules entity - stores both imported rules and rules-engine implementations
     rules: i.entity({
-      id: i.string().unique().indexed(),
       name: i.string().indexed(),
       // Import data (from BattleScribe/NewRecruit)
       rawText: i.string().optional(), // Original rule description from import
@@ -137,9 +130,8 @@ const _schema = i.schema({
 
     // Army states tracking (e.g., Waaagh!, Oath of Moment target, etc.)
     // Each army has its own states, so multiple Ork armies can have separate Waaghs
+    // Note: armyId is handled by the armyStateArmy link, not as a field
     armyStates: i.entity({
-      id: i.string().unique().indexed(),
-      armyId: i.string().indexed(),
       state: i.string(), // 'waaagh-active', 'oath-target-xxx', etc.
       activatedTurn: i.number(),
       expiresPhase: i.string().optional(),

@@ -9,11 +9,13 @@ import {
   rollWounds,
   calculateSaveThreshold,
   rollSaves,
+  rollFeelNoPain,
   parseDamageValue,
   parseAttackCount,
   AttackResult,
   WoundResult,
-  SaveResult
+  SaveResult,
+  FNPResult
 } from './dice-utils';
 
 import {
@@ -40,8 +42,10 @@ export interface TargetStats {
   T: number;
   SV: number;
   INV?: number;
+  FNP?: number;  // Feel No Pain save (e.g. 5 for 5+)
   modelCount: number;
   categories: string[];
+  keywords?: string[];  // For parsing unit keywords like Feel No Pain
 }
 
 export interface CombatOptions {
@@ -71,6 +75,7 @@ export interface CombatResult {
   attackPhase: AttackResult;
   woundPhase: WoundResult;
   savePhase?: SaveResult;
+  fnpPhase?: FNPResult;
   keywords: KeywordModifiers;
   modifiedWeapon: WeaponStats; // The weapon with all modifiers applied
   summary: {
@@ -173,6 +178,30 @@ export function parseKeywords(keywords: string[], targetCategories: string[]): K
   });
 
   return modifiers;
+}
+
+/**
+ * Parse unit keywords to extract defensive abilities like Invuln and FNP
+ */
+export function parseUnitKeywords(keywords: string[]): { invuln: number | null; fnp: number | null } {
+  let invuln: number | null = null;
+  let fnp: number | null = null;
+
+  keywords?.forEach(keyword => {
+    // Invulnerable Save X+ (e.g. "Invulnerable Save 5" or "Invulnerable Save 4+")
+    const invulnMatch = keyword.match(/^invulnerable\s+save\s+(\d+)\+?$/i);
+    if (invulnMatch) {
+      invuln = parseInt(invulnMatch[1], 10);
+    }
+
+    // Feel No Pain X+ (e.g. "Feel No Pain 5" or "Feel No Pain 6+")
+    const fnpMatch = keyword.match(/^feel\s+no\s+pain\s+(\d+)\+?$/i);
+    if (fnpMatch) {
+      fnp = parseInt(fnpMatch[1], 10);
+    }
+  });
+
+  return { invuln, fnp };
 }
 
 /**
@@ -414,6 +443,42 @@ export function executeSavePhase(
   return {
     ...combatResult,
     savePhase,
+    summary: updatedSummary
+  };
+}
+
+/**
+ * Execute Feel No Pain phase (called after save phase)
+ * Rolls FNP saves for each point of damage to negate wounds
+ */
+export function executeFNPPhase(
+  combatResult: CombatResult,
+  target: TargetStats
+): CombatResult {
+  // Check if target has FNP
+  if (!target.FNP || !combatResult.savePhase) {
+    return combatResult;
+  }
+
+  const totalDamage = combatResult.savePhase.totalDamage;
+
+  // If no damage, skip FNP
+  if (totalDamage === 0) {
+    return combatResult;
+  }
+
+  // Roll Feel No Pain saves
+  const fnpPhase = rollFeelNoPain(totalDamage, target.FNP);
+
+  // Update summary with final damage after FNP
+  const updatedSummary = {
+    ...combatResult.summary,
+    totalDamage: fnpPhase.finalDamage
+  };
+
+  return {
+    ...combatResult,
+    fnpPhase,
     summary: updatedSummary
   };
 }

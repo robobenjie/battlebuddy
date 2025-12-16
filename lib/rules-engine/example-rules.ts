@@ -45,6 +45,8 @@ export const EXAMPLE_EXPLANATIONS: Record<string, string> = {
   'waaagh-invuln': 'Part 3 of Waaagh!. Demonstrates modify-save effect for invulnerable saves.',
 
   'waaagh-charge-after-advance': 'Part 4 of Waaagh!. Shows a reminder-only rule that grants an ability we can\'t calculate. Together, these 4 Waaagh! rules show how to decompose complex faction abilities into independent, testable pieces.',
+
+  'krumpin-time': 'Demonstrates Feel No Pain keyword. Shows how to grant defensive abilities that trigger after damage is rolled. FNP is calculated in the combat engine after saves.',
 };
 
 export const EXAMPLE_RULES: Rule[] = [
@@ -843,7 +845,7 @@ export const EXAMPLE_RULES: Rule[] = [
         "type": "army-state",
         "params": {
           "armyStates": [
-            "waaagh"
+            "waaagh-active"
           ],
           "categories": null,
           "weaponTypes": null,
@@ -946,7 +948,7 @@ export const EXAMPLE_RULES: Rule[] = [
       {
         "type": "army-state",
         "params": {
-          "armyStates": ["waaagh"],
+          "armyStates": ["waaagh-active"],
           "categories": null,
           "weaponTypes": null,
           "range": null,
@@ -1012,7 +1014,7 @@ export const EXAMPLE_RULES: Rule[] = [
       {
         "type": "army-state",
         "params": {
-          "armyStates": ["waaagh"],
+          "armyStates": ["waaagh-active"],
           "categories": null,
           "weaponTypes": null,
           "range": null,
@@ -1078,7 +1080,7 @@ export const EXAMPLE_RULES: Rule[] = [
       {
         "type": "army-state",
         "params": {
-          "armyStates": ["waaagh"],
+          "armyStates": ["waaagh-active"],
           "categories": null,
           "weaponTypes": null,
           "range": null,
@@ -1129,7 +1131,7 @@ export const EXAMPLE_RULES: Rule[] = [
       {
         "type": "army-state",
         "params": {
-          "armyStates": ["waaagh"],
+          "armyStates": ["waaagh-active"],
           "categories": null,
           "weaponTypes": null,
           "range": null,
@@ -1149,6 +1151,57 @@ export const EXAMPLE_RULES: Rule[] = [
       "phase": "charge",
       "turn": "own",
       "limit": null
+    },
+    "userInput": null
+  },
+  {
+    "id": "krumpin-time",
+    "name": "Krumpin' Time",
+    "description": "While the Waaagh! is active for your army, models in this unit have the Feel No Pain 5+ ability.",
+    "faction": "Orks",
+    "scope": "unit",
+    "conditions": [
+      {
+        "type": "army-state",
+        "params": {
+          "armyStates": ["waaagh-active"],
+          "categories": null,
+          "weaponTypes": null,
+          "range": null,
+          "statuses": null,
+          "phases": null,
+          "role": null,
+          "inputId": null,
+          "inputValue": null
+        },
+        "operator": null
+      }
+    ],
+    "effects": [
+      {
+        "type": "add-keyword",
+        "target": "unit",
+        "params": {
+          "keyword": "Feel No Pain",
+          "keywordValue": 5,
+          "stat": null,
+          "modifier": null,
+          "ability": null,
+          "abilityValue": null,
+          "rerollType": null,
+          "rerollPhase": null,
+          "autoPhase": null
+        },
+        "appliesTo": null,
+        "conditions": null
+      }
+    ],
+    "duration": "permanent",
+    "activation": {
+      "type": "automatic",
+      "phase": "any",
+      "limit": null,
+      "turn": null
     },
     "userInput": null
   }

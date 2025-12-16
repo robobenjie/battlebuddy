@@ -496,7 +496,7 @@ describe('Example Rules Integration', () => {
     it('should add +1 Attacks when Waaagh is active', () => {
       const context = createTestContext({
         weapon: { name: 'Choppa', range: 0, A: '2', WS: 3, S: 4, AP: 0, D: '1', keywords: [] },
-        armyStates: ['waaagh'],
+        armyStates: ['waaagh-active'],
         combatPhase: 'melee',
       });
 
@@ -521,7 +521,7 @@ describe('Example Rules Integration', () => {
     it('should not apply to ranged weapons', () => {
       const context = createTestContext({
         weapon: { name: 'Slugga', range: 12, A: '2', WS: 3, S: 4, AP: 0, D: '1', keywords: [] },
-        armyStates: ['waaagh'],
+        armyStates: ['waaagh-active'],
       });
 
       const applied = evaluateRule(rule, context);
@@ -596,6 +596,37 @@ describe('Example Rules Integration', () => {
       const movementRule = EXAMPLE_RULES.find(r => r.id === 'wild-ride-movement')!;
       expect(rule.name).toBe(movementRule.name);
       expect(rule.description).toBe(movementRule.description);
+    });
+  });
+
+  describe('Krumpin\' Time (Feel No Pain)', () => {
+    const rule = EXAMPLE_RULES.find(r => r.id === 'krumpin-time')!;
+
+    it('should add Feel No Pain 5 keyword when Waaagh is active', () => {
+      const context = createTestContext({
+        armyStates: ['waaagh-active']
+      });
+
+      evaluateRule(rule, context);
+
+      const keywords = getAddedKeywords(context);
+      expect(keywords).toContain('Feel No Pain 5');
+    });
+
+    it('should not apply when Waaagh is not active', () => {
+      const context = createTestContext({
+        armyStates: []
+      });
+
+      const applied = evaluateRule(rule, context);
+
+      expect(applied).toBe(false);
+      const keywords = getAddedKeywords(context);
+      expect(keywords).not.toContain('Feel No Pain 5');
+    });
+
+    it('should target unit, not weapon', () => {
+      expect(rule.effects[0].target).toBe('unit');
     });
   });
 });

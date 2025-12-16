@@ -44,7 +44,7 @@ export default function DiceRollResults({
   addedKeywords = [],
   modifierSources
 }: DiceRollResultsProps) {
-  const { attackPhase, woundPhase, savePhase, keywords, summary, options, modifiedWeapon } = combatResult;
+  const { attackPhase, woundPhase, savePhase, fnpPhase, keywords, summary, options, modifiedWeapon } = combatResult;
 
   // Use modified weapon for all calculations (has rule modifiers applied)
   const effectiveWeapon = modifiedWeapon;
@@ -457,9 +457,55 @@ export default function DiceRollResults({
                 </p>
               </div>
 
+              {!fnpPhase && (
+                <div className="border-t border-gray-600 pt-2 mt-2">
+                  <p className="text-xl font-bold">
+                    <span className="text-red-500">TOTAL DAMAGE: {summary.totalDamage}</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feel No Pain Phase Card */}
+      {showSavePhase && fnpPhase && (
+        <div className="bg-gray-800 rounded-lg overflow-hidden">
+          <h4 className="font-semibold text-red-400 px-4 py-3 bg-gray-900">FEEL NO PAIN</h4>
+          <div className="flex">
+            {/* Dice (1/3) */}
+            <div className="w-1/3 p-4">
+              <DiceDisplay
+                rolls={fnpPhase.fnpRolls}
+                successIndices={fnpPhase.fnpRolls
+                  .map((_, i) => i)
+                  .filter(i => fnpPhase.fnpRolls[i].value >= (target.FNP || 7))}
+              />
+            </div>
+
+            {/* Text (2/3) */}
+            <div className="w-2/3 p-4 border-l border-gray-700">
+              <div className="text-sm space-y-1">
+                <p>
+                  <span className="text-gray-400">Damage to negate:</span>{' '}
+                  <span className="text-white">{fnpPhase.fnpRolls.length}</span>
+                </p>
+                <p>
+                  <span className="text-gray-400">Feel No Pain save:</span>{' '}
+                  <span className="text-white">{target.FNP}+</span>
+                </p>
+              </div>
+
               <div className="border-t border-gray-600 pt-2 mt-2">
-                <p className="text-xl font-bold">
-                  <span className="text-red-500">TOTAL DAMAGE: {summary.totalDamage}</span>
+                <p className="font-semibold">
+                  <span className="text-gray-400">Results:</span>
+                </p>
+                <p>
+                  • <span className="text-green-400">{fnpPhase.damageNegated} damage negated</span>
+                </p>
+                <p className="text-xl font-bold mt-2">
+                  <span className="text-red-500">FINAL DAMAGE: {fnpPhase.finalDamage}</span>
                 </p>
               </div>
             </div>
@@ -467,8 +513,8 @@ export default function DiceRollResults({
         </div>
       )}
 
-      {/* Total Damage (for fixed damage, show after save phase) */}
-      {showSavePhase && savePhase && (!savePhase.damageRolls || savePhase.damageRolls.length === 0) && (
+      {/* Total Damage (for fixed damage, show after save phase) - only if no FNP */}
+      {showSavePhase && savePhase && (!savePhase.damageRolls || savePhase.damageRolls.length === 0) && !fnpPhase && (
         <div className="bg-gray-800 rounded-lg overflow-hidden">
           <div className="p-4">
             <p className="text-xl font-bold text-center">

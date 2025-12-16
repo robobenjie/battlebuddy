@@ -34,13 +34,14 @@ export default function CommandPhase({ gameId, army, currentPlayer, currentUser,
   const { isOpen, rule, showRule, hideRule } = useRulePopup();
 
   // Query for army states to check if WAAAGH has been declared
+  // Note: Query from armies with states link, not armyStates directly
   const { data: armyStatesData } = db.useQuery(
     army?.id ? {
-      armyStates: {
+      armies: {
+        states: {},
         $: {
           where: {
-            armyId: army.id,
-            state: 'waaagh-active'
+            id: army.id
           }
         }
       }
@@ -86,7 +87,8 @@ export default function CommandPhase({ gameId, army, currentPlayer, currentUser,
     }
   });
 
-  const waaaghState = armyStatesData?.armyStates?.[0];
+  const armyWithStates = armyStatesData?.armies?.[0];
+  const waaaghState = armyWithStates?.states?.find((s: any) => s.state === 'waaagh-active');
   const hasWaaagh = army?.faction?.toLowerCase() === 'orks';
   const waaaghAlreadyDeclared = !!waaaghState;
   const isCurrentPlayer = currentPlayer?.userId === currentUser?.id;
@@ -135,10 +137,9 @@ export default function CommandPhase({ gameId, army, currentPlayer, currentUser,
 
     await db.transact([
       db.tx.armyStates[id()].update({
-        armyId: army.id,
         state: 'waaagh-active',
         activatedTurn: game.currentTurn,
-      })
+      }).link({ army: army.id })
     ]);
   };
 

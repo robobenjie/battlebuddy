@@ -81,10 +81,10 @@ export function buildCombatContext(params: {
     armyStates
   } = params;
 
-  // Filter army states to only those for the attacking army
-  const attackerArmyStates = armyStates.filter(
-    state => state.armyId === attacker.armyId
-  );
+  // Army states are already scoped to the attacker's army by the query
+  // (extracted from game.armies[].states where army matches attacker.armyId)
+  // No need to filter again since armyId field no longer exists (using links now)
+  const attackerArmyStates = armyStates;
 
   // Helper to check if unit is a CHARACTER (leader)
   const isCharacter = (unit: any) => {

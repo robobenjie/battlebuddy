@@ -15,7 +15,7 @@ export default function GamePage() {
   const [isStartingGame, setIsStartingGame] = useState(false);
 
   // First query just to get the game by code
-  const { data: gamesData } = db.useQuery({
+  const { data: gamesData, isLoading: isLoadingGame } = db.useQuery({
     games: {
       $: {
         where: {
@@ -129,7 +129,8 @@ export default function GamePage() {
     }
   }, [user, router]);
 
-  if (isLoading) {
+  // Show loading state while initial game data loads
+  if (isLoadingGame || isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -140,6 +141,7 @@ export default function GamePage() {
     );
   }
 
+  // Only show error after loading is complete
   if (error || !game) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
