@@ -19,13 +19,32 @@ interface ActiveRulesDisplayProps {
 export default function ActiveRulesDisplay({ rules }: ActiveRulesDisplayProps) {
   if (rules.length === 0) return null;
 
+  // Group rules by name and merge their effects
+  const groupedRules = new Map<string, ActiveRule>();
+
+  for (const rule of rules) {
+    if (groupedRules.has(rule.name)) {
+      // Merge effects for rules with the same name
+      const existing = groupedRules.get(rule.name)!;
+      existing.effects = [...existing.effects, ...rule.effects];
+    } else {
+      // First occurrence of this rule name
+      groupedRules.set(rule.name, {
+        ...rule,
+        effects: [...rule.effects] // Create a copy of effects array
+      });
+    }
+  }
+
+  const uniqueRules = Array.from(groupedRules.values());
+
   return (
     <div className="bg-gray-800 rounded-lg overflow-hidden">
       <h4 className="text-xs font-medium text-gray-500 uppercase px-3 py-2">
         Active Rules
       </h4>
       <div className="px-3 pb-3 space-y-2">
-        {rules.map((rule, index) => (
+        {uniqueRules.map((rule, index) => (
           <div key={index} className="text-xs">
             <p className="font-medium text-gray-300 mb-0.5">{rule.name}</p>
             <p className="text-gray-500 mb-1 leading-snug">{rule.description}</p>

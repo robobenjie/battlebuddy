@@ -377,16 +377,29 @@ export default function CombatCalculatorPage({
     };
 
     // Load applicable rules from database (linked rules)
-    const allRules: Rule[] = [];
-    const addedRuleIds = new Set<string>(); // Track which rules we've already added to avoid duplicates
+    const attackerRules: Rule[] = [];
+    const defenderRules: Rule[] = [];
+    const addedAttackerRuleIds = new Set<string>(); // Track which rules we've already added to avoid duplicates
+    const addedDefenderRuleIds = new Set<string>(); // Track which rules we've already added to avoid duplicates
 
-    // Helper to add rules with deduplication
-    const addRules = (rules: Rule | Rule[]) => {
+    // Helper to add attacker rules with deduplication
+    const addAttackerRules = (rules: Rule | Rule[]) => {
       const ruleArray = Array.isArray(rules) ? rules : [rules];
       for (const rule of ruleArray) {
-        if (!addedRuleIds.has(rule.id)) {
-          addedRuleIds.add(rule.id);
-          allRules.push(rule);
+        if (!addedAttackerRuleIds.has(rule.id)) {
+          addedAttackerRuleIds.add(rule.id);
+          attackerRules.push(rule);
+        }
+      }
+    };
+
+    // Helper to add defender rules with deduplication
+    const addDefenderRules = (rules: Rule | Rule[]) => {
+      const ruleArray = Array.isArray(rules) ? rules : [rules];
+      for (const rule of ruleArray) {
+        if (!addedDefenderRuleIds.has(rule.id)) {
+          addedDefenderRuleIds.add(rule.id);
+          defenderRules.push(rule);
         }
       }
     };
@@ -398,7 +411,7 @@ export default function CombatCalculatorPage({
         if (rule?.ruleObject) {
           try {
             const parsedRule = JSON.parse(rule.ruleObject);
-            addRules(parsedRule);
+            addAttackerRules(parsedRule);
           } catch (e) {
             console.error('Failed to parse rule:', rule.name, e);
           }
@@ -429,14 +442,14 @@ export default function CombatCalculatorPage({
     console.log(`📋 After phase filter: ${combatRelevantRules.length} combat-relevant rules`);
     combatRelevantRules.forEach(r => console.log(`   - ${r.name} (${r.id})`));
 
-    addRules(combatRelevantRules);
+    addAttackerRules(combatRelevantRules);
 
     // Get all unit rules for defender (target) - includes defensive abilities like FNP
     if (selectedTarget) {
-      const defenderRules = getAllUnitRules(selectedTarget);
-      console.log(`📋 getAllUnitRules returned ${defenderRules.length} rules for defender:`, selectedTarget.name);
+      const defenderUnitRules = getAllUnitRules(selectedTarget);
+      console.log(`📋 getAllUnitRules returned ${defenderUnitRules.length} rules for defender:`, selectedTarget.name);
 
-      const defenderCombatRelevantRules = defenderRules.filter((rule: Rule) => {
+      const defenderCombatRelevantRules = defenderUnitRules.filter((rule: Rule) => {
         // If rule has a phase constraint, check if it matches current combat phase
         if (rule.activation?.phase) {
           const matches = rule.activation.phase === 'any' || rule.activation.phase === currentCombatPhase;
@@ -450,10 +463,10 @@ export default function CombatCalculatorPage({
       console.log(`📋 Defender: After phase filter: ${defenderCombatRelevantRules.length} combat-relevant rules`);
       defenderCombatRelevantRules.forEach(r => console.log(`   - ${r.name} (${r.id})`));
 
-      addRules(defenderCombatRelevantRules);
+      addDefenderRules(defenderCombatRelevantRules);
     }
 
-    console.log(`📋 Total rules in context: ${allRules.length}`);
+    console.log(`📋 Total attacker rules: ${attackerRules.length}, Total defender rules: ${defenderRules.length}`);
 
     // Get army states from query (flatten from all armies in the game)
     console.log('🔍 game?.armies:', game?.armies);
@@ -470,18 +483,20 @@ export default function CombatCalculatorPage({
       unitArmyId: unit?.armyId,
       armyStates,
       hasWaaagh: armyStates.some(s => s.state === 'waaagh-active'),
-      loadedRules: allRules.length,
+      loadedAttackerRules: attackerRules.length,
+      loadedDefenderRules: defenderRules.length,
       weaponType
     });
 
-    // Build context to evaluate which rules apply
-    console.log('🔍 Building context with armyStates:', armyStates, 'length:', armyStates.length);
-    const context = buildCombatContext({
+    // Build separate contexts for attacker and defender rules
+    console.log('🔍 Building attacker context with armyStates:', armyStates, 'length:', armyStates.length);
+    const attackerContext = buildCombatContext({
       attacker: { ...unit, armyId: currentArmyId },
       defender: selectedTarget || effectiveTargetStats,
       weapon: weaponStats,
       game: game,
       combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
+      combatRole: 'attacker',
       options: {
         modelsFiring: 1,
         withinHalfRange: false,
@@ -489,22 +504,49 @@ export default function CombatCalculatorPage({
         unitHasCharged: false,
         blastBonusAttacks: 0
       },
-      rules: allRules,
+      rules: attackerRules,
       armyStates: armyStates
     });
-    console.log('🔍 Context created with armyStates:', context.armyStates, 'length:', context.armyStates.length);
+    console.log('🔍 Attacker context created with armyStates:', attackerContext.armyStates, 'length:', attackerContext.armyStates.length);
 
-    // Evaluate rules to see which ones apply
-    const appliedRules = evaluateAllRules(allRules, context);
+    console.log('🔍 Building defender context with armyStates:', armyStates, 'length:', armyStates.length);
+    const defenderContext = buildCombatContext({
+      attacker: { ...unit, armyId: currentArmyId },
+      defender: selectedTarget || effectiveTargetStats,
+      weapon: weaponStats,
+      game: game,
+      combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
+      combatRole: 'defender',
+      options: {
+        modelsFiring: 1,
+        withinHalfRange: false,
+        unitRemainedStationary: false,
+        unitHasCharged: false,
+        blastBonusAttacks: 0
+      },
+      rules: defenderRules,
+      armyStates: armyStates
+    });
+    console.log('🔍 Defender context created with armyStates:', defenderContext.armyStates, 'length:', defenderContext.armyStates.length);
+
+    // Evaluate rules separately for attacker and defender
+    const appliedAttackerRules = evaluateAllRules(attackerRules, attackerContext);
+    const appliedDefenderRules = evaluateAllRules(defenderRules, defenderContext);
+
+    // Merge applied rules from both contexts
+    const appliedRules = [...appliedAttackerRules, ...appliedDefenderRules];
 
     // Also include rules that have userInput (conditional rules that will activate with user input)
+    const allRules = [...attackerRules, ...defenderRules];
     const conditionalRules = allRules.filter(rule => {
       // Skip if already applied
       if (appliedRules.some(r => r.id === rule.id)) return false;
 
       // Include if the rule has a userInput field
       if (rule.userInput) {
-        // Check if all non-user-input conditions are met
+        // Check if all non-user-input conditions are met in the appropriate context
+        const isAttackerRule = attackerRules.some(r => r.id === rule.id);
+        const context = isAttackerRule ? attackerContext : defenderContext;
         const nonUserInputConditions = rule.conditions.filter(c => c.type !== 'user-input');
         const allNonUserInputConditionsMet = nonUserInputConditions.every(condition =>
           checkCondition(condition, context)
@@ -519,30 +561,32 @@ export default function CombatCalculatorPage({
     const displayRules = [...appliedRules, ...conditionalRules];
 
     // Debug: log applied rules
-    console.log('✅ Applied Rules:', appliedRules.map(r => r.id));
+    console.log('✅ Applied Attacker Rules:', appliedAttackerRules.map(r => r.id));
+    console.log('✅ Applied Defender Rules:', appliedDefenderRules.map(r => r.id));
     console.log('🔀 Conditional Rules (with user input):', conditionalRules.map(r => r.id));
-    console.log('📊 Context modifiers:', context.modifiers.getAllModifiers());
+    console.log('📊 Attacker context modifiers:', attackerContext.modifiers.getAllModifiers());
+    console.log('📊 Defender context modifiers:', defenderContext.modifiers.getAllModifiers());
 
-    // Extract modifiers
-    const hitMod = context.modifiers.get('hit');
-    const woundMod = context.modifiers.get('wound');
-    const aMod = context.modifiers.get('A') || 0;
-    const sMod = context.modifiers.get('S') || 0;
-    const apMod = context.modifiers.get('AP') || 0;
-    const dMod = context.modifiers.get('D') || 0;
+    // Extract modifiers from attacker context (these affect the attack)
+    const hitMod = attackerContext.modifiers.get('hit');
+    const woundMod = attackerContext.modifiers.get('wound');
+    const aMod = attackerContext.modifiers.get('A') || 0;
+    const sMod = attackerContext.modifiers.get('S') || 0;
+    const apMod = attackerContext.modifiers.get('AP') || 0;
+    const dMod = attackerContext.modifiers.get('D') || 0;
 
-    // Extract modifier sources
-    const hitSources = context.modifiers.getModifiers('hit').map(m => m.source);
-    const woundSources = context.modifiers.getModifiers('wound').map(m => m.source);
-    const aSources = context.modifiers.getModifiers('A').map(m => m.source);
-    const sSources = context.modifiers.getModifiers('S').map(m => m.source);
-    const apSources = context.modifiers.getModifiers('AP').map(m => m.source);
-    const dSources = context.modifiers.getModifiers('D').map(m => m.source);
+    // Extract modifier sources from attacker context
+    const hitSources = attackerContext.modifiers.getModifiers('hit').map(m => m.source);
+    const woundSources = attackerContext.modifiers.getModifiers('wound').map(m => m.source);
+    const aSources = attackerContext.modifiers.getModifiers('A').map(m => m.source);
+    const sSources = attackerContext.modifiers.getModifiers('S').map(m => m.source);
+    const apSources = attackerContext.modifiers.getModifiers('AP').map(m => m.source);
+    const dSources = attackerContext.modifiers.getModifiers('D').map(m => m.source);
 
-    // Extract keyword sources
+    // Extract keyword sources from attacker context
     const keywordSources: Array<{ keyword: string; source: string }> = [];
-    const allMods = context.modifiers.getAllModifiers();
-    for (const [stat, mods] of allMods.entries()) {
+    const attackerMods = attackerContext.modifiers.getAllModifiers();
+    for (const [stat, mods] of attackerMods.entries()) {
       if (stat.startsWith('keyword:')) {
         for (const mod of mods) {
           const keyword = stat.replace('keyword:', '');
@@ -596,16 +640,29 @@ export default function CombatCalculatorPage({
     };
 
     // Load applicable rules from database (linked rules)
-    const allRules: Rule[] = [];
-    const addedRuleIds = new Set<string>(); // Track which rules we've already added to avoid duplicates
+    const attackerRules: Rule[] = [];
+    const defenderRules: Rule[] = [];
+    const addedAttackerRuleIds = new Set<string>(); // Track which rules we've already added to avoid duplicates
+    const addedDefenderRuleIds = new Set<string>(); // Track which rules we've already added to avoid duplicates
 
-    // Helper to add rules with deduplication
-    const addRules = (rules: Rule | Rule[]) => {
+    // Helper to add attacker rules with deduplication
+    const addAttackerRules = (rules: Rule | Rule[]) => {
       const ruleArray = Array.isArray(rules) ? rules : [rules];
       for (const rule of ruleArray) {
-        if (!addedRuleIds.has(rule.id)) {
-          addedRuleIds.add(rule.id);
-          allRules.push(rule);
+        if (!addedAttackerRuleIds.has(rule.id)) {
+          addedAttackerRuleIds.add(rule.id);
+          attackerRules.push(rule);
+        }
+      }
+    };
+
+    // Helper to add defender rules with deduplication
+    const addDefenderRules = (rules: Rule | Rule[]) => {
+      const ruleArray = Array.isArray(rules) ? rules : [rules];
+      for (const rule of ruleArray) {
+        if (!addedDefenderRuleIds.has(rule.id)) {
+          addedDefenderRuleIds.add(rule.id);
+          defenderRules.push(rule);
         }
       }
     };
@@ -617,7 +674,7 @@ export default function CombatCalculatorPage({
         if (rule?.ruleObject) {
           try {
             const parsedRule = JSON.parse(rule.ruleObject);
-            addRules(parsedRule);
+            addAttackerRules(parsedRule);
           } catch (e) {
             console.error('Failed to parse rule:', rule.name, e);
           }
@@ -648,14 +705,14 @@ export default function CombatCalculatorPage({
     console.log(`📋 After phase filter: ${combatRelevantRules.length} combat-relevant rules`);
     combatRelevantRules.forEach(r => console.log(`   - ${r.name} (${r.id})`));
 
-    addRules(combatRelevantRules);
+    addAttackerRules(combatRelevantRules);
 
     // Get all unit rules for defender (target) - includes defensive abilities like FNP
     if (selectedTarget) {
-      const defenderRules = getAllUnitRules(selectedTarget);
-      console.log(`📋 getAllUnitRules returned ${defenderRules.length} rules for defender:`, selectedTarget.name);
+      const defenderUnitRules = getAllUnitRules(selectedTarget);
+      console.log(`📋 getAllUnitRules returned ${defenderUnitRules.length} rules for defender:`, selectedTarget.name);
 
-      const defenderCombatRelevantRules = defenderRules.filter((rule: Rule) => {
+      const defenderCombatRelevantRules = defenderUnitRules.filter((rule: Rule) => {
         // If rule has a phase constraint, check if it matches current combat phase
         if (rule.activation?.phase) {
           const matches = rule.activation.phase === 'any' || rule.activation.phase === currentCombatPhase;
@@ -669,10 +726,10 @@ export default function CombatCalculatorPage({
       console.log(`📋 Defender: After phase filter: ${defenderCombatRelevantRules.length} combat-relevant rules`);
       defenderCombatRelevantRules.forEach(r => console.log(`   - ${r.name} (${r.id})`));
 
-      addRules(defenderCombatRelevantRules);
+      addDefenderRules(defenderCombatRelevantRules);
     }
 
-    console.log(`📋 Total rules in context: ${allRules.length}`);
+    console.log(`📋 Total attacker rules: ${attackerRules.length}, Total defender rules: ${defenderRules.length}`);
 
     // Get army states from query (flatten from all armies in the game)
     console.log('🔍 game?.armies:', game?.armies);
@@ -689,48 +746,68 @@ export default function CombatCalculatorPage({
       unitArmyId: unit?.armyId,
       armyStates,
       hasWaaagh: armyStates.some(s => s.state === 'waaagh-active'),
-      loadedRules: allRules.length,
+      loadedAttackerRules: attackerRules.length,
+      loadedDefenderRules: defenderRules.length,
       weaponType
     });
 
-    // Build context to evaluate which rules apply
-    const context = buildCombatContext({
+    // Build separate contexts for attacker and defender rules
+    const attackerContext = buildCombatContext({
       attacker: { ...unit, armyId: currentArmyId },
       defender: selectedTarget || targetStats,
       weapon: weaponStats,
       game: game,
       combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
+      combatRole: 'attacker',
       options,
-      rules: allRules,
+      rules: attackerRules,
       armyStates: armyStates
     });
 
-    // Evaluate rules to see which ones apply
-    const appliedRules = evaluateAllRules(allRules, context);
+    const defenderContext = buildCombatContext({
+      attacker: { ...unit, armyId: currentArmyId },
+      defender: selectedTarget || targetStats,
+      weapon: weaponStats,
+      game: game,
+      combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
+      combatRole: 'defender',
+      options,
+      rules: defenderRules,
+      armyStates: armyStates
+    });
+
+    // Evaluate rules separately for attacker and defender
+    const appliedAttackerRules = evaluateAllRules(attackerRules, attackerContext);
+    const appliedDefenderRules = evaluateAllRules(defenderRules, defenderContext);
+
+    // Merge applied rules from both contexts
+    const appliedRules = [...appliedAttackerRules, ...appliedDefenderRules];
 
     // Debug: log applied rules
-    console.log('✅ Applied Rules:', appliedRules.map(r => r.id));
-    console.log('📊 Context modifiers:', context.modifiers.getAllModifiers());
+    console.log('✅ Applied Attacker Rules:', appliedAttackerRules.map(r => r.id));
+    console.log('✅ Applied Defender Rules:', appliedDefenderRules.map(r => r.id));
+    console.log('📊 Attacker context modifiers:', attackerContext.modifiers.getAllModifiers());
+    console.log('📊 Defender context modifiers:', defenderContext.modifiers.getAllModifiers());
 
-    // Extract modifiers
-    const hitMod = context.modifiers.get('hit');
-    const woundMod = context.modifiers.get('wound');
-    const keywords = getAddedKeywords(context);
+    // Extract modifiers from attacker context (these affect the attack)
+    const hitMod = attackerContext.modifiers.get('hit');
+    const woundMod = attackerContext.modifiers.get('wound');
+    const keywords = getAddedKeywords(attackerContext);
 
     // Extract weapon stat modifiers
-    const aMod = context.modifiers.get('A') || 0;
-    const sMod = context.modifiers.get('S') || 0;
-    const apMod = context.modifiers.get('AP') || 0;
-    const dMod = context.modifiers.get('D') || 0;
+    const aMod = attackerContext.modifiers.get('A') || 0;
+    const sMod = attackerContext.modifiers.get('S') || 0;
+    const apMod = attackerContext.modifiers.get('AP') || 0;
+    const dMod = attackerContext.modifiers.get('D') || 0;
 
     // Extract modifier sources (which rules provided each modifier)
-    const hitSources = context.modifiers.getModifiers('hit').map(m => m.source);
-    const woundSources = context.modifiers.getModifiers('wound').map(m => m.source);
+    const hitSources = attackerContext.modifiers.getModifiers('hit').map(m => m.source);
+    const woundSources = attackerContext.modifiers.getModifiers('wound').map(m => m.source);
 
     // Extract keyword sources
     const keywordSources: Array<{ keyword: string; source: string }> = [];
-    const allMods = context.modifiers.getAllModifiers();
-    for (const [stat, mods] of allMods.entries()) {
+    const attackerMods = attackerContext.modifiers.getAllModifiers();
+    for (const [stat, mods] of attackerMods.entries()) {
       if (stat.startsWith('keyword:')) {
         for (const mod of mods) {
           const keyword = stat.replace('keyword:', '');
@@ -739,6 +816,45 @@ export default function CombatCalculatorPage({
         }
       }
     }
+
+    // Apply modifiers to weapon stats for execution
+    // Check for "Extra Attacks" keyword - these weapons cannot have attacks modified
+    const hasExtraAttacks = weaponStats.keywords?.some((kw: string) =>
+      kw.toLowerCase() === 'extra attacks'
+    );
+
+    // Use the same logic as combat-calculator-engine for handling dice notation
+    let modifiedA = weaponStats.A;
+    // Only apply A modifier if weapon doesn't have "Extra Attacks" keyword
+    if (aMod !== 0 && !hasExtraAttacks) {
+      // Simple implementation: if it's a number, add the modifier
+      const numA = parseInt(weaponStats.A);
+      if (!isNaN(numA)) {
+        modifiedA = String(numA + aMod);
+      } else {
+        // For dice notation like "D6+3", we'd need parser - for now just keep original
+        modifiedA = weaponStats.A;
+      }
+    }
+
+    let modifiedD = weaponStats.D;
+    if (dMod !== 0) {
+      const numD = parseInt(weaponStats.D);
+      if (!isNaN(numD)) {
+        modifiedD = String(numD + dMod);
+      } else {
+        modifiedD = weaponStats.D;
+      }
+    }
+
+    const modifiedWeaponStats: WeaponStats = {
+      ...weaponStats,
+      keywords: [...weaponStats.keywords, ...keywords],
+      A: modifiedA,
+      S: weaponStats.S + sMod,
+      AP: weaponStats.AP + apMod,
+      D: modifiedD
+    };
 
     // Save for display
     setActiveRules(appliedRules);
@@ -752,14 +868,8 @@ export default function CombatCalculatorPage({
       keywords: keywordSources
     });
 
-    // Execute combat sequence with rules engine
-    const result = executeCombatSequence(weaponStats, targetStats, options, {
-      attacker: { ...unit, armyId: currentArmyId },
-      game: game,
-      combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
-      rules: allRules,
-      armyStates: armyStates
-    });
+    // Execute combat sequence with already-modified weapon (don't pass rules to avoid double-application)
+    const result = executeCombatSequence(modifiedWeaponStats, targetStats, options);
 
     setCombatResult(result);
     setShowSavePhase(false);
