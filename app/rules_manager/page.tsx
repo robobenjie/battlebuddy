@@ -351,21 +351,34 @@ export default function RulesManagerPage() {
                   )}
                 </div>
 
-                <div className="flex justify-end gap-3">
+                <div className="flex justify-between items-center">
                   <button
-                    onClick={handleCancel}
-                    disabled={isSaving}
-                    className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-700 text-white px-6 py-2 rounded transition-colors"
+                    onClick={() => handleAiImplement(editingRule)}
+                    disabled={isImplementing || !editingRule.rawText}
+                    className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition-colors flex items-center gap-2"
+                    title={!editingRule.rawText ? 'No rule text available' : 'Use AI to re-implement this rule'}
                   >
-                    Cancel
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    {isImplementing ? 'Generating...' : 'AI Re-implement'}
                   </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white px-6 py-2 rounded transition-colors"
-                  >
-                    {isSaving ? 'Saving...' : 'Save'}
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleCancel}
+                      disabled={isSaving}
+                      className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-700 text-white px-6 py-2 rounded transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white px-6 py-2 rounded transition-colors"
+                    >
+                      {isSaving ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

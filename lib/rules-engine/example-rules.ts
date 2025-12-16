@@ -58,6 +58,21 @@ export const EXAMPLE_RULES: Rule[] = [
     "scope": "model",
     "conditions": [
       {
+        "type": "combat-role",
+        "params": {
+          "role": "attacker",
+          "categories": null,
+          "weaponTypes": null,
+          "range": null,
+          "statuses": null,
+          "armyStates": null,
+          "phases": null,
+          "inputId": null,
+          "inputValue": null
+        },
+        "operator": null
+      },
+      {
         "type": "is-leading",
         "params": {
           "categories": null,
@@ -314,6 +329,21 @@ export const EXAMPLE_RULES: Rule[] = [
     "scope": "model",
     "conditions": [
       {
+        "type": "combat-role",
+        "params": {
+          "role": "attacker",
+          "categories": null,
+          "weaponTypes": null,
+          "range": null,
+          "statuses": null,
+          "armyStates": null,
+          "phases": null,
+          "inputId": null,
+          "inputValue": null
+        },
+        "operator": null
+      },
+      {
         "type": "weapon-type",
         "params": {
           "weaponTypes": [
@@ -384,6 +414,21 @@ export const EXAMPLE_RULES: Rule[] = [
     "scope": "unit",
     "conditions": [
       {
+        "type": "combat-role",
+        "params": {
+          "role": "attacker",
+          "categories": null,
+          "weaponTypes": null,
+          "range": null,
+          "statuses": null,
+          "armyStates": null,
+          "phases": null,
+          "inputId": null,
+          "inputValue": null
+        },
+        "operator": null
+      },
+      {
         "type": "weapon-type",
         "params": {
           "weaponTypes": [
@@ -436,6 +481,21 @@ export const EXAMPLE_RULES: Rule[] = [
     "faction": "Space Marines",
     "scope": "model",
     "conditions": [
+      {
+        "type": "combat-role",
+        "params": {
+          "role": "attacker",
+          "categories": null,
+          "weaponTypes": null,
+          "range": null,
+          "statuses": null,
+          "armyStates": null,
+          "phases": null,
+          "inputId": null,
+          "inputValue": null
+        },
+        "operator": null
+      },
       {
         "type": "weapon-type",
         "params": {
@@ -506,6 +566,21 @@ export const EXAMPLE_RULES: Rule[] = [
     "faction": "Orks",
     "scope": "unit",
     "conditions": [
+      {
+        "type": "combat-role",
+        "params": {
+          "role": "attacker",
+          "categories": null,
+          "weaponTypes": null,
+          "range": null,
+          "statuses": null,
+          "armyStates": null,
+          "phases": null,
+          "inputId": null,
+          "inputValue": null
+        },
+        "operator": null
+      },
       {
         "type": "weapon-type",
         "params": {
@@ -744,6 +819,21 @@ export const EXAMPLE_RULES: Rule[] = [
     "scope": "unit",
     "conditions": [
       {
+        "type": "combat-role",
+        "params": {
+          "role": "attacker",
+          "categories": null,
+          "weaponTypes": null,
+          "range": null,
+          "statuses": null,
+          "armyStates": null,
+          "phases": null,
+          "inputId": null,
+          "inputValue": null
+        },
+        "operator": null
+      },
+      {
         "type": "weapon-type",
         "params": {
           "weaponTypes": [
@@ -841,6 +931,21 @@ export const EXAMPLE_RULES: Rule[] = [
     "faction": "Orks",
     "scope": "unit",
     "conditions": [
+      {
+        "type": "combat-role",
+        "params": {
+          "role": "attacker",
+          "categories": null,
+          "weaponTypes": null,
+          "range": null,
+          "statuses": null,
+          "armyStates": null,
+          "phases": null,
+          "inputId": null,
+          "inputValue": null
+        },
+        "operator": null
+      },
       {
         "type": "army-state",
         "params": {
@@ -946,6 +1051,21 @@ export const EXAMPLE_RULES: Rule[] = [
     "scope": "army",
     "conditions": [
       {
+        "type": "combat-role",
+        "params": {
+          "role": "attacker",
+          "categories": null,
+          "weaponTypes": null,
+          "range": null,
+          "statuses": null,
+          "armyStates": null,
+          "phases": null,
+          "inputId": null,
+          "inputValue": null
+        },
+        "operator": null
+      },
+      {
         "type": "army-state",
         "params": {
           "armyStates": ["waaagh-active"],
@@ -1012,6 +1132,21 @@ export const EXAMPLE_RULES: Rule[] = [
     "scope": "army",
     "conditions": [
       {
+        "type": "combat-role",
+        "params": {
+          "role": "attacker",
+          "categories": null,
+          "weaponTypes": null,
+          "range": null,
+          "statuses": null,
+          "armyStates": null,
+          "phases": null,
+          "inputId": null,
+          "inputValue": null
+        },
+        "operator": null
+      },
+      {
         "type": "army-state",
         "params": {
           "armyStates": ["waaagh-active"],
@@ -1077,6 +1212,21 @@ export const EXAMPLE_RULES: Rule[] = [
     "faction": "Orks",
     "scope": "army",
     "conditions": [
+      {
+        "type": "combat-role",
+        "params": {
+          "role": "defender",
+          "categories": null,
+          "weaponTypes": null,
+          "range": null,
+          "statuses": null,
+          "armyStates": null,
+          "phases": null,
+          "inputId": null,
+          "inputValue": null
+        },
+        "operator": null
+      },
       {
         "type": "army-state",
         "params": {
@@ -1161,6 +1311,21 @@ export const EXAMPLE_RULES: Rule[] = [
     "faction": "Orks",
     "scope": "unit",
     "conditions": [
+      {
+        "type": "combat-role",
+        "params": {
+          "role": "defender",
+          "categories": null,
+          "weaponTypes": null,
+          "range": null,
+          "statuses": null,
+          "armyStates": null,
+          "phases": null,
+          "inputId": null,
+          "inputValue": null
+        },
+        "operator": null
+      },
       {
         "type": "army-state",
         "params": {

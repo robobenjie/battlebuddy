@@ -604,7 +604,8 @@ describe('Example Rules Integration', () => {
 
     it('should add Feel No Pain 5 keyword when Waaagh is active', () => {
       const context = createTestContext({
-        armyStates: ['waaagh-active']
+        armyStates: ['waaagh-active'],
+        combatRole: 'defender', // FNP is a defensive ability
       });
 
       evaluateRule(rule, context);
@@ -615,7 +616,8 @@ describe('Example Rules Integration', () => {
 
     it('should not apply when Waaagh is not active', () => {
       const context = createTestContext({
-        armyStates: []
+        armyStates: [],
+        combatRole: 'defender', // FNP is a defensive ability
       });
 
       const applied = evaluateRule(rule, context);
