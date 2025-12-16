@@ -17,6 +17,12 @@ interface CommandPhaseProps {
     faction?: string;
     unitIds?: string[];
   };
+  currentUserArmy?: {
+    id: string;
+    name: string;
+    faction?: string;
+    unitIds?: string[];
+  };
   currentPlayer: {
     id: string;
     userId: string;
@@ -30,18 +36,19 @@ interface CommandPhaseProps {
   players: any[];
 }
 
-export default function CommandPhase({ gameId, army, currentPlayer, currentUser, game, players }: CommandPhaseProps) {
+export default function CommandPhase({ gameId, army, currentUserArmy, currentPlayer, currentUser, game, players }: CommandPhaseProps) {
   const { isOpen, rule, showRule, hideRule } = useRulePopup();
 
   // Query for army states to check if WAAAGH has been declared
+  // Use currentUserArmy so each player sees their own army's Waaagh status
   // Note: Query from armies with states link, not armyStates directly
   const { data: armyStatesData } = db.useQuery(
-    army?.id ? {
+    currentUserArmy?.id ? {
       armies: {
         states: {},
         $: {
           where: {
-            id: army.id
+            id: currentUserArmy.id
           }
         }
       }
@@ -89,7 +96,7 @@ export default function CommandPhase({ gameId, army, currentPlayer, currentUser,
 
   const armyWithStates = armyStatesData?.armies?.[0];
   const waaaghState = armyWithStates?.states?.find((s: any) => s.state === 'waaagh-active');
-  const hasWaaagh = army?.faction?.toLowerCase() === 'orks';
+  const hasWaaagh = currentUserArmy?.faction?.toLowerCase() === 'orks';
   const waaaghAlreadyDeclared = !!waaaghState;
   const isCurrentPlayer = currentPlayer?.userId === currentUser?.id;
 
@@ -133,13 +140,13 @@ export default function CommandPhase({ gameId, army, currentPlayer, currentUser,
   };
 
   const declareWaaagh = async () => {
-    if (!army?.id) return;
+    if (!currentUserArmy?.id) return;
 
     await db.transact([
       db.tx.armyStates[id()].update({
         state: 'waaagh-active',
         activatedTurn: game.currentTurn,
-      }).link({ army: army.id })
+      }).link({ army: currentUserArmy.id })
     ]);
   };
 

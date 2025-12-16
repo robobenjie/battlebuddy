@@ -468,28 +468,39 @@ export default function CombatCalculatorPage({
 
     console.log(`📋 Total attacker rules: ${attackerRules.length}, Total defender rules: ${defenderRules.length}`);
 
-    // Get army states from query (flatten from all armies in the game)
+    // Get army states for attacker and defender separately
     console.log('🔍 game?.armies:', game?.armies);
     if (game?.armies) {
       game.armies.forEach((army: any, idx: number) => {
         console.log(`🔍 army[${idx}] id=${army.id}, states:`, army.states);
       });
     }
-    const armyStates: ArmyState[] = game?.armies?.flatMap((army: any) => army.states || []) || [];
+
+    // Get attacker's army states
+    const attackerArmy = game?.armies?.find((army: any) => army.id === currentArmyId);
+    const attackerArmyStates: ArmyState[] = attackerArmy?.states || [];
+
+    // Get defender's army states (from selectedTarget or effectiveTargetStats)
+    const defenderArmyId = selectedTarget?.armyId || effectiveTargetStats?.armyId;
+    const defenderArmy = game?.armies?.find((army: any) => army.id === defenderArmyId);
+    const defenderArmyStates: ArmyState[] = defenderArmy?.states || [];
 
     // Debug logging
     console.log('🔍 WAAAGH Debug:', {
       currentArmyId,
       unitArmyId: unit?.armyId,
-      armyStates,
-      hasWaaagh: armyStates.some(s => s.state === 'waaagh-active'),
+      attackerArmyStates,
+      defenderArmyId,
+      defenderArmyStates,
+      hasAttackerWaaagh: attackerArmyStates.some(s => s.state === 'waaagh-active'),
+      hasDefenderWaaagh: defenderArmyStates.some(s => s.state === 'waaagh-active'),
       loadedAttackerRules: attackerRules.length,
       loadedDefenderRules: defenderRules.length,
       weaponType
     });
 
-    // Build separate contexts for attacker and defender rules
-    console.log('🔍 Building attacker context with armyStates:', armyStates, 'length:', armyStates.length);
+    // Build separate contexts for attacker and defender rules with their respective army states
+    console.log('🔍 Building attacker context with armyStates:', attackerArmyStates, 'length:', attackerArmyStates.length);
     const attackerContext = buildCombatContext({
       attacker: { ...unit, armyId: currentArmyId },
       defender: selectedTarget || effectiveTargetStats,
@@ -505,11 +516,11 @@ export default function CombatCalculatorPage({
         blastBonusAttacks: 0
       },
       rules: attackerRules,
-      armyStates: armyStates
+      armyStates: attackerArmyStates // Use attacker's army states
     });
     console.log('🔍 Attacker context created with armyStates:', attackerContext.armyStates, 'length:', attackerContext.armyStates.length);
 
-    console.log('🔍 Building defender context with armyStates:', armyStates, 'length:', armyStates.length);
+    console.log('🔍 Building defender context with armyStates:', defenderArmyStates, 'length:', defenderArmyStates.length);
     const defenderContext = buildCombatContext({
       attacker: { ...unit, armyId: currentArmyId },
       defender: selectedTarget || effectiveTargetStats,
@@ -525,7 +536,7 @@ export default function CombatCalculatorPage({
         blastBonusAttacks: 0
       },
       rules: defenderRules,
-      armyStates: armyStates
+      armyStates: defenderArmyStates // Use defender's army states
     });
     console.log('🔍 Defender context created with armyStates:', defenderContext.armyStates, 'length:', defenderContext.armyStates.length);
 
@@ -731,27 +742,38 @@ export default function CombatCalculatorPage({
 
     console.log(`📋 Total attacker rules: ${attackerRules.length}, Total defender rules: ${defenderRules.length}`);
 
-    // Get army states from query (flatten from all armies in the game)
+    // Get army states for attacker and defender separately
     console.log('🔍 game?.armies:', game?.armies);
     if (game?.armies) {
       game.armies.forEach((army: any, idx: number) => {
         console.log(`🔍 army[${idx}] id=${army.id}, states:`, army.states);
       });
     }
-    const armyStates: ArmyState[] = game?.armies?.flatMap((army: any) => army.states || []) || [];
+
+    // Get attacker's army states
+    const attackerArmy = game?.armies?.find((army: any) => army.id === currentArmyId);
+    const attackerArmyStates: ArmyState[] = attackerArmy?.states || [];
+
+    // Get defender's army states (from selectedTarget or targetStats)
+    const defenderArmyId = selectedTarget?.armyId || targetStats?.armyId;
+    const defenderArmy = game?.armies?.find((army: any) => army.id === defenderArmyId);
+    const defenderArmyStates: ArmyState[] = defenderArmy?.states || [];
 
     // Debug logging
     console.log('🔍 WAAAGH Debug:', {
       currentArmyId,
       unitArmyId: unit?.armyId,
-      armyStates,
-      hasWaaagh: armyStates.some(s => s.state === 'waaagh-active'),
+      attackerArmyStates,
+      defenderArmyId,
+      defenderArmyStates,
+      hasAttackerWaaagh: attackerArmyStates.some(s => s.state === 'waaagh-active'),
+      hasDefenderWaaagh: defenderArmyStates.some(s => s.state === 'waaagh-active'),
       loadedAttackerRules: attackerRules.length,
       loadedDefenderRules: defenderRules.length,
       weaponType
     });
 
-    // Build separate contexts for attacker and defender rules
+    // Build separate contexts for attacker and defender rules with their respective army states
     const attackerContext = buildCombatContext({
       attacker: { ...unit, armyId: currentArmyId },
       defender: selectedTarget || targetStats,
@@ -761,7 +783,7 @@ export default function CombatCalculatorPage({
       combatRole: 'attacker',
       options,
       rules: attackerRules,
-      armyStates: armyStates
+      armyStates: attackerArmyStates // Use attacker's army states
     });
 
     const defenderContext = buildCombatContext({
@@ -773,7 +795,7 @@ export default function CombatCalculatorPage({
       combatRole: 'defender',
       options,
       rules: defenderRules,
-      armyStates: armyStates
+      armyStates: defenderArmyStates // Use defender's army states
     });
 
     // Evaluate rules separately for attacker and defender

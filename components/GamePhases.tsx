@@ -292,6 +292,7 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
     const phaseProps = {
       gameId,
       army,
+      currentUserArmy,
       currentPlayer,
       currentUser,
       game,
