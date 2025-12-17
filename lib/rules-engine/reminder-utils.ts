@@ -14,22 +14,55 @@ export type PhaseType = 'command' | 'movement' | 'shooting' | 'charge' | 'fight'
 export function getUnitReminders(
   unit: any,
   currentPhase: PhaseType,
-  turnContext: TurnContext
+  turnContext: TurnContext,
+  armyStates?: any[]
 ): Rule[] {
   // Get all rules for this unit (including leaders, models, weapons)
   const allRules = getAllUnitRules(unit);
 
   // Filter for reminder-type rules that match phase and turn
-  return allRules.filter((rule: Rule) => {
-    // Check if this is a reminder-type rule
-    if (!rule.activation) return false;
+  const filteredRules = allRules.filter((rule: Rule) => {
+    // If rule has explicit activation, check phase and turn
+    if (rule.activation) {
+      // Match phase
+      if (rule.activation.phase !== currentPhase && rule.activation.phase !== 'any') {
+        return false;
+      }
 
-    // Match phase
-    if (rule.activation.phase !== currentPhase) return false;
+      // Match turn context
+      // null or undefined means 'both' (applies on any turn)
+      const ruleTurn = rule.activation.turn ?? 'both';
+      if (!(turnContext === 'both' || ruleTurn === 'both' || ruleTurn === turnContext)) {
+        return false;
+      }
+    }
+    // Rules without activation field are always shown (no phase/turn filtering)
 
-    // Match turn context
-    const ruleTurn = rule.activation.turn || 'own';
-    return turnContext === 'both' || ruleTurn === 'both' || ruleTurn === turnContext;
+    // Filter out rules that require army states that aren't active
+    if (rule.conditions) {
+      const armyStateCondition = rule.conditions.find(c => c.type === 'army-state');
+      if (armyStateCondition) {
+        const requiredStates = armyStateCondition.params?.armyStates || [];
+        const hasRequiredState = requiredStates.some((requiredState: string) =>
+          armyStates?.some((state: any) => state.state === requiredState)
+        );
+        if (!hasRequiredState) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  });
+
+  // Deduplicate rules by ID (in case a rule appears multiple times from different sources)
+  const seen = new Set<string>();
+  return filteredRules.filter((rule: Rule) => {
+    if (seen.has(rule.id)) {
+      return false;
+    }
+    seen.add(rule.id);
+    return true;
   });
 }
 
@@ -39,9 +72,10 @@ export function getUnitReminders(
 export function hasReminders(
   unit: any,
   currentPhase: PhaseType,
-  turnContext: TurnContext
+  turnContext: TurnContext,
+  armyStates?: any[]
 ): boolean {
-  return getUnitReminders(unit, currentPhase, turnContext).length > 0;
+  return getUnitReminders(unit, currentPhase, turnContext, armyStates).length > 0;
 }
 
 /**

@@ -134,8 +134,9 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
   const units = allUnits.filter((unit: any) => !destroyedUnitIds.has(unit.id));
 
   // Get units with command phase reminders
+  const armyStates = armyWithStates?.states || [];
   const unitsWithReminders = units.filter((unit: any) =>
-    getUnitReminders(unit, 'command', 'own').length > 0
+    getUnitReminders(unit, 'command', 'own', armyStates).length > 0
   );
 
   // Get all armies in the game for reactive abilities
@@ -198,8 +199,8 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
         </button>
       )}
 
-      {/* Show WAAAGH status if already declared */}
-      {hasWaaagh && waaaghAlreadyDeclared && (
+      {/* Show WAAAGH status if already declared (only for current player) */}
+      {hasWaaagh && waaaghAlreadyDeclared && isCurrentPlayer && (
         <div className="bg-gradient-to-br from-green-700 via-green-600 to-green-800 rounded-2xl p-8 border-4 border-green-400 shadow-2xl overflow-hidden">
           <div className="text-center">
             <div className="text-white font-black text-[10vw] md:text-[6vw] lg:text-[4vw] mb-2 uppercase tracking-wider font-skranji">
@@ -282,7 +283,7 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
 
           {unitsWithReminders.map(unit => {
             const unitData = formatUnitForCard(unit);
-            const unitReminders = getUnitReminders(unit, 'command', 'own');
+            const unitReminders = getUnitReminders(unit, 'command', 'own', armyStates);
 
             return (
               <div key={unit.id} className={`bg-gray-800 rounded-lg overflow-hidden ${!isCurrentPlayer ? 'opacity-60' : ''}`}>

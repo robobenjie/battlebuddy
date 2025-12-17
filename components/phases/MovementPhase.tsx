@@ -245,7 +245,7 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
           const hasActions = hasActionsThisTurn(unit.id);
 
           // Get reminders for this unit
-          const unitReminders = getUnitReminders(unit, 'movement', 'own');
+          const unitReminders = getUnitReminders(unit, 'movement', 'own', armyStates);
 
           return (
             <div key={unit.id} className={`bg-gray-800 rounded-lg overflow-hidden ${!isActivePlayer ? 'opacity-60' : ''}`}>

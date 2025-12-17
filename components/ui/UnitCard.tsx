@@ -68,6 +68,7 @@ interface UnitCardProps {
   defaultExpanded?: boolean;
   currentPhase?: PhaseType;
   currentTurn?: TurnContext;
+  armyStates?: any[];
 }
 
 export default function UnitCard({
@@ -76,7 +77,8 @@ export default function UnitCard({
   expandable = true,
   defaultExpanded = false,
   currentPhase,
-  currentTurn
+  currentTurn,
+  armyStates
 }: UnitCardProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const { isOpen, rule, showRule, hideRule } = useRulePopup();
@@ -96,7 +98,7 @@ export default function UnitCard({
 
   // Get reminder rules for this unit if phase and turn are provided
   const reminders = (currentPhase && currentTurn)
-    ? getUnitReminders(unit, currentPhase, currentTurn)
+    ? getUnitReminders(unit, currentPhase, currentTurn, armyStates)
     : [];
 
   // Helper: group weapons by name+type (optionally add more fields for uniqueness)

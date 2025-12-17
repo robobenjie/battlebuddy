@@ -43,6 +43,7 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
     games: {
       armies: {
         armyRules: {},
+        states: {},
         units: {
           ...UNIT_FULL_QUERY,
         },
@@ -235,7 +236,8 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
     const turnContext = isActivePlayerUnit ? 'own' : 'opponent';
 
     // Get fight phase reminders for this unit
-    const unitReminders = getUnitReminders(unit, 'fight', turnContext);
+    const armyStates = unitArmy?.states || [];
+    const unitReminders = getUnitReminders(unit, 'fight', turnContext, armyStates);
 
     return (
       <div key={unit.id} className="py-2">

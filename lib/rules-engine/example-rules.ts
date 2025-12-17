@@ -307,7 +307,7 @@ export const EXAMPLE_RULES = [
       "type": "automatic",
       "phase": "any",
       "limit": null,
-      "turn": null
+      "turn": "own"
     }
   },
   {
@@ -389,9 +389,9 @@ export const EXAMPLE_RULES = [
     "duration": "turn",
     "activation": {
       "type": "automatic",
-      "phase": "any",
+      "phase": "shooting",
       "limit": null,
-      "turn": null
+      "turn": "own"
     }
   },
   {
@@ -457,7 +457,7 @@ export const EXAMPLE_RULES = [
       "type": "automatic",
       "phase": "shooting",
       "limit": null,
-      "turn": null
+      "turn": "own"
     },
     "userInput": null
   },
@@ -541,7 +541,7 @@ export const EXAMPLE_RULES = [
       "type": "automatic",
       "phase": "shooting",
       "limit": null,
-      "turn": null
+      "turn": "own"
     },
     "userInput": null
   },
@@ -625,7 +625,7 @@ export const EXAMPLE_RULES = [
       "type": "automatic",
       "phase": "charge",
       "limit": null,
-      "turn": null
+      "turn": "own"
     },
     "userInput": null
   },
@@ -771,7 +771,7 @@ export const EXAMPLE_RULES = [
       "type": "automatic",
       "phase": "any",
       "limit": null,
-      "turn": null
+      "turn": "both"
     },
     "userInput": null
   },
@@ -983,7 +983,7 @@ export const EXAMPLE_RULES = [
       "type": "automatic",
       "phase": "fight",
       "limit": null,
-      "turn": null
+      "turn": "both"
     },
     "userInput": null
   },
@@ -1097,7 +1097,7 @@ export const EXAMPLE_RULES = [
       "type": "automatic",
       "phase": "any",
       "limit": null,
-      "turn": null
+      "turn": "both"
     },
     "userInput": null
   },
@@ -1177,7 +1177,7 @@ export const EXAMPLE_RULES = [
       "type": "automatic",
       "phase": "any",
       "limit": null,
-      "turn": null
+      "turn": "both"
     },
     "userInput": null
   },
@@ -1242,7 +1242,7 @@ export const EXAMPLE_RULES = [
       "type": "automatic",
       "phase": "any",
       "limit": null,
-      "turn": null
+      "turn": "both"
     },
     "userInput": null
   },
@@ -1340,7 +1340,7 @@ export const EXAMPLE_RULES = [
       "type": "automatic",
       "phase": "any",
       "limit": null,
-      "turn": null
+      "turn": "both"
     },
     "userInput": null
   }
