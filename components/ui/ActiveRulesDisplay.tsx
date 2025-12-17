@@ -51,12 +51,18 @@ export default function ActiveRulesDisplay({ rules }: ActiveRulesDisplayProps) {
             <div className="flex flex-wrap gap-1">
               {rule.effects.map((effect, effIndex) => {
                 let effectText = '';
-                if (effect.type === 'modify-hit' && effect.params.modifier) {
-                  effectText = `+${effect.params.modifier} to Hit`;
-                } else if (effect.type === 'modify-wound' && effect.params.modifier) {
-                  effectText = `+${effect.params.modifier} to Wound`;
-                } else if (effect.type === 'modify-characteristic') {
-                  effectText = `+${effect.params.modifier} ${effect.params.stat}`;
+
+                // Helper to format modifier with proper sign
+                const formatModifier = (modifier: number) => {
+                  return modifier >= 0 ? `+${modifier}` : `${modifier}`;
+                };
+
+                if (effect.type === 'modify-hit' && effect.params.modifier !== undefined) {
+                  effectText = `${formatModifier(effect.params.modifier)} to Hit`;
+                } else if (effect.type === 'modify-wound' && effect.params.modifier !== undefined) {
+                  effectText = `${formatModifier(effect.params.modifier)} to Wound`;
+                } else if (effect.type === 'modify-characteristic' && effect.params.modifier !== undefined) {
+                  effectText = `${formatModifier(effect.params.modifier)} ${effect.params.stat}`;
                 } else if (effect.type === 'add-keyword') {
                   effectText = effect.params.keywordValue
                     ? `${effect.params.keyword} ${effect.params.keywordValue}`

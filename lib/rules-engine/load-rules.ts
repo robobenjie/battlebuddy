@@ -136,8 +136,20 @@ export function getAllUnitRules(
     for (const rule of unit.unitRules) {
       if (rule?.ruleObject) {
         try {
-          const parsedRule = JSON.parse(rule.ruleObject);
-          addRules(parsedRule);
+          const parsedRules = parseRuleObject(rule.ruleObject);
+
+          // For rules with "is-leading" condition:
+          // - If unit is a leader: keep the rule (will be evaluated at runtime)
+          // - If unit is not a leader: skip the rule (doesn't apply)
+          for (const parsedRule of parsedRules) {
+            const hasIsLeadingCondition = parsedRule.conditions?.some((c: any) => c.type === 'is-leading');
+            if (hasIsLeadingCondition && !unit.isLeader) {
+              console.log('   ⏭️  Skipped unit rule with is-leading condition (unit is not a leader):', parsedRule.name);
+              continue;
+            }
+            // For leaders, keep is-leading rules so they can be evaluated at runtime
+            addRules(parsedRule);
+          }
         } catch (e) {
           console.error('Failed to parse unit rule:', rule.name, e);
         }
@@ -153,6 +165,7 @@ export function getAllUnitRules(
       console.log('   Processing leader:', leader.name || leader.id);
 
       // Get leader's unit rules
+      // If the leader is in this unit's leaders array, they ARE leading by definition
       // Only include scope: "unit" rules - scope: "model" rules stay with the leader
       if (leader?.unitRules) {
         console.log('   Leader has', leader.unitRules.length, 'unit rules');
@@ -174,6 +187,11 @@ export function getAllUnitRules(
 
                 // Only include rules with scope: "unit" (these apply to the led unit)
                 if (parsedRule.scope === 'unit') {
+                  // Remove "is-leading" condition since we've already verified the leader is leading
+                  // (by the fact that they're in the leaders array)
+                  if (parsedRule.conditions) {
+                    parsedRule.conditions = parsedRule.conditions.filter((c: any) => c.type !== 'is-leading');
+                  }
                   console.log('   ✅ Loaded leader unit rule (scope: unit):', parsedRule.name);
                   addRules(parsedRule);
                 } else {
@@ -214,6 +232,10 @@ export function getAllUnitRules(
 
                     // Only include rules with scope: "unit" (these apply to the led unit)
                     if (parsedRule.scope === 'unit') {
+                      // Remove "is-leading" condition since we've already verified the leader is leading
+                      if (parsedRule.conditions) {
+                        parsedRule.conditions = parsedRule.conditions.filter((c: any) => c.type !== 'is-leading');
+                      }
                       console.log('   ✅ Loaded leader model rule (scope: unit):', parsedRule.name);
                       addRules(parsedRule);
                     } else {

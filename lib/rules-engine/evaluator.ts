@@ -85,7 +85,12 @@ export function checkCondition(condition: RuleCondition, context: CombatContext)
     }
 
     case 'being-led': {
-      // Check if the attacker is being led (has a leader)
+      // Check if the current participant (based on combatRole) is being led (has a leader)
+      // When evaluating attacker rules, check attacker.leaderId
+      // When evaluating defender rules, check defender.leaderId
+      if (context.combatRole === 'defender') {
+        return !!(context.defender as any).leaderId;
+      }
       return !!context.attacker.leaderId;
     }
 

@@ -66,12 +66,13 @@ export function formatModifierSources(
 }
 
 /**
- * Format modifier display for UI (e.g., "+1 Tank Hunters")
+ * Format modifier display for UI (e.g., "+1 Tank Hunters" or "-1 Super Runts")
  */
 export function formatModifierDisplay(
   modifier: number,
   sources: string
 ): string | null {
-  if (modifier <= 0 || !sources) return null;
-  return `+${modifier} ${sources}`;
+  if (modifier === 0 || !sources) return null;
+  const sign = modifier > 0 ? '+' : '';
+  return `${sign}${modifier} ${sources}`;
 }

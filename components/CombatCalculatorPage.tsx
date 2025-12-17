@@ -613,13 +613,31 @@ export default function CombatCalculatorPage({
     console.log('📊 Attacker context modifiers:', attackerContext.modifiers.getAllModifiers());
     console.log('📊 Defender context modifiers:', defenderContext.modifiers.getAllModifiers());
 
-    // Extract modifiers from attacker context (these affect the attack)
-    const hitMod = attackerContext.modifiers.get('hit');
-    const woundMod = attackerContext.modifiers.get('wound');
-    const aMod = attackerContext.modifiers.get('A') || 0;
-    const sMod = attackerContext.modifiers.get('S') || 0;
-    const apMod = attackerContext.modifiers.get('AP') || 0;
-    const dMod = attackerContext.modifiers.get('D') || 0;
+    // Extract modifiers from attacker context (offensive abilities)
+    const attackerHitMod = attackerContext.modifiers.get('hit') || 0;
+    const attackerWoundMod = attackerContext.modifiers.get('wound') || 0;
+    const attackerAMod = attackerContext.modifiers.get('A') || 0;
+    const attackerSMod = attackerContext.modifiers.get('S') || 0;
+    const attackerApMod = attackerContext.modifiers.get('AP') || 0;
+    const attackerDMod = attackerContext.modifiers.get('D') || 0;
+
+    // Extract defensive modifiers from defender context (defensive abilities)
+    // (e.g., Super Runts: "subtract 1 from wound roll" when defending)
+    const defenderHitMod = defenderContext.modifiers.get('hit') || 0;
+    const defenderWoundMod = defenderContext.modifiers.get('wound') || 0;
+    const defenderAMod = defenderContext.modifiers.get('A') || 0;
+    const defenderSMod = defenderContext.modifiers.get('S') || 0;
+    const defenderApMod = defenderContext.modifiers.get('AP') || 0;
+    const defenderDMod = defenderContext.modifiers.get('D') || 0;
+
+    // Combine modifiers from both contexts
+    // Defensive abilities can penalize the attacker's rolls/stats
+    const hitMod = attackerHitMod + defenderHitMod;
+    const woundMod = attackerWoundMod + defenderWoundMod;
+    const aMod = attackerAMod + defenderAMod;
+    const sMod = attackerSMod + defenderSMod;
+    const apMod = attackerApMod + defenderApMod;
+    const dMod = attackerDMod + defenderDMod;
 
     // Extract save modifiers from defender context
     // INV and FNP are keywords, not stats
@@ -644,13 +662,31 @@ export default function CombatCalculatorPage({
       FNP: fnpMod
     });
 
-    // Extract modifier sources from attacker context
-    const hitSources = attackerContext.modifiers.getModifiers('hit').map(m => m.source);
-    const woundSources = attackerContext.modifiers.getModifiers('wound').map(m => m.source);
-    const aSources = attackerContext.modifiers.getModifiers('A').map(m => m.source);
-    const sSources = attackerContext.modifiers.getModifiers('S').map(m => m.source);
-    const apSources = attackerContext.modifiers.getModifiers('AP').map(m => m.source);
-    const dSources = attackerContext.modifiers.getModifiers('D').map(m => m.source);
+    // Extract modifier sources from both attacker and defender contexts
+    const hitSources = [
+      ...attackerContext.modifiers.getModifiers('hit').map(m => m.source),
+      ...defenderContext.modifiers.getModifiers('hit').map(m => m.source)
+    ];
+    const woundSources = [
+      ...attackerContext.modifiers.getModifiers('wound').map(m => m.source),
+      ...defenderContext.modifiers.getModifiers('wound').map(m => m.source)
+    ];
+    const aSources = [
+      ...attackerContext.modifiers.getModifiers('A').map(m => m.source),
+      ...defenderContext.modifiers.getModifiers('A').map(m => m.source)
+    ];
+    const sSources = [
+      ...attackerContext.modifiers.getModifiers('S').map(m => m.source),
+      ...defenderContext.modifiers.getModifiers('S').map(m => m.source)
+    ];
+    const apSources = [
+      ...attackerContext.modifiers.getModifiers('AP').map(m => m.source),
+      ...defenderContext.modifiers.getModifiers('AP').map(m => m.source)
+    ];
+    const dSources = [
+      ...attackerContext.modifiers.getModifiers('D').map(m => m.source),
+      ...defenderContext.modifiers.getModifiers('D').map(m => m.source)
+    ];
 
     // Extract keyword sources from attacker context
     const keywordSources: Array<{ keyword: string; source: string }> = [];

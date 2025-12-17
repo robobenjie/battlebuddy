@@ -125,6 +125,7 @@ export function buildCombatContext(params: {
       T: defender.models?.[0]?.T || 0,
       SV: defender.models?.[0]?.SV || 0,
       INV: defender.models?.[0]?.INV,
+      leaderId: getLeaderId(defender),
       isLeader: isCharacter(defender),
     },
 

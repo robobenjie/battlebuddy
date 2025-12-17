@@ -8,6 +8,7 @@ import { getAllUnitRules } from '../load-rules';
 import { Rule } from '../types';
 import { evaluateRule } from '../evaluator';
 import { buildCombatContext } from '../context';
+import { EXAMPLE_RULES } from '../example-rules';
 
 describe('Scope-based rule filtering', () => {
   describe('When bodyguard unit (boys) attacks with attached leader (warboss)', () => {
@@ -572,6 +573,149 @@ describe('Scope-based rule filtering', () => {
       // Verify it added +1 to hit modifier
       const hitModifier = context.modifiers.get('hit');
       expect(hitModifier).toBe(1);
+    });
+
+    it('should apply "Super Runts" (-1 to wound defensively) when Gretchin with Zogrod leader are attacked', () => {
+      // Get the Super Runts rule from example-rules.ts
+      const superRuntsRule = EXAMPLE_RULES.find(r => r.id === 'super-runts');
+      expect(superRuntsRule).toBeDefined();
+
+      // Mock data: Gretchin unit with attached Zogrod leader
+      const gretchinUnit = {
+        id: 'gretchin-1',
+        name: 'Gretchin',
+        isLeader: false,
+        armyId: 'ork-army-1',
+        categories: ['INFANTRY'],
+        unitRules: [],
+        models: [
+          {
+            id: 'gretchin-model-1',
+            modelRules: [],
+            T: 3,
+            SV: 6,
+            INV: undefined
+          }
+        ],
+        leaders: [
+          {
+            id: 'zogrod-1',
+            name: 'Zogrod Wortsnagga',
+            isLeader: true,
+            categories: ['CHARACTER'],
+            unitRules: [
+              {
+                name: 'Super Runts',
+                ruleObject: JSON.stringify(superRuntsRule)
+              }
+            ],
+            models: [
+              {
+                id: 'zogrod-model-1',
+                modelRules: []
+              }
+            ]
+          }
+        ]
+      };
+
+      // Mock attacker (enemy shooting at Gretchin)
+      const attacker = {
+        id: 'enemy-unit-1',
+        name: 'Enemy Unit',
+        armyId: 'enemy-army-1',
+        categories: ['INFANTRY'],
+        models: [
+          {
+            T: 4,
+            SV: 3
+          }
+        ]
+      };
+
+      const weapon = {
+        name: 'Bolter',
+        range: 24,
+        A: '2',
+        WS: 3,
+        S: 4,
+        AP: 0,
+        D: '1',
+        keywords: [],
+        type: 'ranged' as const
+      };
+
+      // Get rules for the Gretchin unit (should include "Super Runts" from Zogrod)
+      const rules = getAllUnitRules(gretchinUnit);
+      const loadedSuperRunts = rules.find(r => r.id === 'super-runts');
+
+      // Verify the rule was loaded
+      expect(loadedSuperRunts).toBeDefined();
+      expect(loadedSuperRunts?.name).toBe('Super Runts');
+
+      // Build attacker context (attacker's perspective for wound roll)
+      const attackerContext = buildCombatContext({
+        attacker,
+        defender: gretchinUnit,
+        weapon,
+        game: {
+          id: 'test-game',
+          currentTurn: 1,
+          currentPhase: 'shooting'
+        },
+        combatPhase: 'shooting',
+        combatRole: 'attacker', // Attacker's perspective
+        options: {
+          modelsFiring: 10,
+          withinHalfRange: false,
+          targetVisible: true,
+          userInputs: {}
+        },
+        rules: [], // Attacker has no rules in this test
+        armyStates: []
+      });
+
+      // Build defender context (Gretchin's defensive rules)
+      const defenderContext = buildCombatContext({
+        attacker,
+        defender: gretchinUnit,
+        weapon,
+        game: {
+          id: 'test-game',
+          currentTurn: 1,
+          currentPhase: 'shooting'
+        },
+        combatPhase: 'shooting',
+        combatRole: 'defender', // Defender's perspective
+        options: {
+          modelsFiring: 10,
+          withinHalfRange: false,
+          targetVisible: true,
+          userInputs: {}
+        },
+        rules, // Gretchin's rules including Super Runts from Zogrod
+        armyStates: []
+      });
+
+      // Evaluate "Super Runts" rule in defender context
+      const ruleApplied = evaluateRule(loadedSuperRunts!, defenderContext);
+
+      // Verify the rule was applied
+      expect(ruleApplied).toBe(true);
+
+      // The defensive modifier should affect the ATTACKER's wound roll
+      // So we need to check that the attacker gets a -1 to wound when attacking
+      // In the actual combat calculator, defensive modifiers from defenderContext
+      // are applied to the attacker's wound roll
+
+      // For now, verify the modifier exists in defender context
+      // TODO: Update combat calculator to merge defensive wound modifiers into attacker rolls
+      const defenderWoundModifier = defenderContext.modifiers.get('wound');
+      expect(defenderWoundModifier).toBe(-1);
+
+      // The correct end-to-end test would be:
+      // After merging contexts, attackerContext should have -1 to wound when attacking Gretchin
+      // This will need to be implemented in the combat calculator
     });
   });
 });

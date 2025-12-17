@@ -230,8 +230,8 @@ export default function WeaponProfileDisplay({
     const effectiveHit = getEffectiveHitValue(weapon.WS, hitModifier);
     const modifierParts: string[] = [];
 
-    // Add rule modifiers if present
-    if (hitModifier > 0 && modifierSources?.hit) {
+    // Add rule modifiers if present (both positive and negative)
+    if (hitModifier !== 0 && modifierSources?.hit) {
       const sources = formatModifierSources(modifierSources.hit, activeRules);
       const display = formatModifierDisplay(hitModifier, sources);
       if (display) {
@@ -269,8 +269,8 @@ export default function WeaponProfileDisplay({
 
     const modifierParts: string[] = [];
 
-    // Add rule modifiers if present
-    if (woundModifier > 0 && modifierSources?.wound) {
+    // Add rule modifiers if present (both positive and negative)
+    if (woundModifier !== 0 && modifierSources?.wound) {
       const sources = formatModifierSources(modifierSources.wound, activeRules);
       const display = formatModifierDisplay(woundModifier, sources);
       if (display) {
