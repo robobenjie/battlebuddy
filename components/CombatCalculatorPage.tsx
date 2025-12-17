@@ -1220,13 +1220,6 @@ export default function CombatCalculatorPage({
             </div>
           )}
 
-          {/* Active Rules Display */}
-          {activeRules.length > 0 && (
-            <div className="mb-6">
-              <ActiveRulesDisplay rules={activeRules} />
-            </div>
-          )}
-
           {/* Action Buttons */}
           <div className="flex items-center justify-between pt-4 border-t border-gray-700">
             <button
@@ -1254,6 +1247,13 @@ export default function CombatCalculatorPage({
               )}
             </div>
           </div>
+
+          {/* Active Rules Display */}
+          {activeRules.length > 0 && (
+            <div className="mt-6">
+              <ActiveRulesDisplay rules={activeRules} />
+            </div>
+          )}
         </div>
 
         {/* Collapsed Unit Card at bottom */}
