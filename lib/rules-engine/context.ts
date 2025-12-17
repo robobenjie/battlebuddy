@@ -91,6 +91,19 @@ export function buildCombatContext(params: {
     return unit.categories?.some((cat: string) => cat.toLowerCase() === 'character');
   };
 
+  // Helper to check if unit has a leader attached
+  const getLeaderId = (unit: any) => {
+    // Check if leaderId field exists (direct field)
+    if (unit.leaderId) return unit.leaderId;
+
+    // Check if leaders array exists and has items (relationship)
+    if (unit.leaders && unit.leaders.length > 0) {
+      return unit.leaders[0].id; // Return first leader's ID
+    }
+
+    return undefined;
+  };
+
   return {
     // Spread options (modelsFiring, withinHalfRange, etc.)
     ...options,
@@ -100,7 +113,7 @@ export function buildCombatContext(params: {
       unitId: attacker.id,
       armyId: attacker.armyId,
       categories: attacker.categories || [],
-      leaderId: attacker.leaderId,
+      leaderId: getLeaderId(attacker),
       isLeader: isCharacter(attacker),
     },
 

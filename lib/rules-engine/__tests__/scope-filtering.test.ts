@@ -6,6 +6,8 @@
 import { describe, it, expect } from 'vitest';
 import { getAllUnitRules } from '../load-rules';
 import { Rule } from '../types';
+import { evaluateRule } from '../evaluator';
+import { buildCombatContext } from '../context';
 
 describe('Scope-based rule filtering', () => {
   describe('When bodyguard unit (boys) attacks with attached leader (warboss)', () => {
@@ -449,6 +451,127 @@ describe('Scope-based rule filtering', () => {
 
       // Boys should NOT get the scope: "model" rule
       expect(ruleIds).not.toContain('da-biggest-and-da-best');
+    });
+  });
+
+  describe('End-to-end: Rule evaluation with scope filtering', () => {
+    it('should apply "Might is Right" (+1 to hit) when Boys attack with attached Warboss', () => {
+      // Mock data: Boys unit with attached Warboss leader
+      const boysUnit = {
+        id: 'boys-1',
+        name: 'Ork Boyz',
+        isLeader: false,
+        armyId: 'ork-army-1',
+        unitRules: [],
+        models: [
+          {
+            id: 'boy-model-1',
+            modelRules: []
+          }
+        ],
+        leaders: [
+          {
+            id: 'warboss-1',
+            name: 'Warboss',
+            isLeader: true,
+            unitRules: [
+              {
+                name: 'Might is Right',
+                ruleObject: JSON.stringify({
+                  id: 'might-is-right',
+                  name: 'Might is Right',
+                  scope: 'unit',
+                  conditions: [
+                    {
+                      type: 'weapon-type',
+                      params: { weaponTypes: ['melee'] }
+                    }
+                  ],
+                  effects: [
+                    {
+                      type: 'modify-hit',
+                      target: 'self',
+                      params: { modifier: 1 }
+                    }
+                  ]
+                })
+              }
+            ],
+            models: [
+              {
+                id: 'warboss-model-1',
+                modelRules: []
+              }
+            ]
+          }
+        ]
+      };
+
+      // Get rules for the Boys unit (should include "Might is Right" from Warboss)
+      const rules = getAllUnitRules(boysUnit);
+      const mightIsRight = rules.find(r => r.id === 'might-is-right');
+
+      // Verify the rule was loaded
+      expect(mightIsRight).toBeDefined();
+      expect(mightIsRight?.name).toBe('Might is Right');
+
+      const weapon = {
+        name: 'Choppa',
+        range: 0,
+        A: '2',
+        WS: 3,
+        S: 4,
+        AP: -1,
+        D: '1',
+        keywords: [],
+        type: 'melee' as const
+      };
+
+      const defender = {
+        id: 'target-1',
+        name: 'Target Unit',
+        armyId: 'enemy-army-1',
+        categories: [],
+        models: [
+          {
+            T: 4,
+            SV: 3,
+            INV: undefined
+          }
+        ]
+      };
+
+      // Build combat context
+      const context = buildCombatContext({
+        attacker: boysUnit,
+        defender,
+        weapon,
+        game: {
+          id: 'test-game',
+          currentTurn: 1,
+          currentPhase: 'fight'
+        },
+        combatPhase: 'melee',
+        combatRole: 'attacker',
+        options: {
+          modelsFiring: 10,
+          withinHalfRange: false,
+          targetVisible: true,
+          userInputs: {}
+        },
+        rules,
+        armyStates: []
+      });
+
+      // Evaluate "Might is Right" rule
+      const ruleApplied = evaluateRule(mightIsRight!, context);
+
+      // Verify the rule was applied
+      expect(ruleApplied).toBe(true);
+
+      // Verify it added +1 to hit modifier
+      const hitModifier = context.modifiers.get('hit');
+      expect(hitModifier).toBe(1);
     });
   });
 });
