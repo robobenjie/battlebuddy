@@ -146,8 +146,7 @@
         "params": {
           "keyword": "Scouts",
           "keywordValue": 9
-        },
-        "appliesTo": "bodyguard"
+        }
       },
       {
         "type": "modify-hit",
@@ -155,7 +154,6 @@
         "params": {
           "modifier": 1
         },
-        "appliesTo": "bodyguard",
         "conditions": [
           {
             "type": "combat-role",
@@ -171,7 +169,6 @@
         "params": {
           "modifier": 1
         },
-        "appliesTo": "bodyguard",
         "conditions": [
           {
             "type": "combat-role",
@@ -187,7 +184,6 @@
         "params": {
           "modifier": -1
         },
-        "appliesTo": "bodyguard",
         "conditions": [
           {
             "type": "combat-role",
@@ -218,8 +214,7 @@
       {
         "type": "stat-modifier",
         "stat": "movement",
-        "modifier": "+6",
-        "appliesTo": "unit"
+        "modifier": "+6"
       }
     ],
     "duration": "permanent",
@@ -245,7 +240,6 @@
         "params": {
           "modifier": 1
         },
-        "appliesTo": "bodyguard",
         "conditions": [
           {
             "type": "weapon-type",
@@ -348,10 +342,7 @@
     "id": "objective-cp-gain",
     "name": "Objective Secured CP",
     "faction": "Orks",
-    "scope": {
-      "type": "unit",
-      "appliesTo": "all"
-    },
+    "scope": "unit",
     "battlescribeId": "f1f6-dbea-fe70-ee9d",
     "rawText": "At the start of your Movement phase, roll one D6 for each objective marker you control that has one or more units from your army with this ability within range of it (excluding Battle-shocked units). If one or more of those rolls is a 4+, you gain 1CP.",
     "description": "At the start of your Movement phase, roll one D6 for each objective marker you control that has one or more units from your army with this ability within range of it (excluding Battle-shocked units). If one or more of those rolls is a 4+, you gain 1CP.",
@@ -431,10 +422,7 @@
     "id": "drive-by-dakka",
     "name": "Drive-by Dakka",
     "faction": "Orks",
-    "scope": {
-      "type": "unit",
-      "appliesTo": "all"
-    },
+    "scope": "unit",
     "battlescribeId": "97fb-dd9a-9db6-c77f",
     "rawText": "Each time a model in this unit makes a ranged attack that targets a unit within 9\", improve the Armour Penetration characteristic of that attack by 1.",
     "description": "Each time a model in this unit makes a ranged attack that targets a unit within 9\", improve the Armour Penetration characteristic of that attack by 1.",
@@ -601,10 +589,7 @@
     "id": "waaagh-energy",
     "name": "Waaagh! Energy",
     "faction": "Orks",
-    "scope": {
-      "type": "model",
-      "appliesTo": "leader"
-    },
+    "scope": "model",
     "battlescribeId": "3d7-ae1b-665a-9b15",
     "rawText": "While this model is leading a unit, add 1 to the Strength and Damage characteristics of this model’s ’Eadbanger weapon for every 5 models in that unit (rounding down), but while that unit contains 10 or more models, that weapon has the [HAZARDOUS] ability.",
     "description": "While this model is leading a unit, add 1 to the Strength and Damage characteristics of this model's 'Eadbanger weapon for every 5 models in that unit (rounding down), but while that unit contains 10 or more models, that weapon has the [HAZARDOUS] ability.",
@@ -630,8 +615,7 @@
               "inputValue": "5-9"
             }
           }
-        ],
-        "appliesTo": "leader"
+        ]
       },
       {
         "type": "modify-characteristic",
@@ -648,8 +632,7 @@
               "inputValue": "5-9"
             }
           }
-        ],
-        "appliesTo": "leader"
+        ]
       },
       {
         "type": "modify-characteristic",
@@ -666,8 +649,7 @@
               "inputValue": "10-14"
             }
           }
-        ],
-        "appliesTo": "leader"
+        ]
       },
       {
         "type": "modify-characteristic",
@@ -684,8 +666,7 @@
               "inputValue": "10-14"
             }
           }
-        ],
-        "appliesTo": "leader"
+        ]
       },
       {
         "type": "add-keyword",
@@ -701,8 +682,7 @@
               "inputValue": "10-14"
             }
           }
-        ],
-        "appliesTo": "leader"
+        ]
       },
       {
         "type": "modify-characteristic",
@@ -719,8 +699,7 @@
               "inputValue": "15-19"
             }
           }
-        ],
-        "appliesTo": "leader"
+        ]
       },
       {
         "type": "modify-characteristic",
@@ -737,8 +716,7 @@
               "inputValue": "15-19"
             }
           }
-        ],
-        "appliesTo": "leader"
+        ]
       },
       {
         "type": "add-keyword",
@@ -754,8 +732,7 @@
               "inputValue": "15-19"
             }
           }
-        ],
-        "appliesTo": "leader"
+        ]
       },
       {
         "type": "modify-characteristic",
@@ -772,8 +749,7 @@
               "inputValue": "20+"
             }
           }
-        ],
-        "appliesTo": "leader"
+        ]
       },
       {
         "type": "modify-characteristic",
@@ -790,8 +766,7 @@
               "inputValue": "20+"
             }
           }
-        ],
-        "appliesTo": "leader"
+        ]
       },
       {
         "type": "add-keyword",
@@ -807,8 +782,7 @@
               "inputValue": "20+"
             }
           }
-        ],
-        "appliesTo": "leader"
+        ]
       }
     ],
     "duration": {

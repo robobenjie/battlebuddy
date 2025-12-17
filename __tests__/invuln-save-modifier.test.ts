@@ -15,10 +15,7 @@ const waaaghInvulnRule: Rule = {
   name: 'Waaagh! - Invulnerable Save',
   description: 'While the Waaagh! is active, models from your army have a 5+ invulnerable save.',
   faction: 'Orks',
-  scope: {
-    type: 'army',
-    appliesTo: 'all'
-  },
+  scope: 'army',
   conditions: [
     {
       type: 'army-state',

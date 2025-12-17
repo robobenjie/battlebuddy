@@ -205,6 +205,115 @@ export function parseUnitKeywords(keywords: string[]): { invuln: number | null; 
 }
 
 /**
+ * Calculate and merge combat modifiers from both attacker and defender perspectives
+ * Returns the combined modifiers that should be applied to the combat
+ */
+export function calculateCombatModifiers(params: {
+  attacker: any;
+  defender: any;
+  weapon: WeaponStats;
+  game: any;
+  combatPhase: 'shooting' | 'melee';
+  options: CombatOptions;
+  attackerRules: Rule[];
+  defenderRules: Rule[];
+  attackerArmyStates: ArmyState[];
+  defenderArmyStates: ArmyState[];
+}): {
+  hitModifier: number;
+  woundModifier: number;
+  weaponModifiers: { A: number; S: number; AP: number; D: number };
+  targetModifiers: { T: number; SV: number; INV?: number; FNP?: number };
+  addedKeywords: string[];
+  appliedRules: Rule[];
+} {
+  // Build separate contexts for attacker and defender
+  const attackerContext = buildCombatContext({
+    attacker: params.attacker,
+    defender: params.defender,
+    weapon: params.weapon,
+    game: params.game,
+    combatPhase: params.combatPhase,
+    combatRole: 'attacker',
+    options: params.options,
+    rules: params.attackerRules,
+    armyStates: params.attackerArmyStates
+  });
+
+  const defenderContext = buildCombatContext({
+    attacker: params.attacker,
+    defender: params.defender,
+    weapon: params.weapon,
+    game: params.game,
+    combatPhase: params.combatPhase,
+    combatRole: 'defender',
+    options: params.options,
+    rules: params.defenderRules,
+    armyStates: params.defenderArmyStates
+  });
+
+  // Evaluate rules separately for attacker and defender
+  const appliedAttackerRules = evaluateAllRules(params.attackerRules, attackerContext);
+  const appliedDefenderRules = evaluateAllRules(params.defenderRules, defenderContext);
+
+  // Merge applied rules
+  const appliedRules = [...appliedAttackerRules, ...appliedDefenderRules];
+
+  // Extract modifiers from attacker context (offensive modifiers)
+  const hitModifier = attackerContext.modifiers.get('hit');
+  const attackerWoundModifier = attackerContext.modifiers.get('wound');
+
+  // Extract modifiers from defender context (defensive modifiers)
+  // Defensive wound modifiers affect the attacker's wound roll
+  const defenderWoundModifier = defenderContext.modifiers.get('wound');
+
+  // Combine wound modifiers (attacker bonuses + defender penalties)
+  const woundModifier = attackerWoundModifier + defenderWoundModifier;
+
+  // Extract weapon characteristic modifiers (from attacker)
+  const weaponModifiers = {
+    A: attackerContext.modifiers.get('A') || 0,
+    S: attackerContext.modifiers.get('S') || 0,
+    AP: attackerContext.modifiers.get('AP') || 0,
+    D: attackerContext.modifiers.get('D') || 0
+  };
+
+  // Extract target stat modifiers (from defender)
+  const tMod = defenderContext.modifiers.get('T') || 0;
+  const svMod = defenderContext.modifiers.get('SV') || 0;
+
+  // Extract save modifiers from defender context
+  const invulnKeywords = defenderContext.modifiers.getModifiers('keyword:Invulnerable Save');
+  const invMod = invulnKeywords.length > 0
+    ? Math.min(...invulnKeywords.map(m => m.value))
+    : undefined;
+
+  const fnpKeywords = defenderContext.modifiers.getModifiers('keyword:Feel No Pain');
+  const fnpMod = fnpKeywords.length > 0
+    ? Math.min(...fnpKeywords.map(m => m.value))
+    : undefined;
+
+  const targetModifiers = {
+    T: tMod,
+    SV: svMod,
+    INV: invMod,
+    FNP: fnpMod
+  };
+
+  // Get added keywords from attacker context
+  const addedKeywords = getAddedKeywords(attackerContext);
+
+  return {
+    hitModifier,
+    woundModifier,
+    weaponModifiers,
+    targetModifiers,
+    addedKeywords,
+    appliedRules
+  };
+}
+
+/**
  * Execute the full combat sequence with rules engine support
  */
 export function executeCombatSequence(
@@ -217,14 +326,39 @@ export function executeCombatSequence(
     combatPhase?: 'shooting' | 'melee';
     rules?: Rule[];
     armyStates?: ArmyState[];
+    // Pre-calculated modifiers (if provided, skip rule evaluation)
+    preCalculatedModifiers?: {
+      hitModifier: number;
+      woundModifier: number;
+      weaponModifiers: { A: number; S: number; AP: number; D: number };
+      addedKeywords: string[];
+      appliedRules: Rule[];
+    };
   }
 ): CombatResult {
-  // Build context if rules are provided
-  let context: CombatContext | null = null;
+  // Use pre-calculated modifiers if provided, otherwise calculate from rules
+  let hitMod = 0;
+  let woundMod = 0;
+  let aMod = 0;
+  let sMod = 0;
+  let apMod = 0;
+  let dMod = 0;
+  let addedKeywords: string[] = [];
   let appliedRules: Rule[] = [];
 
-  if (params?.rules && params?.attacker && params?.game) {
-    context = buildCombatContext({
+  if (params?.preCalculatedModifiers) {
+    // Use pre-calculated modifiers (already merged from attacker and defender)
+    hitMod = params.preCalculatedModifiers.hitModifier;
+    woundMod = params.preCalculatedModifiers.woundModifier;
+    aMod = params.preCalculatedModifiers.weaponModifiers.A;
+    sMod = params.preCalculatedModifiers.weaponModifiers.S;
+    apMod = params.preCalculatedModifiers.weaponModifiers.AP;
+    dMod = params.preCalculatedModifiers.weaponModifiers.D;
+    addedKeywords = params.preCalculatedModifiers.addedKeywords;
+    appliedRules = params.preCalculatedModifiers.appliedRules;
+  } else if (params?.rules && params?.attacker && params?.game) {
+    // Legacy path: calculate modifiers from rules (only supports attacker rules)
+    const context = buildCombatContext({
       attacker: params.attacker,
       defender: target,
       weapon,
@@ -238,78 +372,79 @@ export function executeCombatSequence(
     // Evaluate all rules and apply modifiers
     appliedRules = evaluateAllRules(params.rules, context);
 
-    // Get added keywords from rules
-    const addedKeywords = getAddedKeywords(context);
-
-    // Merge with weapon keywords
-    weapon = {
-      ...weapon,
-      keywords: [...weapon.keywords, ...addedKeywords]
-    };
-
-    // Apply weapon characteristic modifiers from rules
-    const aMod = context.modifiers.get('A') || 0;
-    const sMod = context.modifiers.get('S') || 0;
-    const apMod = context.modifiers.get('AP') || 0;
-    const dMod = context.modifiers.get('D') || 0;
-
-    // Check for "Extra Attacks" keyword - these weapons cannot have attacks modified
-    const hasExtraAttacks = weapon.keywords?.some((kw: string) =>
-      kw.toLowerCase() === 'extra attacks'
-    );
-
-    // Modify attacks properly (handle string parsing)
-    let modifiedA = weapon.A;
-    // Only apply A modifier if weapon doesn't have "Extra Attacks" keyword
-    if (aMod !== 0 && !hasExtraAttacks) {
-      const parsed = parseAttackCount(weapon.A);
-      if (parsed.dice > 0) {
-        // Dice notation: add to modifier (e.g., "d6" → "d6+5")
-        const newMod = parsed.modifier + aMod;
-        if (newMod > 0) {
-          modifiedA = `D${parsed.dice}+${newMod}`;
-        } else {
-          modifiedA = `D${parsed.dice}`;
-        }
-      } else {
-        // Fixed attacks: add to fixed value (e.g., "5" → "10")
-        const newFixed = parsed.fixed + parsed.modifier + aMod;
-        modifiedA = newFixed.toString();
-      }
-    }
-
-    // Modify damage properly (handle string parsing)
-    let modifiedD = weapon.D;
-    if (dMod !== 0) {
-      const parsed = parseAttackCount(weapon.D); // Reuse attack parser - same format
-      if (parsed.dice > 0) {
-        // Dice notation: add to modifier (e.g., "d6" → "d6+2")
-        const newMod = parsed.modifier + dMod;
-        if (newMod > 0) {
-          modifiedD = `D${parsed.dice}+${newMod}`;
-        } else if (newMod < 0) {
-          modifiedD = `D${parsed.dice}${newMod}`;
-        } else {
-          modifiedD = `D${parsed.dice}`;
-        }
-      } else {
-        // Fixed damage: add to fixed value (e.g., "3" → "5")
-        const newFixed = parsed.fixed + parsed.modifier + dMod;
-        modifiedD = Math.max(1, newFixed).toString();
-      }
-    }
-
-    weapon = {
-      ...weapon,
-      A: modifiedA,
-      S: weapon.S + sMod,
-      AP: weapon.AP + apMod,
-      D: modifiedD
-    };
-
-    console.log('⚔️ Applied weapon modifiers:', { A: aMod, S: sMod, AP: apMod, D: dMod });
-    console.log('📈 Modified weapon stats:', { A: weapon.A, S: weapon.S, AP: weapon.AP, D: weapon.D });
+    // Extract modifiers from context
+    hitMod = context.modifiers.get('hit');
+    woundMod = context.modifiers.get('wound');
+    aMod = context.modifiers.get('A') || 0;
+    sMod = context.modifiers.get('S') || 0;
+    apMod = context.modifiers.get('AP') || 0;
+    dMod = context.modifiers.get('D') || 0;
+    addedKeywords = getAddedKeywords(context);
   }
+
+  // Apply weapon modifiers (works for both legacy and new paths)
+  // Merge added keywords with weapon keywords
+  weapon = {
+    ...weapon,
+    keywords: [...weapon.keywords, ...addedKeywords]
+  };
+
+  // Check for "Extra Attacks" keyword - these weapons cannot have attacks modified
+  const hasExtraAttacks = weapon.keywords?.some((kw: string) =>
+    kw.toLowerCase() === 'extra attacks'
+  );
+
+  // Modify attacks properly (handle string parsing)
+  let modifiedA = weapon.A;
+  // Only apply A modifier if weapon doesn't have "Extra Attacks" keyword
+  if (aMod !== 0 && !hasExtraAttacks) {
+    const parsed = parseAttackCount(weapon.A);
+    if (parsed.dice > 0) {
+      // Dice notation: add to modifier (e.g., "d6" → "d6+5")
+      const newMod = parsed.modifier + aMod;
+      if (newMod > 0) {
+        modifiedA = `D${parsed.dice}+${newMod}`;
+      } else {
+        modifiedA = `D${parsed.dice}`;
+      }
+    } else {
+      // Fixed attacks: add to fixed value (e.g., "5" → "10")
+      const newFixed = parsed.fixed + parsed.modifier + aMod;
+      modifiedA = newFixed.toString();
+    }
+  }
+
+  // Modify damage properly (handle string parsing)
+  let modifiedD = weapon.D;
+  if (dMod !== 0) {
+    const parsed = parseAttackCount(weapon.D); // Reuse attack parser - same format
+    if (parsed.dice > 0) {
+      // Dice notation: add to modifier (e.g., "d6" → "d6+2")
+      const newMod = parsed.modifier + dMod;
+      if (newMod > 0) {
+        modifiedD = `D${parsed.dice}+${newMod}`;
+      } else if (newMod < 0) {
+        modifiedD = `D${parsed.dice}${newMod}`;
+      } else {
+        modifiedD = `D${parsed.dice}`;
+      }
+    } else {
+      // Fixed damage: add to fixed value (e.g., "3" → "5")
+      const newFixed = parsed.fixed + parsed.modifier + dMod;
+      modifiedD = Math.max(1, newFixed).toString();
+    }
+  }
+
+  weapon = {
+    ...weapon,
+    A: modifiedA,
+    S: weapon.S + sMod,
+    AP: weapon.AP + apMod,
+    D: modifiedD
+  };
+
+  console.log('⚔️ Applied weapon modifiers:', { A: aMod, S: sMod, AP: apMod, D: dMod });
+  console.log('📈 Modified weapon stats:', { A: weapon.A, S: weapon.S, AP: weapon.AP, D: weapon.D });
 
   // Parse keywords (now includes rule-added keywords)
   const keywords = parseKeywords(weapon.keywords, target.categories);
@@ -339,11 +474,8 @@ export function executeCombatSequence(
     hitThreshold = Math.max(2, hitThreshold - 1);
   }
 
-  // Apply hit modifiers from rules
-  if (context) {
-    const hitMod = context.modifiers.get('hit');
-    hitThreshold = Math.max(2, Math.min(6, hitThreshold - hitMod));
-  }
+  // Apply hit modifiers (works for both legacy and new paths)
+  hitThreshold = Math.max(2, Math.min(6, hitThreshold - hitMod));
 
   // Roll attacks
   const attackPhase = rollAttacks(totalAttacks, hitThreshold, {
@@ -360,12 +492,9 @@ export function executeCombatSequence(
     lance: keywords.lance && options.unitHasCharged
   });
 
-  // Apply wound modifiers from rules
-  let adjustedWoundThreshold = woundThreshold;
-  if (context) {
-    const woundMod = context.modifiers.get('wound');
-    adjustedWoundThreshold = Math.max(2, Math.min(6, woundThreshold - woundMod));
-  }
+  // Apply wound modifiers (works for both legacy and new paths)
+  // NOTE: woundMod now includes both attacker bonuses AND defender penalties (merged in calculateCombatModifiers)
+  let adjustedWoundThreshold = Math.max(2, Math.min(6, woundThreshold - woundMod));
 
   // Roll wounds
   const woundPhase = rollWounds(

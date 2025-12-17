@@ -16,7 +16,7 @@ import { Rule } from './types';
  * These help the AI understand the different patterns and use cases
  */
 export const EXAMPLE_EXPLANATIONS: Record<string, string> = {
-  'waaagh-energy': 'Demonstrates radio input with multiple options based on unit size. Shows how effects scale with context (more models = stronger ability, but we can just ask the player for complicated conditional state). Example of leader-only effects using appliesTo field.',
+  'waaagh-energy': 'Demonstrates radio input with multiple options based on unit size. Shows how effects scale with context (more models = stronger ability, but we can just ask the player for complicated conditional state). Example of leader-only effects using scope.',
 
   'drive-by-dakka': 'Shows toggle input for conditional ability activation. Demonstrates how to handle "if X happened this turn" mechanics using user input rather than automatic detection.',
 
@@ -26,7 +26,7 @@ export const EXAMPLE_EXPLANATIONS: Record<string, string> = {
 
   'furious-charge': 'Shows unit-status conditions (charged) and temporary duration (turn). Demonstrates abilities that trigger based on unit actions.',
 
-  'super-runts': 'Complex example showing being-led condition, appliesTo field (leader vs bodyguard), and effect-level conditions (combat-role). Demonstrates how leader auras work: (scope is unit!) Also shows we can use multiple objects for a single written rule.',
+  'super-runts': 'Complex example showing being-led condition and effect-level conditions (combat-role). Demonstrates how leader auras work: (scope is unit!) Also shows we can use multiple objects for a single written rule.',
 
   'bomb-squigs': 'Reminder-only rule with manual activation and once-per-battle limit. Shows that rules can have empty conditions/effects arrays when they just need to remind the player.',
 
@@ -49,7 +49,7 @@ export const EXAMPLE_EXPLANATIONS: Record<string, string> = {
   'krumpin-time': 'Demonstrates Feel No Pain keyword. Shows how to grant defensive abilities that trigger after damage is rolled. FNP is calculated in the combat engine after saves.',
 };
 
-export const EXAMPLE_RULES: Rule[] = [
+export const EXAMPLE_RULES = [
   {
     "id": "waaagh-energy",
     "name": "Waaagh! Energy",
@@ -118,7 +118,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": "leader",
               "conditions": null
             },
             {
@@ -135,7 +134,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": "leader",
               "conditions": null
             }
           ]
@@ -158,7 +156,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": "leader",
               "conditions": null
             },
             {
@@ -175,7 +172,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": "leader",
               "conditions": null
             },
             {
@@ -192,7 +188,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": "leader",
               "conditions": null
             }
           ]
@@ -215,7 +210,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": "leader",
               "conditions": null
             },
             {
@@ -232,7 +226,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": "leader",
               "conditions": null
             },
             {
@@ -249,7 +242,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": "leader",
               "conditions": null
             }
           ]
@@ -272,7 +264,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": "leader",
               "conditions": null
             },
             {
@@ -289,7 +280,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": "leader",
               "conditions": null
             },
             {
@@ -306,7 +296,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": "leader",
               "conditions": null
             }
           ]
@@ -391,7 +380,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": null,
               "conditions": null
             }
           ]
@@ -461,7 +449,6 @@ export const EXAMPLE_RULES: Rule[] = [
           "rerollPhase": null,
           "autoPhase": null
         },
-        "appliesTo": null,
         "conditions": null
       }
     ],
@@ -546,7 +533,6 @@ export const EXAMPLE_RULES: Rule[] = [
           "abilityValue": null,
           "autoPhase": null
         },
-        "appliesTo": null,
         "conditions": null
       }
     ],
@@ -631,7 +617,6 @@ export const EXAMPLE_RULES: Rule[] = [
           "rerollPhase": null,
           "autoPhase": null
         },
-        "appliesTo": null,
         "conditions": null
       }
     ],
@@ -682,7 +667,6 @@ export const EXAMPLE_RULES: Rule[] = [
           "rerollPhase": null,
           "autoPhase": null
         },
-        "appliesTo": "bodyguard",
         "conditions": null
       },
       {
@@ -699,7 +683,6 @@ export const EXAMPLE_RULES: Rule[] = [
           "rerollPhase": null,
           "autoPhase": null
         },
-        "appliesTo": "bodyguard",
         "conditions": [
           {
             "type": "combat-role",
@@ -732,7 +715,6 @@ export const EXAMPLE_RULES: Rule[] = [
           "rerollPhase": null,
           "autoPhase": null
         },
-        "appliesTo": "bodyguard",
         "conditions": [
           {
             "type": "combat-role",
@@ -765,7 +747,6 @@ export const EXAMPLE_RULES: Rule[] = [
           "rerollPhase": null,
           "autoPhase": null
         },
-        "appliesTo": "bodyguard",
         "conditions": [
           {
             "type": "combat-role",
@@ -886,7 +867,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": null,
               "conditions": null
             }
           ]
@@ -909,7 +889,6 @@ export const EXAMPLE_RULES: Rule[] = [
                 "rerollPhase": null,
                 "autoPhase": null
               },
-              "appliesTo": null,
               "conditions": null
             }
           ]
@@ -996,7 +975,6 @@ export const EXAMPLE_RULES: Rule[] = [
           "rerollPhase": null,
           "autoPhase": null
         },
-        "appliesTo": null,
         "conditions": null
       }
     ],
@@ -1111,7 +1089,6 @@ export const EXAMPLE_RULES: Rule[] = [
           "rerollPhase": null,
           "autoPhase": null
         },
-        "appliesTo": null,
         "conditions": null
       }
     ],
@@ -1192,7 +1169,6 @@ export const EXAMPLE_RULES: Rule[] = [
           "rerollPhase": null,
           "autoPhase": null
         },
-        "appliesTo": null,
         "conditions": null
       }
     ],
@@ -1258,7 +1234,6 @@ export const EXAMPLE_RULES: Rule[] = [
           "rerollPhase": null,
           "autoPhase": null
         },
-        "appliesTo": null,
         "conditions": null
       }
     ],
@@ -1357,7 +1332,6 @@ export const EXAMPLE_RULES: Rule[] = [
           "rerollPhase": null,
           "autoPhase": null
         },
-        "appliesTo": null,
         "conditions": null
       }
     ],
@@ -1370,4 +1344,4 @@ export const EXAMPLE_RULES: Rule[] = [
     },
     "userInput": null
   }
-] as Rule[];
+];

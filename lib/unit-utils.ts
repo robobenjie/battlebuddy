@@ -58,7 +58,10 @@ export const getModifiedMovement = (unit: any, armyStates?: any[]) => {
       for (const condition of rule.conditions) {
         if (condition.type === 'army-state') {
           // Check if the required army state is active
-          const hasState = armyStates?.some((state: any) => state.state === condition.state);
+          const requiredStates = condition.params?.armyStates || [];
+          const hasState = requiredStates.some((requiredState: string) =>
+            armyStates?.some((state: any) => state.state === requiredState)
+          );
           if (!hasState) {
             conditionsMet = false;
             break;
@@ -71,19 +74,17 @@ export const getModifiedMovement = (unit: any, armyStates?: any[]) => {
 
     // Apply movement modifiers
     for (const effect of rule.effects) {
-      if (effect.type === 'stat-modifier' && effect.stat === 'movement') {
-        const modValue = parseInt(effect.modifier);
-        if (!isNaN(modValue)) {
-          modifier += modValue;
-          activeModifiers.push({ name: rule.name, value: modValue });
-        }
+      if (effect.type === 'modify-characteristic' && (effect.params as any)?.stat === 'M') {
+        const modValue = (effect.params as any).modifier || 0;
+        modifier += modValue;
+        activeModifiers.push({ name: rule.name, value: modValue });
       }
     }
   }
 
   if (modifier === 0) return baseMovement;
 
-  const baseValue = parseInt(baseMovement);
+  const baseValue = parseInt(baseMovement as string);
   if (isNaN(baseValue)) return baseMovement;
 
   const modifiedValue = baseValue + modifier;

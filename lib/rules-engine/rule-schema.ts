@@ -41,8 +41,6 @@ export const EffectTypeSchema = z.enum([
 
 export const EffectTargetSchema = z.enum(['self', 'weapon', 'unit', 'enemy']);
 
-export const EffectAppliesToSchema = z.enum(['all', 'leader', 'bodyguard']);
-
 export const ConditionOperatorSchema = z.enum(['AND', 'OR']);
 
 // ===== ACTIVATION =====
@@ -99,7 +97,6 @@ export const RuleEffectSchema = z.object({
   type: EffectTypeSchema,
   target: EffectTargetSchema,
   params: RuleEffectParamsSchema,
-  appliesTo: z.union([EffectAppliesToSchema, z.null()]),
   conditions: z.union([z.array(RuleConditionSchema), z.null()])
 }).strict();
 

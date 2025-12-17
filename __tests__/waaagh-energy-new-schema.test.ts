@@ -15,10 +15,7 @@ const waaaghEnergyRule: Rule = {
   "name": "Waaagh! Energy",
   "description": "While this model is leading a unit, add 1 to the Strength and Damage characteristics of this model's 'Eadbanger weapon for every 5 models in that unit (rounding down), but while that unit contains 10 or more models, that weapon has the [HAZARDOUS] ability.",
   "faction": "Orks",
-  "scope": {
-    "type": "model",
-    "appliesTo": "leader"
-  },
+  "scope": "model",
   "conditions": [
     {
       "type": "is-leading",
@@ -44,14 +41,12 @@ const waaaghEnergyRule: Rule = {
           {
             "type": "modify-characteristic",
             "target": "weapon",
-            "params": { "stat": "S", "modifier": 1 },
-            "appliesTo": "leader"
+            "params": { "stat": "S", "modifier": 1 }
           },
           {
             "type": "modify-characteristic",
             "target": "weapon",
-            "params": { "stat": "D", "modifier": 1 },
-            "appliesTo": "leader"
+            "params": { "stat": "D", "modifier": 1 }
           }
         ]
       },
@@ -62,20 +57,17 @@ const waaaghEnergyRule: Rule = {
           {
             "type": "modify-characteristic",
             "target": "weapon",
-            "params": { "stat": "S", "modifier": 2 },
-            "appliesTo": "leader"
+            "params": { "stat": "S", "modifier": 2 }
           },
           {
             "type": "modify-characteristic",
             "target": "weapon",
             "params": { "stat": "D", "modifier": 2 },
-            "appliesTo": "leader"
           },
           {
             "type": "add-keyword",
             "target": "weapon",
             "params": { "keyword": "Hazardous" },
-            "appliesTo": "leader"
           }
         ]
       },
@@ -87,19 +79,16 @@ const waaaghEnergyRule: Rule = {
             "type": "modify-characteristic",
             "target": "weapon",
             "params": { "stat": "S", "modifier": 3 },
-            "appliesTo": "leader"
           },
           {
             "type": "modify-characteristic",
             "target": "weapon",
             "params": { "stat": "D", "modifier": 3 },
-            "appliesTo": "leader"
           },
           {
             "type": "add-keyword",
             "target": "weapon",
             "params": { "keyword": "Hazardous" },
-            "appliesTo": "leader"
           }
         ]
       },
@@ -111,19 +100,16 @@ const waaaghEnergyRule: Rule = {
             "type": "modify-characteristic",
             "target": "weapon",
             "params": { "stat": "S", "modifier": 4 },
-            "appliesTo": "leader"
           },
           {
             "type": "modify-characteristic",
             "target": "weapon",
             "params": { "stat": "D", "modifier": 4 },
-            "appliesTo": "leader"
           },
           {
             "type": "add-keyword",
             "target": "weapon",
             "params": { "keyword": "Hazardous" },
-            "appliesTo": "leader"
           }
         ]
       }

@@ -15,10 +15,7 @@ const waaaghEnergyRule: Rule = {
   "name": "Waaagh! Energy",
   "description": "While this model is leading a unit, add 1 to the Strength and Damage characteristics of this model's 'Eadbanger weapon for every 5 models in that unit (rounding down), but while that unit contains 10 or more models, that weapon has the [HAZARDOUS] ability.",
   "faction": "Orks",
-  "scope": {
-    "type": "model",
-    "appliesTo": "leader"
-  },
+  "scope": "model",
   "conditions": [
     {
       "type": "is-leading",
@@ -42,8 +39,7 @@ const waaaghEnergyRule: Rule = {
             "inputValue": "5-9"
           }
         }
-      ],
-      "appliesTo": "leader"
+      ]
     },
     // 5-9 models: +1 D
     {
@@ -61,8 +57,7 @@ const waaaghEnergyRule: Rule = {
             "inputValue": "5-9"
           }
         }
-      ],
-      "appliesTo": "leader"
+      ]
     },
     // 10-14 models: +2 S
     {
@@ -80,8 +75,7 @@ const waaaghEnergyRule: Rule = {
             "inputValue": "10-14"
           }
         }
-      ],
-      "appliesTo": "leader"
+      ]
     },
     // 10-14 models: +2 D
     {
@@ -99,8 +93,7 @@ const waaaghEnergyRule: Rule = {
             "inputValue": "10-14"
           }
         }
-      ],
-      "appliesTo": "leader"
+      ]
     },
     // 10-14 models: HAZARDOUS
     {
@@ -117,8 +110,7 @@ const waaaghEnergyRule: Rule = {
             "inputValue": "10-14"
           }
         }
-      ],
-      "appliesTo": "leader"
+      ]
     },
     // 20+ models: +4 S
     {
@@ -136,8 +128,7 @@ const waaaghEnergyRule: Rule = {
             "inputValue": "20+"
           }
         }
-      ],
-      "appliesTo": "leader"
+      ]
     },
     // 20+ models: +4 D
     {
@@ -155,8 +146,7 @@ const waaaghEnergyRule: Rule = {
             "inputValue": "20+"
           }
         }
-      ],
-      "appliesTo": "leader"
+      ]
     },
     // 20+ models: HAZARDOUS
     {
@@ -173,8 +163,7 @@ const waaaghEnergyRule: Rule = {
             "inputValue": "20+"
           }
         }
-      ],
-      "appliesTo": "leader"
+      ]
     }
   ],
   "duration": {

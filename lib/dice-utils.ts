@@ -249,7 +249,7 @@ export function rollWounds(
   const lethalWounds = [...lethalHitIndices]; // These auto-wound
   const normalHitsCount = hitCount - lethalHitIndices.length;
 
-  let woundRolls = rollDice(normalHitsCount).map(value => ({ value }));
+  let woundRolls: DiceRoll[] = rollDice(normalHitsCount).map(value => ({ value }));
 
   const wounds: number[] = [];
   const criticalWounds: number[] = [];

@@ -19,10 +19,7 @@ const waaaghStrengthRule: Rule = {
   name: 'Waaagh!',
   description: 'While a Waaagh! is active, add 1 to the Strength characteristic',
   faction: 'Orks',
-  scope: {
-    type: 'weapon',
-    appliesTo: 'all'
-  },
+  scope: 'weapon',
   conditions: [
     {
       type: 'army-state',

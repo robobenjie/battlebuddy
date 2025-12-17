@@ -24,6 +24,7 @@ export interface CombatContext extends CombatOptions {
     T: number;
     SV: number;
     INV?: number;
+    leaderId?: string;      // If unit is being led
     isLeader?: boolean;     // If this unit is itself a leader (CHARACTER)
   };
 

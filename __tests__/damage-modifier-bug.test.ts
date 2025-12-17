@@ -39,10 +39,7 @@ describe('Damage Modifier Application Bug', () => {
     name: 'Damage Boost Test',
     description: 'Adds +2 damage',
     faction: 'Orks',
-    scope: {
-      type: 'model',
-      appliesTo: 'leader'
-    },
+    scope: 'model',
     conditions: [
       {
         type: 'is-leading',
@@ -62,8 +59,7 @@ describe('Damage Modifier Application Bug', () => {
             {
               type: 'modify-characteristic',
               target: 'weapon',
-              params: { stat: 'D', modifier: 2 },
-              appliesTo: 'leader'
+              params: { stat: 'D', modifier: 2 }
             }
           ]
         },

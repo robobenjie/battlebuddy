@@ -42,6 +42,7 @@ interface NewRecruitSelection {
   entryId: string;
   number?: number;
   type?: string;
+  group?: string;
   rules?: NewRecruitRule[];
   profiles?: NewRecruitProfile[];
   selections?: NewRecruitSelection[];

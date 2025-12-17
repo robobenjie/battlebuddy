@@ -288,45 +288,6 @@ describe('Rule Schema Validation', () => {
     });
   });
 
-  describe('AppliesTo Field', () => {
-    it('effects with appliesTo should have valid values', () => {
-      EXAMPLE_RULES.forEach(rule => {
-        const allEffects = [
-          ...rule.effects,
-          ...(rule.userInput?.options?.flatMap(opt => opt.effects || []) || [])
-        ];
-
-        allEffects.forEach(effect => {
-          if (effect.appliesTo) {
-            expect(['all', 'leader', 'bodyguard']).toContain(effect.appliesTo);
-          }
-        });
-      });
-    });
-
-    it('should have examples with bodyguard-only effects', () => {
-      const hasBodyguardEffects = EXAMPLE_RULES.some(rule => {
-        const allEffects = [
-          ...rule.effects,
-          ...(rule.userInput?.options?.flatMap(opt => opt.effects || []) || [])
-        ];
-        return allEffects.some(effect => effect.appliesTo === 'bodyguard');
-      });
-      expect(hasBodyguardEffects).toBe(true);
-    });
-
-    it('should have examples with leader-only effects', () => {
-      const hasLeaderEffects = EXAMPLE_RULES.some(rule => {
-        const allEffects = [
-          ...rule.effects,
-          ...(rule.userInput?.options?.flatMap(opt => opt.effects || []) || [])
-        ];
-        return allEffects.some(effect => effect.appliesTo === 'leader');
-      });
-      expect(hasLeaderEffects).toBe(true);
-    });
-  });
-
   describe('Activation Limits', () => {
     it('activation limits should be valid', () => {
       EXAMPLE_RULES.forEach(rule => {
@@ -527,16 +488,6 @@ describe('Rule Schema Validation', () => {
       expect(ruleWithEffectConditions).toBeDefined();
 
       const result = validateRule(ruleWithEffectConditions!);
-      expect(result.success).toBe(true);
-    });
-
-    it('should validate rules with appliesTo field', () => {
-      const ruleWithAppliesTo = EXAMPLE_RULES.find(r =>
-        r.effects.some(e => e.appliesTo)
-      );
-      expect(ruleWithAppliesTo).toBeDefined();
-
-      const result = validateRule(ruleWithAppliesTo!);
       expect(result.success).toBe(true);
     });
 

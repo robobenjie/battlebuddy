@@ -324,26 +324,26 @@ describe('Example Rules Integration', () => {
     });
   });
 
-  describe('Super Runts (leader with appliesTo)', () => {
+  describe('Super Runts (leader abilities)', () => {
     const rule = EXAMPLE_RULES.find(r => r.id === 'super-runts')!;
 
-    it('should add Scouts 9" keyword to bodyguard units', () => {
+    it('should add Scouts 9" keyword to the whole unit (leader attacking)', () => {
       const context = createTestContext({
-        weapon: { name: 'Slugga', range: 12, A: '2', WS: 3, S: 4, AP: 0, D: '1', keywords: [] },
-        attacker: { id: 'unit-1', armyId: 'army-1', categories: ['Infantry'], leaderId: 'leader-1' },
+        weapon: { name: 'Power Klaw', range: 0, A: '3', WS: 3, S: 8, AP: -2, D: '2', keywords: [] },
+        attacker: { id: 'zogrod-1', armyId: 'army-1', categories: ['CHARACTER', 'Infantry'] },
       });
 
       evaluateRule(rule, context);
 
-      // Scouts keyword applies to bodyguard (unit being led)
+      // Scouts keyword applies to whole unit when leader is leading
       const keywords = getAddedKeywords(context);
       expect(keywords).toContain('Scouts 9');
     });
 
-    it('should add +1 to hit for bodyguard when attacking', () => {
+    it('should add +1 to hit for leader (Zogrod) when attacking', () => {
       const context = createTestContext({
-        weapon: { name: 'Slugga', range: 12, A: '2', WS: 3, S: 4, AP: 0, D: '1', keywords: [] },
-        attacker: { id: 'unit-1', armyId: 'army-1', categories: ['Infantry'], leaderId: 'leader-1' },
+        weapon: { name: 'Power Klaw', range: 0, A: '3', WS: 3, S: 8, AP: -2, D: '2', keywords: [] },
+        attacker: { id: 'zogrod-1', armyId: 'army-1', categories: ['CHARACTER', 'Infantry'] },
         combatRole: 'attacker',
       });
 
@@ -352,10 +352,10 @@ describe('Example Rules Integration', () => {
       expect(context.modifiers.get('hit')).toBe(1);
     });
 
-    it('should add +1 to wound for bodyguard when attacking', () => {
+    it('should add +1 to wound for leader (Zogrod) when attacking', () => {
       const context = createTestContext({
-        weapon: { name: 'Slugga', range: 12, A: '2', WS: 3, S: 4, AP: 0, D: '1', keywords: [] },
-        attacker: { id: 'unit-1', armyId: 'army-1', categories: ['Infantry'], leaderId: 'leader-1' },
+        weapon: { name: 'Power Klaw', range: 0, A: '3', WS: 3, S: 8, AP: -2, D: '2', keywords: [] },
+        attacker: { id: 'zogrod-1', armyId: 'army-1', categories: ['CHARACTER', 'Infantry'] },
         combatRole: 'attacker',
       });
 
@@ -364,10 +364,11 @@ describe('Example Rules Integration', () => {
       expect(context.modifiers.get('wound')).toBe(1);
     });
 
-    it('should subtract 1 from wound rolls against bodyguard when defending', () => {
+    it('should subtract 1 from wound rolls against leader (Zogrod) when defending', () => {
       const context = createTestContext({
-        weapon: { name: 'Slugga', range: 12, A: '2', WS: 3, S: 4, AP: 0, D: '1', keywords: [] },
-        attacker: { id: 'unit-1', armyId: 'army-1', categories: ['Infantry'], leaderId: 'leader-1' },
+        weapon: { name: 'Bolter', range: 24, A: '2', WS: 3, S: 4, AP: 0, D: '1', keywords: [] },
+        attacker: { id: 'unit-enemy', armyId: 'army-2', categories: ['Infantry'] },
+        defender: { id: 'zogrod-1', armyId: 'army-1', categories: ['CHARACTER', 'Infantry'], models: [{ T: 4, SV: 4 }] },
         combatRole: 'defender',
       });
 
@@ -377,16 +378,16 @@ describe('Example Rules Integration', () => {
       expect(context.modifiers.get('wound')).toBe(-1);
     });
 
-    it('should not apply when unit is not being led', () => {
+    it('should not apply when leader is not leading (no bodyguard attached)', () => {
       const context = createTestContext({
-        weapon: { name: 'Slugga', range: 12, A: '2', WS: 3, S: 4, AP: 0, D: '1', keywords: [] },
-        attacker: { id: 'unit-1', armyId: 'army-1', categories: ['Infantry'] }, // No leaderId
+        weapon: { name: 'Power Klaw', range: 0, A: '3', WS: 3, S: 8, AP: -2, D: '2', keywords: [] },
+        attacker: { id: 'gretchin-1', armyId: 'army-1', categories: ['Infantry'] }, // Not a CHARACTER
         combatRole: 'attacker',
       });
 
       const applied = evaluateRule(rule, context);
 
-      // Rule doesn't apply - being-led condition not met
+      // Rule doesn't apply - is-leading condition not met (not a leader)
       expect(applied).toBe(false);
       expect(context.modifiers.get('hit')).toBe(0);
     });

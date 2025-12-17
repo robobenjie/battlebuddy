@@ -63,7 +63,6 @@ describe('Combat Calculator - Invulnerable Save Integration', () => {
           rerollPhase: null,
           autoPhase: null
         },
-        appliesTo: null,
         conditions: null
       }
     ],
