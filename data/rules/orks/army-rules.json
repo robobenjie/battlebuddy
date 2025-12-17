@@ -76,11 +76,11 @@
     ],
     "effects": [
       {
-        "type": "modify-save",
+        "type": "add-keyword",
         "target": "unit",
         "params": {
-          "stat": "INV",
-          "modifier": 5
+          "keyword": "Invulnerable Save",
+          "keywordValue": 5
         }
       }
     ],

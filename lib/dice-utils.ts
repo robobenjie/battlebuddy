@@ -326,14 +326,14 @@ export function calculateSaveThreshold(
   const modifiedSave = baseSave - ap;
 
   if (invulnerable !== undefined && invulnerable !== null) {
-    // Use invuln if it's better than modified save
-    if (invulnerable < modifiedSave || modifiedSave <= 1) {
+    // Use invuln if it's better (lower) than modified save, or if modified save is impossible (>6)
+    if (invulnerable <= modifiedSave || modifiedSave > 6) {
       return { threshold: invulnerable, usingInvulnerable: true };
     }
   }
 
-  // No save if modified to 1+ or worse
-  if (modifiedSave <= 1) {
+  // No save if modified to 7+ or worse
+  if (modifiedSave > 6) {
     return { threshold: 7, usingInvulnerable: false }; // Impossible to save
   }
 

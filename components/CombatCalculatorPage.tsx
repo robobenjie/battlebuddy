@@ -121,6 +121,12 @@ export default function CombatCalculatorPage({
     AP?: number;
     D?: number;
   }>({});
+  const [targetStatModifiers, setTargetStatModifiers] = useState<{
+    T?: number;
+    SV?: number;
+    INV?: number;
+    FNP?: number;
+  }>({});
   const [addedKeywords, setAddedKeywords] = useState<string[]>([]);
   const [modifierSources, setModifierSources] = useState<{
     hit?: string[];
@@ -166,6 +172,19 @@ export default function CombatCalculatorPage({
   const targetSelectRef = useRef<HTMLSelectElement>(null);
 
   // Auto-focus the target dropdown when component mounts
+  // Helper to apply target stat modifiers (for display and combat calculation)
+  const applyTargetModifiers = (baseTarget: TargetStats | null | undefined, modifiers: { T?: number; SV?: number; INV?: number; FNP?: number }): TargetStats | null => {
+    if (!baseTarget) return null;
+
+    return {
+      ...baseTarget,
+      T: baseTarget.T + (modifiers.T || 0),
+      SV: baseTarget.SV + (modifiers.SV || 0),
+      INV: modifiers.INV !== undefined ? modifiers.INV : baseTarget.INV,
+      FNP: modifiers.FNP !== undefined ? modifiers.FNP : baseTarget.FNP
+    };
+  };
+
   useEffect(() => {
     if (targetSelectRef.current) {
       targetSelectRef.current.focus();
@@ -485,6 +504,22 @@ export default function CombatCalculatorPage({
     const defenderArmy = game?.armies?.find((army: any) => army.id === defenderArmyId);
     const defenderArmyStates: ArmyState[] = defenderArmy?.states || [];
 
+    // Get army rules from the defender's army
+    if (defenderArmy?.armyRules) {
+      console.log(`📋 Loading ${defenderArmy.armyRules.length} army rules for defender army`);
+      for (const rule of defenderArmy.armyRules) {
+        if (rule?.ruleObject) {
+          try {
+            const parsedRule = JSON.parse(rule.ruleObject);
+            console.log(`   Adding defender army rule: ${parsedRule.name} (${parsedRule.id})`);
+            addDefenderRules(parsedRule);
+          } catch (e) {
+            console.error('Failed to parse defender army rule:', rule.name, e);
+          }
+        }
+      }
+    }
+
     // Debug logging
     console.log('🔍 WAAAGH Debug:', {
       currentArmyId,
@@ -585,6 +620,29 @@ export default function CombatCalculatorPage({
     const sMod = attackerContext.modifiers.get('S') || 0;
     const apMod = attackerContext.modifiers.get('AP') || 0;
     const dMod = attackerContext.modifiers.get('D') || 0;
+
+    // Extract save modifiers from defender context
+    // INV and FNP are keywords, not stats
+    const invulnKeywords = defenderContext.modifiers.getModifiers('keyword:Invulnerable Save');
+    const invMod = invulnKeywords.length > 0
+      ? Math.min(...invulnKeywords.map(m => m.value))
+      : undefined;
+
+    const fnpKeywords = defenderContext.modifiers.getModifiers('keyword:Feel No Pain');
+    const fnpMod = fnpKeywords.length > 0
+      ? Math.min(...fnpKeywords.map(m => m.value))
+      : undefined;
+
+    const svMod = defenderContext.modifiers.get('SV') || 0;
+    const tMod = defenderContext.modifiers.get('T') || 0;
+
+    // Save target stat modifiers to state for display
+    setTargetStatModifiers({
+      T: tMod,
+      SV: svMod,
+      INV: invMod,
+      FNP: fnpMod
+    });
 
     // Extract modifier sources from attacker context
     const hitSources = attackerContext.modifiers.getModifiers('hit').map(m => m.source);
@@ -759,6 +817,22 @@ export default function CombatCalculatorPage({
     const defenderArmy = game?.armies?.find((army: any) => army.id === defenderArmyId);
     const defenderArmyStates: ArmyState[] = defenderArmy?.states || [];
 
+    // Get army rules from the defender's army
+    if (defenderArmy?.armyRules) {
+      console.log(`📋 Loading ${defenderArmy.armyRules.length} army rules for defender army`);
+      for (const rule of defenderArmy.armyRules) {
+        if (rule?.ruleObject) {
+          try {
+            const parsedRule = JSON.parse(rule.ruleObject);
+            console.log(`   Adding defender army rule: ${parsedRule.name} (${parsedRule.id})`);
+            addDefenderRules(parsedRule);
+          } catch (e) {
+            console.error('Failed to parse defender army rule:', rule.name, e);
+          }
+        }
+      }
+    }
+
     // Debug logging
     console.log('🔍 WAAAGH Debug:', {
       currentArmyId,
@@ -815,6 +889,21 @@ export default function CombatCalculatorPage({
     const hitMod = attackerContext.modifiers.get('hit');
     const woundMod = attackerContext.modifiers.get('wound');
     const keywords = getAddedKeywords(attackerContext);
+
+    // Extract save modifiers from defender context
+    // INV and FNP are keywords, not stats
+    const invulnKeywords = defenderContext.modifiers.getModifiers('keyword:Invulnerable Save');
+    const invMod = invulnKeywords.length > 0
+      ? Math.min(...invulnKeywords.map(m => m.value))
+      : undefined;
+
+    const fnpKeywords = defenderContext.modifiers.getModifiers('keyword:Feel No Pain');
+    const fnpMod = fnpKeywords.length > 0
+      ? Math.min(...fnpKeywords.map(m => m.value))
+      : undefined;
+
+    const svMod = defenderContext.modifiers.get('SV') || 0;
+    const tMod = defenderContext.modifiers.get('T') || 0;
 
     // Extract weapon stat modifiers
     const aMod = attackerContext.modifiers.get('A') || 0;
@@ -890,8 +979,22 @@ export default function CombatCalculatorPage({
       keywords: keywordSources
     });
 
-    // Execute combat sequence with already-modified weapon (don't pass rules to avoid double-application)
-    const result = executeCombatSequence(modifiedWeaponStats, targetStats, options);
+    // Apply save modifiers to target stats using the same helper as display
+    const modifiedTargetStats = applyTargetModifiers(targetStats, {
+      T: tMod,
+      SV: svMod,
+      INV: invMod,
+      FNP: fnpMod
+    })!;
+
+    console.log('📊 Modified target stats:', {
+      original: { T: targetStats.T, SV: targetStats.SV, INV: targetStats.INV, FNP: targetStats.FNP },
+      modified: { T: modifiedTargetStats.T, SV: modifiedTargetStats.SV, INV: modifiedTargetStats.INV, FNP: modifiedTargetStats.FNP },
+      modifiers: { tMod, svMod, invMod, fnpMod }
+    });
+
+    // Execute combat sequence with already-modified weapon and target (don't pass rules to avoid double-application)
+    const result = executeCombatSequence(modifiedWeaponStats, modifiedTargetStats, options);
 
     setCombatResult(result);
     setShowSavePhase(false);
@@ -913,10 +1016,13 @@ export default function CombatCalculatorPage({
       keywords: (selectedWeapon as any).keywords || []
     };
 
-    let updatedResult = executeSavePhase(combatResult, weaponStats, targetStats);
+    // Apply modifiers to target stats (INV, FNP, etc.)
+    const modifiedTargetStats = applyTargetModifiers(targetStats, targetStatModifiers)!;
 
-    // Execute FNP phase after saves
-    updatedResult = executeFNPPhase(updatedResult, targetStats);
+    let updatedResult = executeSavePhase(combatResult, weaponStats, modifiedTargetStats);
+
+    // Execute FNP phase after saves (also use modified target stats for FNP)
+    updatedResult = executeFNPPhase(updatedResult, modifiedTargetStats);
 
     setCombatResult(updatedResult);
     setShowSavePhase(true);
@@ -1101,7 +1207,7 @@ export default function CombatCalculatorPage({
               <WeaponProfileDisplay
                 weapon={selectedWeapon as any}
                 modifiedWeapon={applyWeaponModifiers(selectedWeapon, weaponStatModifiers)}
-                target={targetStats}
+                target={applyTargetModifiers(targetStats, targetStatModifiers)}
                 unitName={unit?.name}
                 hideRange={weaponType === 'melee'}
                 unitHasCharged={unitHasCharged}
@@ -1165,7 +1271,7 @@ export default function CombatCalculatorPage({
       {showDigitalDiceMenu && selectedWeapon && targetStats && (
         <DigitalDiceMenu
           weapon={applyWeaponModifiers(selectedWeapon, weaponStatModifiers)}
-          target={targetStats}
+          target={applyTargetModifiers(targetStats, targetStatModifiers)!}
           totalWeaponCount={totalWeaponCount}
           unitHasCharged={unitHasCharged}
           unitHasMovedOrAdvanced={unitHasMovedOrAdvanced}
@@ -1195,7 +1301,7 @@ export default function CombatCalculatorPage({
               <DiceRollResults
                 combatResult={combatResult}
                 weapon={applyWeaponModifiers(selectedWeapon, weaponStatModifiers)}
-                target={targetStats}
+                target={applyTargetModifiers(targetStats, targetStatModifiers)!}
                 onRollSaves={handleRollSaves}
                 showSavePhase={showSavePhase}
                 activeRules={activeRules}

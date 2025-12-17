@@ -236,11 +236,12 @@ export function applyEffect(effect: RuleEffect, context: CombatContext, ruleId: 
     case 'modify-save': {
       if (!params.stat) return;
 
+      // Only for SV and T (INV and FNP are handled as keywords)
       const modifier: Modifier = {
         source: ruleId,
         stat: params.stat,
         value: params.modifier || 0,
-        operation: params.modifier ? '+' : 'set',
+        operation: '+',
         priority: 0,
       };
       context.modifiers.add(modifier);

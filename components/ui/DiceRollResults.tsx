@@ -6,6 +6,7 @@ import { CombatResult, WeaponStats, TargetStats } from '../../lib/combat-calcula
 import DiceDisplay, { AutoHitsDisplay, Die } from './DiceDisplay';
 import ActiveRulesDisplay from './ActiveRulesDisplay';
 import { getEffectiveHitValue, getEffectiveWoundValue, formatModifierSources, formatModifierDisplay } from '../../lib/combat-display-utils';
+import { calculateSaveThreshold } from '../../lib/dice-utils';
 
 interface DiceRollResultsProps {
   combatResult: CombatResult;
@@ -64,9 +65,10 @@ export default function DiceRollResults({
   // Check if we can skip save rolling:
   // - Save is impossible (worse than 6+)
   // - Damage is not variable (fixed number)
+  const saveCalc = calculateSaveThreshold(target.SV, effectiveWeapon.AP, target.INV);
+  const saveThreshold = saveCalc.threshold;
+  const usingInvuln = saveCalc.usingInvulnerable;
   const modifiedSave = target.SV - effectiveWeapon.AP;
-  const usingInvuln = target.INV && (target.INV < modifiedSave || modifiedSave <= 1);
-  const saveThreshold = usingInvuln ? target.INV : (modifiedSave <= 1 ? 7 : modifiedSave);
   const hasVariableDamage = effectiveWeapon.D.toUpperCase().includes('D');
   const canSkipSaveRolling = saveThreshold >= 7 && !hasVariableDamage;
 
@@ -377,22 +379,25 @@ export default function DiceRollResults({
 
                 <p>
                   <span className="text-gray-400">Save on:</span>{' '}
-                  <span className="text-white">
-                    {(() => {
-                      const modifiedSave = target.SV - effectiveWeapon.AP;
-                      const usingInvuln = target.INV && (target.INV < modifiedSave || modifiedSave <= 1);
-                      if (usingInvuln) {
-                        return `${target.INV}+ (invuln)`;
-                      }
-                      if (modifiedSave <= 1) {
-                        return 'No save';
-                      }
-                      return `${modifiedSave}+`;
-                    })()}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {' '}({target.SV}+ save, {Math.abs(effectiveWeapon.AP)} AP)
-                  </span>
+                  {(() => {
+                    const localSaveCalc = calculateSaveThreshold(target.SV, effectiveWeapon.AP, target.INV);
+                    return (
+                      <>
+                        <span className="text-white">
+                          {localSaveCalc.usingInvulnerable
+                            ? `${localSaveCalc.threshold}+ (invulnerable)`
+                            : localSaveCalc.threshold >= 7
+                            ? 'No save'
+                            : `${localSaveCalc.threshold}+`}
+                        </span>
+                        {!localSaveCalc.usingInvulnerable && (
+                          <span className="text-xs text-gray-400">
+                            {' '}({target.SV}+ save, {Math.abs(effectiveWeapon.AP)} AP)
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
                 </p>
 
                 <p>
@@ -585,20 +590,24 @@ export default function DiceRollResults({
 
                 <p>
                   <span className="text-gray-400">Save on:</span>{' '}
-                  <span className="text-white">
-                    {(() => {
-                      if (usingInvuln) {
-                        return `${target.INV}+ (invuln)`;
-                      }
-                      if (modifiedSave <= 1) {
-                        return 'No save';
-                      }
-                      return `${modifiedSave}+`;
-                    })()}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {' '}({target.SV}+ save, {Math.abs(effectiveWeapon.AP)} AP)
-                  </span>
+                  {(() => {
+                    return (
+                      <>
+                        <span className="text-white">
+                          {usingInvuln
+                            ? `${saveThreshold}+ (invulnerable)`
+                            : saveThreshold >= 7
+                            ? 'No save'
+                            : `${saveThreshold}+`}
+                        </span>
+                        {!usingInvuln && (
+                          <span className="text-xs text-gray-400">
+                            {' '}({target.SV}+ save, {Math.abs(effectiveWeapon.AP)} AP)
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
                 </p>
 
                 <p>
