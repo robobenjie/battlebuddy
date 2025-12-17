@@ -32,7 +32,12 @@ export const UNIT_FULL_QUERY = {
       modelRules: {}
     }
   }, // Load attached leaders with their rules
-  bodyguardUnits: {}, // Load bodyguard units (for CHARACTER filtering)
+  bodyguardUnits: {
+    unitRules: {},
+    models: {
+      modelRules: {}
+    }
+  }, // Load bodyguard units this leader is leading (with their rules)
   unitRules: {},
   models: {
     modelRules: {},
@@ -54,7 +59,12 @@ export const UNIT_BASIC_QUERY = {
       modelRules: {}
     }
   }, // Load attached leaders with their rules
-  bodyguardUnits: {}, // Load bodyguard units (for CHARACTER filtering)
+  bodyguardUnits: {
+    unitRules: {},
+    models: {
+      modelRules: {}
+    }
+  }, // Load bodyguard units this leader is leading (with their rules)
   unitRules: {},
   models: {
     modelRules: {},

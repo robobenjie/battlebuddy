@@ -2,6 +2,7 @@
 
 import { db } from '../../lib/db';
 import { id } from '@instantdb/react';
+import { useEffect } from 'react';
 import UnitCard from '../ui/UnitCard';
 import ReminderBadge from '../ui/ReminderBadge';
 import { useRulePopup } from '../ui/RulePopup';
@@ -100,6 +101,31 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
   const waaaghAlreadyDeclared = !!waaaghState;
   const isCurrentPlayer = currentPlayer?.userId === currentUser?.id;
 
+  // Expire army states at the start of command phase if they should expire
+  useEffect(() => {
+    if (!armyWithStates?.states || !isCurrentPlayer) return;
+
+    // Check if Waaagh should expire (activated in a previous turn and should expire in command phase)
+    const statesToExpire = armyWithStates.states.filter((state: any) => {
+      // Skip if no expiration phase set
+      if (!state.expiresPhase) return false;
+
+      // Only expire if:
+      // 1. We're in the command phase (which we are)
+      // 2. It was activated in a previous turn (not this turn)
+      // 3. The expiration phase matches current phase
+      return state.expiresPhase === 'command' && state.activatedTurn < game.currentTurn;
+    });
+
+    if (statesToExpire.length > 0) {
+      console.log(`🔄 Expiring ${statesToExpire.length} army states at start of command phase`);
+      const transactions = statesToExpire.map((state: any) =>
+        db.tx.armyStates[state.id].delete()
+      );
+      db.transact(transactions);
+    }
+  }, [game.currentTurn, isCurrentPlayer, armyWithStates?.states]);
+
   // Get units with command phase abilities
   const allUnits = unitsData?.armies[0]?.units || [];
   const destroyedUnitIds = new Set((unitsData?.games?.[0]?.destroyedUnits || []).map((u: any) => u.id));
@@ -142,10 +168,12 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
   const declareWaaagh = async () => {
     if (!currentUserArmy?.id) return;
 
+    // Waaagh lasts until the player's next command phase (a full game round)
     await db.transact([
       db.tx.armyStates[id()].update({
         state: 'waaagh-active',
         activatedTurn: game.currentTurn,
+        expiresPhase: 'command', // Expires at the start of next command phase
       }).link({ army: currentUserArmy.id })
     ]);
   };

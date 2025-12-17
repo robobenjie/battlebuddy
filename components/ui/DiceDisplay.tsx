@@ -26,7 +26,7 @@ export function Die({ value, type, size = 15, sides = 6 }: DiceProps) {
   if (isD3) {
     return (
       <div
-        className={`inline-flex items-center justify-center border-2 rounded font-bold ${colors[type]}`}
+        className={`inline-flex items-center justify-center border rounded font-bold ${colors[type]}`}
         style={{ width: `${size}px`, height: `${size}px`, fontSize: `${size * 0.6}px` }}
       >
         <span className="text-black">{value}</span>
@@ -52,7 +52,7 @@ export function Die({ value, type, size = 15, sides = 6 }: DiceProps) {
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center border-2 rounded ${colors[type]}`}
+      className={`relative inline-flex items-center justify-center border rounded ${colors[type]}`}
       style={{ width: `${size}px`, height: `${size}px` }}
     >
       {pips.map((position, i) => {
@@ -118,7 +118,7 @@ interface BonusSquareProps {
 function BonusSquare({ count, size = 15 }: BonusSquareProps) {
   return (
     <div
-      className="inline-flex items-center justify-center border-2 rounded font-bold border-green-600"
+      className="inline-flex items-center justify-center border rounded font-bold border-green-600"
       style={{ width: `${size}px`, height: `${size}px`, fontSize: `${size * 0.5}px` }}
     >
       <span className="text-green-400">+{count}</span>
@@ -171,14 +171,14 @@ export default function DiceDisplay({
         // Show +1 bonus square next to critical hits that generate sustained hits
         if (sustainedHitsSet.has(index)) {
           return (
-            <div key={index} className="inline-flex items-center gap-1">
+            <div key={index} className="inline-flex items-start gap-1">
               {dieElement}
               <BonusSquare count={1} size={size} />
             </div>
           );
         }
 
-        return <div key={index} className="inline-block">{dieElement}</div>;
+        return <div key={index} className="inline-flex items-start">{dieElement}</div>;
       })}
     </div>
   );

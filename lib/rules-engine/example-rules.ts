@@ -26,7 +26,7 @@ export const EXAMPLE_EXPLANATIONS: Record<string, string> = {
 
   'furious-charge': 'Shows unit-status conditions (charged) and temporary duration (turn). Demonstrates abilities that trigger based on unit actions.',
 
-  'super-runts': 'Complex example showing being-led condition, appliesTo field (leader vs bodyguard), and effect-level conditions (combat-role). Demonstrates how leader auras work. Also shows we can use multiple objects for a single written rule.',
+  'super-runts': 'Complex example showing being-led condition, appliesTo field (leader vs bodyguard), and effect-level conditions (combat-role). Demonstrates how leader auras work: (scope is unit!) Also shows we can use multiple objects for a single written rule.',
 
   'bomb-squigs': 'Reminder-only rule with manual activation and once-per-battle limit. Shows that rules can have empty conditions/effects arrays when they just need to remind the player.',
 
