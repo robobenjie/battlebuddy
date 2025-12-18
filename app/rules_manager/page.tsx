@@ -381,21 +381,22 @@ export default function RulesManagerPage() {
                   <div className="text-xs text-gray-400 mb-2">
                     Enter an array of rule objects. Each rule can have multiple effects.
                   </div>
-                  <div className="relative flex border border-gray-700 rounded focus-within:border-red-500 bg-gray-900 max-h-[70vh] overflow-auto">
-                    {/* Line numbers */}
-                    <div className="sticky left-0 flex-shrink-0 bg-gray-950 text-gray-500 font-mono text-sm p-3 pr-2 select-none border-r border-gray-700">
-                      {(ruleObjectText || ' ').split('\n').map((_, i) => (
-                        <div key={i} className="text-right leading-6">
-                          {i + 1}
-                        </div>
-                      ))}
-                    </div>
-                    {/* Textarea */}
-                    <textarea
-                      value={ruleObjectText}
-                      onChange={(e) => setRuleObjectText(e.target.value)}
-                      className="flex-1 min-h-[16rem] bg-transparent text-white font-mono text-sm p-3 pl-3 focus:outline-none resize-none leading-6"
-                      placeholder={`[
+                  <div className="relative border border-gray-700 rounded focus-within:border-red-500 bg-gray-900 max-h-[70vh] overflow-auto">
+                    <div className="flex min-h-[16rem]">
+                      {/* Line numbers */}
+                      <div className="sticky left-0 flex-shrink-0 bg-gray-950 text-gray-500 font-mono text-sm pt-4 pb-3 px-2 pr-2 select-none border-r border-gray-700">
+                        {(ruleObjectText || ' ').split('\n').map((_, i) => (
+                          <div key={i} className="text-right leading-6 px-1">
+                            {i + 1}
+                          </div>
+                        ))}
+                      </div>
+                      {/* Textarea */}
+                      <textarea
+                        value={ruleObjectText}
+                        onChange={(e) => setRuleObjectText(e.target.value)}
+                        className="flex-1 bg-transparent text-white font-mono text-sm p-3 pl-3 focus:outline-none resize-none leading-6 overflow-hidden"
+                        placeholder={`[
   {
     "type": "modifyAdvance",
     "params": {"modifier": 1}
@@ -405,8 +406,9 @@ export default function RulesManagerPage() {
     "params": {"modifier": 1}
   }
 ]`}
-                      rows={(ruleObjectText || '').split('\n').length || 10}
-                    />
+                        rows={(ruleObjectText || '').split('\n').length || 10}
+                      />
+                    </div>
                   </div>
                   {error && (
                     <div className="mt-2 text-red-400 text-sm">{error}</div>
