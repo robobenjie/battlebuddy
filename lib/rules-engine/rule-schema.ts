@@ -1,168 +1,218 @@
-/**
- * Zod schema for rule validation and OpenAI structured output
- *
- * All fields are required (as per OpenAI structured outputs requirements)
- * Optional fields use union with null: z.union([z.string(), z.null()])
- *
- * This is the single source of truth for rule validation.
+import { z } from "zod";
+
+
+/** ---------------------------
+ *  Triggers / scope
+ *  ---------------------------
+ */
+export const Scope = z.enum(["model", "unit", "army"]);
+export const Turn = z.enum(["own", "opponent", "both"]);
+export const TriggerType = z.enum(["automatic", "manual", "reactive"]);
+export const Limit = z.enum(["none", "once-per-turn", "once-per-battle"]);
+
+// 10th edition phases
+export const Phase = z.enum(["command", "movement", "shooting", "charge", "fight", "any"]);
+
+export const Trigger = z.object({
+  t: TriggerType,
+  phase: Phase,
+  turn: Turn,
+  limit: Limit,
+}).strict();
+
+/** ---------------------------
+ *  Typed abilities (Wahapedia-derived starter set)
+ *  ---------------------------
  */
 
-import { z } from 'zod';
-
-// ===== ENUMS AND BASIC TYPES =====
-
-export const RuleScopeSchema = z.enum(['weapon', 'unit', 'model', 'detachment', 'army']);
-
-export const RuleDurationSchema = z.enum(['permanent', 'turn', 'phase', 'until-deactivated']);
-
-export const ConditionTypeSchema = z.enum([
-  'target-category',
-  'weapon-type',
-  'range',
-  'unit-status',
-  'army-state',
-  'is-leading',
-  'being-led',
-  'combat-phase',
-  'combat-role',
-  'user-input'
+// Flag-like unit abilities (no parameters)
+export const UnitAbilityFlag = z.enum([
+  "deepStrike",
+  "fightsFirst",
+  "infiltrators",
+  "leader",
+  "loneOperative",
 ]);
 
-export const EffectTypeSchema = z.enum([
-  'modify-hit',
-  'modify-wound',
-  'modify-characteristic',
-  'add-keyword',
-  'grant-ability',
-  'modify-save',
-  'reroll',
-  'auto-success'
+// Parameterized unit abilities
+export const UnitAbility = z.union([
+  z.object({ t: z.literal("deadlyDemise"), x: z.number().int().min(1) }).strict(),
+  z.object({ t: z.literal("feelNoPain"), threshold: z.number().int().min(2).max(6) }).strict(),
+  z.object({ t: z.literal("scouts"), distance: z.number().int().min(1).max(12) }).strict(),
+  z.object({ t: z.literal("flag"), id: UnitAbilityFlag }).strict(),
 ]);
 
-export const EffectTargetSchema = z.enum(['self', 'weapon', 'unit', 'enemy']);
+// Flag-like weapon abilities (no parameters)
+export const WeaponAbilityFlag = z.enum([
+  "assault",
+  "blast",
+  "devastatingWounds",
+  "hazardous",
+  "heavy",
+  "ignoresCover",
+  "indirectFire",
+  "lethalHits",
+  "pistol",
+  "torrent",
+  "twinLinked",
+]);
 
-export const ConditionOperatorSchema = z.enum(['AND', 'OR']);
+// Parameterized weapon abilities
+export const WeaponAbility = z.union([
+  z.object({ t: z.literal("rapidFire"), x: z.number().int().min(1) }).strict(),
+  z.object({ t: z.literal("sustainedHits"), x: z.number().int().min(1) }).strict(),
+  z.object({
+    t: z.literal("anti"),
+    keyword: z.string(),                    // could later be a typed keyword enum if you want
+    threshold: z.number().int().min(2).max(6),
+  }).strict(),
+  z.object({ t: z.literal("flag"), id: WeaponAbilityFlag }).strict(),
+]);
 
-// ===== ACTIVATION =====
+/** ---------------------------
+ *  Conditions / When AST
+ *  ---------------------------
+ */
+export const Atom = z.union([
+  z.object({ t: z.literal("true") }).strict(),
+  z.object({ t: z.literal("false") }).strict(),
 
-export const RuleActivationSchema = z.object({
-  type: z.enum(['manual', 'automatic']),
-  limit: z.union([z.enum(['once-per-battle', 'once-per-turn', 'unlimited']), z.null()]),
-  phase: z.union([z.string(), z.null()]),
-  turn: z.union([z.enum(['own', 'opponent', 'both']), z.null()])
-}).strict();
+  z.object({ t: z.literal("combatRole"), v: z.enum(["attacker", "defender"]) }).strict(),
+  z.object({ t: z.literal("weaponType"), any: z.array(z.enum(["ranged", "melee"])).min(1) }).strict(),
+  z.object({ t: z.literal("targetCategory"), any: z.array(z.string()).min(1) }).strict(),
+  z.object({ t: z.literal("unitStatus"), has: z.array(z.string()).min(1) }).strict(),
+  z.object({ t: z.literal("armyState"), is: z.array(z.string()).min(1) }).strict(),
+  z.object({ t: z.literal("isLeading") }).strict(),
 
-// ===== CONDITION PARAMS =====
+  // Optional: ability-based conditions (typed)
+  z.object({ t: z.literal("weaponHasAbility"), ability: WeaponAbility }).strict(),
+  z.object({ t: z.literal("unitHasAbility"), ability: UnitAbility }).strict(),
+]);
 
-export const RuleConditionParamsSchema = z.object({
-  categories: z.union([z.array(z.string()), z.null()]),
-  weaponTypes: z.union([z.array(z.enum(['melee', 'ranged'])), z.null()]),
-  range: z.union([z.object({
-    operator: z.enum(['within-half', 'min', 'max']),
-    value: z.union([z.number(), z.null()])
-  }).strict(), z.null()]),
-  statuses: z.union([z.array(z.string()), z.null()]),
-  armyStates: z.union([z.array(z.string()), z.null()]),
-  phases: z.union([z.array(z.string()), z.null()]),
-  role: z.union([z.enum(['attacker', 'defender']), z.null()]),
-  inputId: z.union([z.string(), z.null()]),
-  inputValue: z.union([z.string(), z.number(), z.boolean(), z.null()])
-}).strict();
+export const When: z.ZodType<any> = z.lazy(() =>
+  z.union([
+    Atom,
+    z.object({ t: z.literal("all"), xs: z.array(When).min(1) }).strict(),
+    z.object({ t: z.literal("any"), xs: z.array(When).min(1) }).strict(),
+    z.object({ t: z.literal("not"), x: When }).strict(),
+  ])
+);
 
-// ===== CONDITION =====
+/** ---------------------------
+ *  Effects
+ *  ---------------------------
+ */
+export const WeaponStat = z.enum(["S", "AP", "A", "D"]);
+export const DefensiveStat = z.enum(["T", "SV"]);
 
-export const RuleConditionSchema = z.object({
-  type: ConditionTypeSchema,
-  params: RuleConditionParamsSchema,
-  operator: z.union([ConditionOperatorSchema, z.null()])
-}).strict();
+export const Fx = z.union([
+  // Dice modifiers (offensive and defensive)
+  z.object({ t: z.literal("modHit"), add: z.number().int() }).strict(),
+  z.object({ t: z.literal("modWound"), add: z.number().int() }).strict(),
 
-// ===== EFFECT PARAMS =====
+  // Weapon stats (offensive)
+  z.object({ t: z.literal("modWeaponStat"), stat: WeaponStat, add: z.number().int() }).strict(),
 
-export const RuleEffectParamsSchema = z.object({
-  stat: z.union([z.enum(['WS', 'S', 'A', 'AP', 'D', 'T', 'SV', 'INV']), z.null()]),
-  modifier: z.union([z.number(), z.null()]),
-  keyword: z.union([z.string(), z.null()]),
-  keywordValue: z.union([z.number(), z.null()]),
-  ability: z.union([z.string(), z.null()]),
-  abilityValue: z.union([z.string(), z.null()]),
-  rerollType: z.union([z.enum(['all', 'failed', 'ones']), z.null()]),
-  rerollPhase: z.union([z.enum(['hit', 'wound', 'damage']), z.null()]),
-  autoPhase: z.union([z.enum(['hit', 'wound']), z.null()])
-}).strict();
+  // Defensive stats
+  z.object({ t: z.literal("modDefensiveStat"), stat: DefensiveStat, add: z.number().int() }).strict(),
 
-// ===== EFFECT =====
+  // Add typed abilities (no stringly-typed keywords)
+  z.object({ t: z.literal("addWeaponAbility"), ability: WeaponAbility }).strict(),
+  z.object({ t: z.literal("addUnitAbility"), ability: UnitAbility }).strict(),
 
-export const RuleEffectSchema = z.object({
-  type: EffectTypeSchema,
-  target: EffectTargetSchema,
-  params: RuleEffectParamsSchema,
-  conditions: z.union([z.array(RuleConditionSchema), z.null()])
-}).strict();
+  // Save characteristics (invuln and FNP)
+  z.object({ t: z.literal("setInvuln"), n: z.number().int().min(2).max(7) }).strict(),
+  z.object({ t: z.literal("setFNP"), n: z.number().int().min(2).max(7) }).strict(),
 
-// ===== USER INPUT =====
+  // Rerolls
+  z.object({ t: z.literal("reroll"), phase: z.enum(["hit", "wound"]), kind: z.enum(["ones", "failed"]) }).strict(),
+]);
 
-export const RuleUserInputSchema = z.object({
-  type: z.enum(['toggle', 'radio', 'select']),
+/** ---------------------------
+ *  Blocks (conditional then)
+ *  ---------------------------
+ */
+export const Block: z.ZodType<any> = z.lazy(() =>
+  z.union([
+    // allow fx: [] so options can be “no-op” without dummy effects
+    z.object({ t: z.literal("do"), fx: z.array(Fx) }).strict(),
+
+    z.object({ t: z.literal("if"), when: When, then: z.array(Block).min(1) }).strict(),
+  ])
+);
+
+export const Then = z.array(Block).min(1);
+
+/** ---------------------------
+ *  Choices
+ *  ---------------------------
+ */
+export const Lifetime = z.union([
+  z.object({ t: z.literal("roll") }).strict(),
+  z.object({ t: z.literal("turn") }).strict(),
+  z.object({ t: z.literal("game") }).strict(),
+]);
+
+export const Choice = z.object({
   id: z.string(),
-  label: z.string(),
-  defaultValue: z.union([z.string(), z.number(), z.boolean(), z.null()]),
-  options: z.union([z.array(z.object({
-    value: z.union([z.string(), z.number(), z.boolean()]),
+  prompt: z.string(),
+  lifetime: Lifetime,
+  options: z.array(z.object({
+    v: z.string(),
     label: z.string(),
-    effects: z.union([z.array(RuleEffectSchema), z.null()])
-  }).strict()), z.null()])
+    then: Then,
+  }).strict()).min(2),
 }).strict();
 
-// ===== COMPLETE RULE SCHEMA =====
-
-export const RuleSchema = z.object({
+/** ---------------------------
+ *  Rule variants
+ *  ---------------------------
+ */
+export const RuleBase = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
-  faction: z.union([z.string(), z.null()]),
-  scope: RuleScopeSchema,
-  conditions: z.array(RuleConditionSchema),
-  effects: z.array(RuleEffectSchema),
-  duration: RuleDurationSchema,
-  activation: z.union([RuleActivationSchema, z.null()]),
-  userInput: z.union([RuleUserInputSchema, z.null()]),
-  reactive: z.boolean()
+  faction: z.string(),
+  scope: Scope,
+  trigger: Trigger,
+  when: When,
 }).strict();
 
-// Response schema for OpenAI API
+export const PassiveRule = RuleBase.extend({
+  kind: z.literal("passive"),
+  then: Then,
+}).strict();
+
+export const ChoiceRule = RuleBase.extend({
+  kind: z.literal("choice"),
+  choice: Choice,
+}).strict();
+
+export const ReminderRule = RuleBase.extend({
+  kind: z.literal("reminder"),
+}).strict();
+
+export const RuleSchema = z.union([PassiveRule, ChoiceRule, ReminderRule]);
+
+/** ---------------------------
+ *  Plug into your top-level schema
+ *  ---------------------------
+ */
 export const OpenAIResponseSchema = z.object({
   implementable: z.boolean(),
   message: z.string(),
-  rules: z.union([z.array(RuleSchema).min(1), z.null()])
+  rules: z.union([z.array(RuleSchema).min(1), z.null()]),
 }).strict();
 
-// ===== TYPE EXPORTS =====
-
-// Export inferred types from Zod schemas (useful for TypeScript)
-export type RuleSchemaType = z.infer<typeof RuleSchema>;
-export type RuleEffectSchemaType = z.infer<typeof RuleEffectSchema>;
-export type RuleConditionSchemaType = z.infer<typeof RuleConditionSchema>;
-export type RuleUserInputSchemaType = z.infer<typeof RuleUserInputSchema>;
-
-// ===== VALIDATION HELPER =====
-
-/**
- * Validates a rule against the schema and returns validation result
+/** ---------------------------
+ *  TypeScript type exports
+ *  ---------------------------
  */
-export function validateRule(rule: unknown): { success: boolean; data?: RuleSchemaType; error?: z.ZodError } {
-  const result = RuleSchema.safeParse(rule);
-
-  if (result.success) {
-    return { success: true, data: result.data };
-  } else {
-    return { success: false, error: result.error };
-  }
-}
-
-/**
- * Validates a rule and throws if invalid
- */
-export function parseRule(rule: unknown): RuleSchemaType {
-  return RuleSchema.parse(rule);
-}
+export type Rule = z.infer<typeof RuleSchema>;
+export type PassiveRuleType = z.infer<typeof PassiveRule>;
+export type ChoiceRuleType = z.infer<typeof ChoiceRule>;
+export type ReminderRuleType = z.infer<typeof ReminderRule>;
+export type TriggerType = z.infer<typeof Trigger>;
+export type WhenType = z.infer<typeof When>;
+export type FxType = z.infer<typeof Fx>;
+export type BlockType = z.infer<typeof Block>;

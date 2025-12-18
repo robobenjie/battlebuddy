@@ -8,31 +8,20 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildCombatContext, evaluateAllRules, checkCondition } from '../lib/rules-engine';
-import type { Rule, CombatContext } from '../lib/rules-engine/types';
+import { buildCombatContext } from '../lib/rules-engine/context';
+import { evaluateAllRules, evaluateWhen } from '../lib/rules-engine/evaluator';
+import type { Rule } from '../lib/rules-engine/types';
 import { getTestRule } from '../lib/rules-engine/test-rules';
+import type { WeaponStats } from '../lib/combat-calculator-engine';
 
 describe('is-leading condition bug', () => {
   // The "Might is Right" rule from test-rules.json
   const mightIsRightRule: Rule = getTestRule('might-is-right')!;
 
-  it('should evaluate is-leading condition as TRUE when unit has bodyguard units', () => {
-    // Warboss unit with bodyguard units (is leading)
-    const warbossUnit = {
-      id: 'warboss-1',
-      name: 'Warboss',
-      armyId: 'ork-army-1',
-      bodyguardUnits: [
-        { id: 'boys-1', name: 'Ork Boyz' }
-      ],
-      // This is what we're setting in CombatCalculatorPage.tsx
-      isLeader: true
-    };
-
-    const weapon = {
+  it('should evaluate is-leading condition as TRUE when unit has isLeader: true', () => {
+    const weapon: WeaponStats = {
       name: 'Big Choppa',
       range: 0,
-      type: 'melee' as const,
       A: '4',
       WS: 2,
       S: 10,
@@ -43,9 +32,9 @@ describe('is-leading condition bug', () => {
 
     const defender = {
       id: 'target-1',
-      name: 'Target',
       armyId: 'enemy-army-1',
-      models: [{ T: 4, SV: 3, W: 2 }]
+      categories: ['INFANTRY'],
+      models: [{ T: 4, SV: 3, INV: 6, W: 2 }]
     };
 
     const game = {
@@ -54,9 +43,14 @@ describe('is-leading condition bug', () => {
       currentPhase: 'fight'
     };
 
-    // Build combat context
+    // Build combat context with a leader unit
     const context = buildCombatContext({
-      attacker: warbossUnit,
+      attacker: {
+        id: 'warboss-1',
+        armyId: 'ork-army-1',
+        categories: ['CHARACTER', 'INFANTRY'],
+        isLeader: true // This unit IS a leader
+      },
       defender: defender,
       weapon: weapon,
       game: game,
@@ -73,12 +67,9 @@ describe('is-leading condition bug', () => {
       armyStates: []
     });
 
-    // Test 1: The is-leading condition should evaluate to true
-    const isLeadingCondition = {
-      type: 'is-leading' as const,
-      params: {}
-    };
-    const isLeadingResult = checkCondition(isLeadingCondition, context);
+    // Test 1: The isLeading condition should evaluate to true
+    const isLeadingCondition = { t: 'isLeading' as const };
+    const isLeadingResult = evaluateWhen(isLeadingCondition, context);
     expect(isLeadingResult).toBe(true);
 
     // Test 2: The rule should be applied
@@ -87,20 +78,10 @@ describe('is-leading condition bug', () => {
     expect(appliedRules[0].id).toBe('might-is-right-hit');
   });
 
-  it('should evaluate is-leading condition as FALSE when unit has no bodyguard units', () => {
-    // Warboss unit without bodyguard units (not leading)
-    const warbossUnit = {
-      id: 'warboss-1',
-      name: 'Warboss',
-      armyId: 'ork-army-1',
-      bodyguardUnits: [],
-      isLeader: false
-    };
-
-    const weapon = {
+  it('should evaluate is-leading condition as FALSE when unit has isLeader: false', () => {
+    const weapon: WeaponStats = {
       name: 'Big Choppa',
       range: 0,
-      type: 'melee' as const,
       A: '4',
       WS: 2,
       S: 10,
@@ -111,9 +92,9 @@ describe('is-leading condition bug', () => {
 
     const defender = {
       id: 'target-1',
-      name: 'Target',
       armyId: 'enemy-army-1',
-      models: [{ T: 4, SV: 3, W: 2 }]
+      categories: ['INFANTRY'],
+      models: [{ T: 4, SV: 3, INV: 6, W: 2 }]
     };
 
     const game = {
@@ -123,7 +104,12 @@ describe('is-leading condition bug', () => {
     };
 
     const context = buildCombatContext({
-      attacker: warbossUnit,
+      attacker: {
+        id: 'warboss-1',
+        armyId: 'ork-army-1',
+        categories: ['CHARACTER', 'INFANTRY'],
+        isLeader: false // NOT a leader
+      },
       defender: defender,
       weapon: weapon,
       game: game,
@@ -140,12 +126,9 @@ describe('is-leading condition bug', () => {
       armyStates: []
     });
 
-    // Test 1: The is-leading condition should evaluate to false
-    const isLeadingCondition = {
-      type: 'is-leading' as const,
-      params: {}
-    };
-    const isLeadingResult = checkCondition(isLeadingCondition, context);
+    // Test 1: The isLeading condition should evaluate to false
+    const isLeadingCondition = { t: 'isLeading' as const };
+    const isLeadingResult = evaluateWhen(isLeadingCondition, context);
     expect(isLeadingResult).toBe(false);
 
     // Test 2: The rule should NOT be applied
@@ -153,23 +136,10 @@ describe('is-leading condition bug', () => {
     expect(appliedRules).toHaveLength(0);
   });
 
-  it('should apply Might is Right when Warboss (with isLeader=true) attacks', () => {
-    // This simulates exactly what happens in CombatCalculatorPage.tsx
-    const warbossUnit = {
-      id: 'warboss-1',
-      name: 'Warboss',
-      armyId: 'ork-army-1',
-      bodyguardUnits: [
-        { id: 'boys-1', name: 'Ork Boyz' }
-      ],
-      // THIS is what we set in CombatCalculatorPage.tsx line 546
-      isLeader: !!(true && 1 > 0) // simulates: !!(unit?.bodyguardUnits && unit.bodyguardUnits.length > 0)
-    };
-
-    const weapon = {
+  it('should apply Might is Right when leader attacks', () => {
+    const weapon: WeaponStats = {
       name: 'Big Choppa',
       range: 0,
-      type: 'melee' as const,
       A: '4',
       WS: 2,
       S: 10,
@@ -180,9 +150,9 @@ describe('is-leading condition bug', () => {
 
     const defender = {
       id: 'gorkanaut-1',
-      name: 'Gorkanaut',
       armyId: 'enemy-army-1',
-      models: [{ T: 12, SV: 3, W: 24 }]
+      categories: ['VEHICLE'],
+      models: [{ T: 12, SV: 3, INV: 6, W: 24 }]
     };
 
     const game = {
@@ -192,7 +162,12 @@ describe('is-leading condition bug', () => {
     };
 
     const context = buildCombatContext({
-      attacker: warbossUnit,
+      attacker: {
+        id: 'warboss-1',
+        armyId: 'ork-army-1',
+        categories: ['CHARACTER', 'INFANTRY'],
+        isLeader: true
+      },
       defender: defender,
       weapon: weapon,
       game: game,
@@ -209,17 +184,8 @@ describe('is-leading condition bug', () => {
       armyStates: []
     });
 
-    console.log('🔍 Test Debug:');
-    console.log('  warbossUnit.isLeader:', warbossUnit.isLeader);
-    console.log('  warbossUnit.bodyguardUnits.length:', warbossUnit.bodyguardUnits.length);
-    console.log('  context.attacker.isLeader:', (context.attacker as any).isLeader);
-
     // The rule should be applied
     const appliedRules = evaluateAllRules([mightIsRightRule], context);
-
-    console.log('  Applied rules:', appliedRules.length);
-    console.log('  Applied rule IDs:', appliedRules.map(r => r.id));
-
     expect(appliedRules).toHaveLength(1);
     expect(appliedRules[0].id).toBe('might-is-right-hit');
   });

@@ -38,21 +38,22 @@ export default function DigitalDiceMenu({
   );
   const [unitRemainedStationary, setUnitRemainedStationary] = useState(!unitHasMovedOrAdvanced);
 
-  // State for user inputs from conditional rules
+  // State for user inputs from choice rules
   const [userInputs, setUserInputs] = useState<Record<string, any>>(() => {
     const initial: Record<string, any> = {};
     activeRules
-      .filter(rule => rule.userInput)
-      .forEach(rule => {
-        if (rule.userInput) {
-          initial[rule.userInput.id] = rule.userInput.defaultValue;
+      .filter((rule: any) => rule.kind === 'choice')
+      .forEach((rule: any) => {
+        if (rule.choice) {
+          // Default to first option value
+          initial[rule.choice.id] = rule.choice.options[0]?.v;
         }
       });
     return initial;
   });
 
-  // Get rules that require user input
-  const rulesWithInput = activeRules.filter(rule => rule.userInput);
+  // Get rules that require user input (choice rules)
+  const rulesWithInput = activeRules.filter(rule => rule.kind === 'choice' && rule.choice);
 
   // Update blast bonus when target model count changes
   useEffect(() => {
@@ -216,60 +217,36 @@ export default function DigitalDiceMenu({
             </div>
           )}
 
-          {/* Conditional Rule Inputs */}
+          {/* Conditional Rule Inputs (Choice Rules) */}
           {rulesWithInput.map(rule => {
-            const input = rule.userInput!;
+            if (rule.kind !== 'choice' || !rule.choice) return null;
 
-            if (input.type === 'toggle') {
-              return (
-                <div key={input.id} className="bg-gray-800 rounded p-3 border-l-4 border-purple-500">
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <div>
-                      <p className="text-white font-semibold">{input.label}</p>
-                      <p className="text-xs text-gray-400 mt-1">{rule.name}</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={userInputs[input.id] || false}
-                      onChange={(e) => setUserInputs(prev => ({
-                        ...prev,
-                        [input.id]: e.target.checked
-                      }))}
-                      className="w-6 h-6 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500"
-                    />
-                  </label>
+            const choice = rule.choice;
+
+            return (
+              <div key={choice.id} className="bg-gray-800 rounded p-3 border-l-4 border-purple-500">
+                <p className="text-white font-semibold mb-2">{choice.prompt}</p>
+                <p className="text-xs text-gray-400 mb-3">{rule.name}</p>
+                <div className="space-y-2">
+                  {choice.options.map(option => (
+                    <label key={option.v} className="flex items-start cursor-pointer hover:bg-gray-700 p-2 rounded transition-colors">
+                      <input
+                        type="radio"
+                        name={choice.id}
+                        value={option.v}
+                        checked={userInputs[choice.id] === option.v}
+                        onChange={(e) => setUserInputs(prev => ({
+                          ...prev,
+                          [choice.id]: option.v
+                        }))}
+                        className="mt-1 w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500"
+                      />
+                      <span className="ml-3 text-sm text-gray-300">{option.label}</span>
+                    </label>
+                  ))}
                 </div>
-              );
-            }
-
-            if (input.type === 'radio' && input.options) {
-              return (
-                <div key={input.id} className="bg-gray-800 rounded p-3 border-l-4 border-purple-500">
-                  <p className="text-white font-semibold mb-2">{input.label}</p>
-                  <p className="text-xs text-gray-400 mb-3">{rule.name}</p>
-                  <div className="space-y-2">
-                    {input.options.map(option => (
-                      <label key={option.value} className="flex items-start cursor-pointer hover:bg-gray-700 p-2 rounded transition-colors">
-                        <input
-                          type="radio"
-                          name={input.id}
-                          value={option.value}
-                          checked={userInputs[input.id] === option.value}
-                          onChange={(e) => setUserInputs(prev => ({
-                            ...prev,
-                            [input.id]: option.value
-                          }))}
-                          className="mt-1 w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500"
-                        />
-                        <span className="ml-3 text-sm text-gray-300">{option.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
-
-            return null;
+              </div>
+            );
           })}
 
           {/* Active Keywords Display */}

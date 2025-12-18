@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { executeCombatSequence, executeSavePhase, WeaponStats, TargetStats, CombatOptions } from '../lib/combat-calculator-engine';
-import { Rule } from '../lib/rules-engine/types';
+import { getTestRule } from '../lib/rules-engine/test-rules';
 
 describe('Damage Modifier Application Bug', () => {
   const testWeapon: WeaponStats = {
@@ -34,46 +34,7 @@ describe('Damage Modifier Application Bug', () => {
   };
 
   // Rule that adds +2 damage
-  const damageBoostRule: Rule = {
-    id: 'damage-boost',
-    name: 'Damage Boost Test',
-    description: 'Adds +2 damage',
-    faction: 'Orks',
-    scope: 'model',
-    conditions: [
-      {
-        type: 'is-leading',
-        params: {}
-      }
-    ],
-    userInput: {
-      type: 'toggle',
-      id: 'boost-active',
-      label: 'Boost Active',
-      defaultValue: true,
-      options: [
-        {
-          value: true,
-          label: 'Active',
-          effects: [
-            {
-              type: 'modify-characteristic',
-              target: 'weapon',
-              params: { stat: 'D', modifier: 2 }
-            }
-          ]
-        },
-        {
-          value: false,
-          label: 'Inactive',
-          effects: []
-        }
-      ]
-    },
-    effects: [],
-    duration: { type: 'permanent' },
-    activation: { phase: 'any', trigger: 'automatic' }
-  };
+  const damageBoostRule = getTestRule('damage-boost-leader')!;
 
   it('should correctly add numeric damage modifier to string damage value', () => {
     // Execute combat with damage modifier
@@ -82,8 +43,7 @@ describe('Damage Modifier Application Bug', () => {
       withinHalfRange: false,
       blastBonusAttacks: 0,
       unitHasCharged: false,
-      unitRemainedStationary: false,
-      userInputs: { 'boost-active': true }
+      unitRemainedStationary: false
     };
 
     const result = executeCombatSequence(
@@ -142,8 +102,7 @@ describe('Damage Modifier Application Bug', () => {
       withinHalfRange: false,
       blastBonusAttacks: 0,
       unitHasCharged: false,
-      unitRemainedStationary: false,
-      userInputs: { 'boost-active': true }
+      unitRemainedStationary: false
     };
 
     // This should work - d6+2 damage

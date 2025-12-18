@@ -2,6 +2,10 @@
 - After completing a feature, run tests with `npm test` and check for typescript errors with `npm build`
 - When informed of a bug always try to create a failing test, verify the test is failing and then fix the bug.
 - Never put rules-jon in a test: tests should reference rules in lib/rules-engine/test-rules.json
+- Never try to support two different data formats. Never maintain backwards compatability. There should be one representation for things used in code, data and tests.
+
+# Rules Schema guidelines:
+design doc linves in rules-schema-guidelines.md
 
 
 # How to test Rules Engine:

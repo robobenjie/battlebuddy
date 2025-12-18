@@ -8,40 +8,10 @@ import { evaluateRule } from '../lib/rules-engine/evaluator';
 import { buildCombatContext } from '../lib/rules-engine/context';
 import { Rule, ArmyState } from '../lib/rules-engine/types';
 import { WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
+import { getTestRule } from '../lib/rules-engine/test-rules';
 
-// Waaagh invuln save rule
-const waaaghInvulnRule: Rule = {
-  id: 'waaagh-invuln-save',
-  name: 'Waaagh! - Invulnerable Save',
-  description: 'While the Waaagh! is active, models from your army have a 5+ invulnerable save.',
-  faction: 'Orks',
-  scope: 'army',
-  conditions: [
-    {
-      type: 'army-state',
-      params: {
-        armyStates: ['waaagh-active']
-      }
-    }
-  ],
-  effects: [
-    {
-      type: 'add-keyword',
-      target: 'unit',
-      params: {
-        keyword: 'Invulnerable Save',
-        keywordValue: 5
-      }
-    }
-  ],
-  duration: {
-    type: 'permanent'
-  },
-  activation: {
-    phase: 'any',
-    trigger: 'automatic'
-  }
-};
+// Use the actual waaagh-invuln rule from test-rules.json
+const waaaghInvulnRule = getTestRule('waaagh-invuln')!;
 
 describe('Invulnerable Save Modifiers', () => {
   const testWeapon: WeaponStats = {
@@ -112,10 +82,11 @@ describe('Invulnerable Save Modifiers', () => {
       const applied = evaluateRule(waaaghInvulnRule, context);
       expect(applied).toBe(true);
 
-      // Check that the keyword modifier was added
-      const invModifiers = context.modifiers.getModifiers('keyword:Invulnerable Save');
+      // Check that the INV modifier was added
+      const invModifiers = context.modifiers.getModifiers('INV');
       expect(invModifiers.length).toBe(1);
       expect(invModifiers[0].value).toBe(5);
+      expect(invModifiers[0].operation).toBe('set');
 
       // Check that we can extract the value
       const invValue = invModifiers.length > 0
@@ -205,13 +176,13 @@ describe('Invulnerable Save Modifiers', () => {
 
       evaluateRule(waaaghInvulnRule, context);
 
-      // Extract using the same method as CombatCalculatorPage
-      const invulnKeywords = context.modifiers.getModifiers('keyword:Invulnerable Save');
-      const invMod = invulnKeywords.length > 0
-        ? Math.min(...invulnKeywords.map(m => m.value))
+      // Extract INV modifiers
+      const invModifiers = context.modifiers.getModifiers('INV');
+      const invMod = invModifiers.length > 0
+        ? Math.min(...invModifiers.map(m => m.value))
         : undefined;
 
-      expect(invulnKeywords.length).toBeGreaterThan(0);
+      expect(invModifiers.length).toBeGreaterThan(0);
       expect(invMod).toBe(5);
     });
 
@@ -256,13 +227,13 @@ describe('Invulnerable Save Modifiers', () => {
 
       evaluateRule(waaaghInvulnRule, context);
 
-      // Extract modifier
-      const invulnKeywords = context.modifiers.getModifiers('keyword:Invulnerable Save');
-      const invMod = invulnKeywords.length > 0
-        ? Math.min(...invulnKeywords.map(m => m.value))
+      // Extract INV modifiers
+      const invModifiers = context.modifiers.getModifiers('INV');
+      const invMod = invModifiers.length > 0
+        ? Math.min(...invModifiers.map(m => m.value))
         : undefined;
 
-      expect(invulnKeywords.length).toBeGreaterThan(0);
+      expect(invModifiers.length).toBeGreaterThan(0);
       expect(invMod).toBe(5); // Waaagh sets to 5+
 
       // In actual combat calculation, we should use the better (lower) of the two

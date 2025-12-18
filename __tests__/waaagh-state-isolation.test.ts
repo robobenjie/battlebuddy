@@ -9,43 +9,13 @@
 
 import { describe, it, expect } from 'vitest';
 import { evaluateRule } from '../lib/rules-engine/evaluator';
-import { buildCombatContext } from '../lib/rules-engine/context';
+import { buildCombatContext, explainModifiers } from '../lib/rules-engine/context';
 import { Rule, ArmyState } from '../lib/rules-engine/types';
-import { WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
+import { WeaponStats, TargetStats, explainModifiers as explainCombatModifiers } from '../lib/combat-calculator-engine';
+import { getTestRule } from '../lib/rules-engine/test-rules';
 
-// Simplified Waaagh! rule that adds +1 Strength
-const waaaghStrengthRule: Rule = {
-  id: 'waaagh-strength',
-  name: 'Waaagh!',
-  description: 'While a Waaagh! is active, add 1 to the Strength characteristic',
-  faction: 'Orks',
-  scope: 'weapon',
-  conditions: [
-    {
-      type: 'army-state',
-      params: {
-        armyStates: ['waaagh-active']
-      }
-    }
-  ],
-  effects: [
-    {
-      type: 'modify-characteristic',
-      target: 'weapon',
-      params: {
-        stat: 'S',
-        modifier: 1
-      }
-    }
-  ],
-  duration: {
-    type: 'permanent'
-  },
-  activation: {
-    phase: 'any',
-    trigger: 'automatic'
-  }
-};
+// Use the actual waaagh-strength rule from test-rules.json
+const waaaghStrengthRule = getTestRule('waaagh-strength')!;
 
 describe('Waaagh! State Isolation', () => {
   const testMeleeWeapon: WeaponStats = {
@@ -236,31 +206,8 @@ describe('Waaagh! State Isolation', () => {
         armyId: orkArmyId
       };
 
-      // Create a defensive Waaagh rule (applies to defender role)
-      const waaaghDefensiveRule: Rule = {
-        ...waaaghStrengthRule,
-        id: 'waaagh-defensive',
-        name: 'Waaagh! (Defensive)',
-        description: 'Defensive bonuses during Waaagh',
-        conditions: [
-          {
-            type: 'army-state',
-            params: {
-              armyStates: ['waaagh-active']
-            }
-          }
-        ],
-        effects: [
-          {
-            type: 'modify-characteristic',
-            target: 'unit',
-            params: {
-              stat: 'T',
-              modifier: 1
-            }
-          }
-        ]
-      };
+      // Use the defensive Waaagh rule from test-rules.json
+      const waaaghToughnessRule = getTestRule('waaagh-toughness')!;
 
       // Space Marine attacks Ork (who has Waaagh active)
       const defenderContext = buildCombatContext({
@@ -289,11 +236,11 @@ describe('Waaagh! State Isolation', () => {
           unitHasCharged: false,
           unitRemainedStationary: false
         },
-        rules: [waaaghDefensiveRule],
+        rules: [waaaghToughnessRule],
         armyStates: [waaaghState] // Defender's army has Waaagh
       });
 
-      const applied = evaluateRule(waaaghDefensiveRule, defenderContext);
+      const applied = evaluateRule(waaaghToughnessRule, defenderContext);
       expect(applied).toBe(true);
 
       const tMod = defenderContext.modifiers.get('T');
@@ -312,29 +259,8 @@ describe('Waaagh! State Isolation', () => {
         armyId: orkArmyId
       };
 
-      const waaaghDefensiveRule: Rule = {
-        ...waaaghStrengthRule,
-        id: 'waaagh-defensive',
-        name: 'Waaagh! (Defensive)',
-        conditions: [
-          {
-            type: 'army-state',
-            params: {
-              armyStates: ['waaagh-active']
-            }
-          }
-        ],
-        effects: [
-          {
-            type: 'modify-characteristic',
-            target: 'unit',
-            params: {
-              stat: 'T',
-              modifier: 1
-            }
-          }
-        ]
-      };
+      // Use the defensive Waaagh rule from test-rules.json
+      const waaaghToughnessRule = getTestRule('waaagh-toughness')!;
 
       // Ork attacks Space Marine (defender has no Waaagh)
       const defenderContext = buildCombatContext({
@@ -363,11 +289,11 @@ describe('Waaagh! State Isolation', () => {
           unitHasCharged: false,
           unitRemainedStationary: false
         },
-        rules: [waaaghDefensiveRule],
+        rules: [waaaghToughnessRule],
         armyStates: [] // Defender's army has NO Waaagh state
       });
 
-      const applied = evaluateRule(waaaghDefensiveRule, defenderContext);
+      const applied = evaluateRule(waaaghToughnessRule, defenderContext);
       expect(applied).toBe(false); // Should not apply
 
       const tMod = defenderContext.modifiers.get('T');

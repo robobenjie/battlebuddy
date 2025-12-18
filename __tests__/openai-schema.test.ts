@@ -38,10 +38,11 @@ describe('OpenAI Schema Compatibility', () => {
 
     const schemaString = JSON.stringify(jsonSchema);
 
-    // Check for unsupported keywords
-    expect(schemaString).not.toContain('allOf');
-    expect(schemaString).not.toContain('oneOf');
-    expect(schemaString).not.toContain('not');
+    // Check for unsupported JSON Schema keywords (as actual schema keywords, not string values)
+    // These would appear as: "allOf":[...], "oneOf":[...], "not":{...}
+    expect(schemaString).not.toContain('"allOf":');
+    expect(schemaString).not.toContain('"oneOf":');
+    expect(schemaString).not.toContain('"not":{');
   });
 
   it('should have additionalProperties: false on all nested objects', () => {

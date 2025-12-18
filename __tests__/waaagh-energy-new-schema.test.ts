@@ -8,121 +8,10 @@ import { evaluateRule } from '../lib/rules-engine/evaluator';
 import { buildCombatContext } from '../lib/rules-engine/context';
 import { Rule } from '../lib/rules-engine/types';
 import { WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
+import { getTestRule } from '../lib/rules-engine/test-rules';
 
-// Waaagh! Energy rule with NEW IMPROVED structure
-const waaaghEnergyRule: Rule = {
-  "id": "waaagh-energy",
-  "name": "Waaagh! Energy",
-  "description": "While this model is leading a unit, add 1 to the Strength and Damage characteristics of this model's 'Eadbanger weapon for every 5 models in that unit (rounding down), but while that unit contains 10 or more models, that weapon has the [HAZARDOUS] ability.",
-  "faction": "Orks",
-  "scope": "model",
-  "conditions": [
-    {
-      "type": "is-leading",
-      "params": {}
-    }
-  ],
-  "effects": [], // Effects are now in userInput options
-  "userInput": {
-    "type": "radio",
-    "id": "unit-size",
-    "label": "Unit size (models in led unit)",
-    "defaultValue": "0-4",
-    "options": [
-      {
-        "value": "0-4",
-        "label": "0-4 models (+0)",
-        "effects": []
-      },
-      {
-        "value": "5-9",
-        "label": "5-9 models (+1 S/D)",
-        "effects": [
-          {
-            "type": "modify-characteristic",
-            "target": "weapon",
-            "params": { "stat": "S", "modifier": 1 }
-          },
-          {
-            "type": "modify-characteristic",
-            "target": "weapon",
-            "params": { "stat": "D", "modifier": 1 }
-          }
-        ]
-      },
-      {
-        "value": "10-14",
-        "label": "10-14 models (+2 S/D, HAZARDOUS)",
-        "effects": [
-          {
-            "type": "modify-characteristic",
-            "target": "weapon",
-            "params": { "stat": "S", "modifier": 2 }
-          },
-          {
-            "type": "modify-characteristic",
-            "target": "weapon",
-            "params": { "stat": "D", "modifier": 2 },
-          },
-          {
-            "type": "add-keyword",
-            "target": "weapon",
-            "params": { "keyword": "Hazardous" },
-          }
-        ]
-      },
-      {
-        "value": "15-19",
-        "label": "15-19 models (+3 S/D, HAZARDOUS)",
-        "effects": [
-          {
-            "type": "modify-characteristic",
-            "target": "weapon",
-            "params": { "stat": "S", "modifier": 3 },
-          },
-          {
-            "type": "modify-characteristic",
-            "target": "weapon",
-            "params": { "stat": "D", "modifier": 3 },
-          },
-          {
-            "type": "add-keyword",
-            "target": "weapon",
-            "params": { "keyword": "Hazardous" },
-          }
-        ]
-      },
-      {
-        "value": "20+",
-        "label": "20+ models (+4 S/D, HAZARDOUS)",
-        "effects": [
-          {
-            "type": "modify-characteristic",
-            "target": "weapon",
-            "params": { "stat": "S", "modifier": 4 },
-          },
-          {
-            "type": "modify-characteristic",
-            "target": "weapon",
-            "params": { "stat": "D", "modifier": 4 },
-          },
-          {
-            "type": "add-keyword",
-            "target": "weapon",
-            "params": { "keyword": "Hazardous" },
-          }
-        ]
-      }
-    ]
-  },
-  "duration": {
-    "type": "permanent"
-  },
-  "activation": {
-    "phase": "any",
-    "trigger": "automatic"
-  }
-};
+// Waaagh! Energy rule from test-rules.json
+const waaaghEnergyRule: Rule = getTestRule('waaagh-energy')!;
 
 describe('Waaagh! Energy (NEW Schema)', () => {
   const testWeapon: WeaponStats = {
@@ -151,19 +40,23 @@ describe('Waaagh! Energy (NEW Schema)', () => {
   };
 
   describe('Schema structure', () => {
-    it('should have userInput with options containing effects', () => {
-      expect(waaaghEnergyRule.userInput).toBeDefined();
-      expect(waaaghEnergyRule.userInput?.options).toBeDefined();
+    it('should be a choice rule with options', () => {
+      expect(waaaghEnergyRule.kind).toBe('choice');
+      expect(waaaghEnergyRule.choice).toBeDefined();
+      expect(waaaghEnergyRule.choice?.options).toBeDefined();
 
-      // Check that options have effects arrays
-      const option5_9 = waaaghEnergyRule.userInput?.options?.find(o => o.value === '5-9');
-      expect(option5_9?.effects).toBeDefined();
-      expect(option5_9?.effects).toHaveLength(2); // +1 S and +1 D
+      // Check that 5-9 option has effects
+      const option5_9 = waaaghEnergyRule.choice?.options?.find(o => o.v === '5-9');
+      expect(option5_9).toBeDefined();
+      expect(option5_9?.then).toBeDefined();
+      // Should have 1 "do" block with 2 effects (+1 S and +1 D)
+      expect(option5_9?.then?.[0]?.fx).toHaveLength(2);
     });
 
-    it('should have empty main effects array', () => {
-      // Effects are now in userInput options, not at the top level
-      expect(waaaghEnergyRule.effects).toEqual([]);
+    it('should use choice structure instead of top-level effects', () => {
+      // New schema: effects are in choice.options[].then, not at the top level
+      expect(waaaghEnergyRule.kind).toBe('choice');
+      expect(waaaghEnergyRule.choice).toBeDefined();
     });
   });
 
@@ -267,12 +160,12 @@ describe('Waaagh! Energy (NEW Schema)', () => {
       expect(sMod).toBe(2);
       expect(dMod).toBe(2);
 
-      // Check for HAZARDOUS keyword
-      const keywordMod = context.modifiers.getModifiers('keyword:Hazardous');
-      expect(keywordMod.length).toBeGreaterThan(0);
+      // Check for HAZARDOUS weapon ability
+      const abilityMod = context.modifiers.getModifiers('weaponAbility:hazardous');
+      expect(abilityMod.length).toBeGreaterThan(0);
     });
 
-    it('should apply +4 S/D and HAZARDOUS when 20+ models selected', () => {
+    it('should apply +3 S/D and HAZARDOUS when 15+ models selected', () => {
       const context = buildCombatContext({
         attacker: {
           id: 'warboss',
@@ -290,7 +183,7 @@ describe('Waaagh! Energy (NEW Schema)', () => {
           blastBonusAttacks: 0,
           unitHasCharged: false,
           unitRemainedStationary: false,
-          userInputs: { 'unit-size': '20+' }
+          userInputs: { 'unit-size': '15+' }
         },
         rules: [waaaghEnergyRule],
         armyStates: []
@@ -301,12 +194,12 @@ describe('Waaagh! Energy (NEW Schema)', () => {
 
       const sMod = context.modifiers.get('S');
       const dMod = context.modifiers.get('D');
-      expect(sMod).toBe(4);
-      expect(dMod).toBe(4);
+      expect(sMod).toBe(3);
+      expect(dMod).toBe(3);
 
-      // Check for HAZARDOUS keyword
-      const keywordMod = context.modifiers.getModifiers('keyword:Hazardous');
-      expect(keywordMod.length).toBeGreaterThan(0);
+      // Check for HAZARDOUS weapon ability
+      const abilityMod = context.modifiers.getModifiers('weaponAbility:hazardous');
+      expect(abilityMod.length).toBeGreaterThan(0);
     });
   });
 

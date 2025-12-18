@@ -2,160 +2,97 @@
  * Rule evaluation engine
  */
 
-import { Rule, RuleCondition, RuleEffect, Modifier } from './types';
+import { Rule, Modifier, WhenType, FxType, BlockType } from './types';
 import { CombatContext } from './context';
 
 /**
- * Check if a condition is met given the current context
+ * Evaluate a When (condition) AST node
  */
-export function checkCondition(condition: RuleCondition, context: CombatContext): boolean {
-  const { type, params, operator = 'OR' } = condition;
+export function evaluateWhen(when: WhenType, context: CombatContext): boolean {
+  switch (when.t) {
+    // Boolean constants
+    case 'true':
+      return true;
+    case 'false':
+      return false;
 
-  switch (type) {
-    case 'target-category': {
-      if (!params.categories || params.categories.length === 0) return true;
+    // Boolean operators
+    case 'all':
+      return when.xs.every((x: WhenType) => evaluateWhen(x, context));
+    case 'any':
+      return when.xs.some((x: WhenType) => evaluateWhen(x, context));
+    case 'not':
+      return !evaluateWhen(when.x, context);
 
-      if (operator === 'OR') {
-        // Target has ANY of the specified categories
-        return params.categories.some(cat =>
-          context.defender.categories.some(defCat =>
-            defCat.toLowerCase() === cat.toLowerCase()
-          )
-        );
-      } else {
-        // Target has ALL of the specified categories
-        return params.categories.every(cat =>
-          context.defender.categories.some(defCat =>
-            defCat.toLowerCase() === cat.toLowerCase()
-          )
-        );
-      }
-    }
+    // Combat role
+    case 'combatRole':
+      return context.combatRole === when.v;
 
-    case 'weapon-type': {
-      if (!params.weaponTypes || params.weaponTypes.length === 0) return true;
-
+    // Weapon type
+    case 'weaponType': {
       const weaponType = context.weapon.range === 0 ? 'melee' : 'ranged';
-      return params.weaponTypes.includes(weaponType);
+      return when.any.includes(weaponType);
     }
 
-    case 'range': {
-      if (!params.range) return true;
+    // Target category
+    case 'targetCategory':
+      return when.any.some((cat: string) =>
+        context.defender.categories.some((defCat: string) =>
+          defCat.toLowerCase() === cat.toLowerCase()
+        )
+      );
 
-      const { operator: rangeOp, value } = params.range;
+    // Unit status
+    case 'unitStatus':
+      return when.has.some((status: string) => {
+        if (status === 'charged') return context.unitHasCharged;
+        if (status === 'moved') return !context.unitRemainedStationary;
+        if (status === 'stationary') return context.unitRemainedStationary;
+        return false;
+      });
 
-      if (rangeOp === 'within-half') {
-        return context.withinHalfRange;
-      } else if (rangeOp === 'min' && value !== undefined) {
-        return context.weapon.range >= value;
-      } else if (rangeOp === 'max' && value !== undefined) {
-        return context.weapon.range <= value;
-      }
-
-      return false;
-    }
-
-    case 'unit-status': {
-      if (!params.statuses || params.statuses.length === 0) return true;
-
-      // Check context flags for unit status
-      for (const status of params.statuses) {
-        if (status === 'charged' && context.unitHasCharged) return true;
-        if (status === 'moved' && !context.unitRemainedStationary) return true;
-        if (status === 'stationary' && context.unitRemainedStationary) return true;
-      }
-
-      return false;
-    }
-
-    case 'army-state': {
-      if (!params.armyStates || params.armyStates.length === 0) return true;
-
-      // Check if the attacking army has any of the required states
-      return params.armyStates.some(requiredState =>
+    // Army state
+    case 'armyState':
+      return when.is.some((requiredState: string) =>
         context.armyStates.some(armyState =>
           armyState.state === requiredState
         )
       );
-    }
 
-    case 'is-leading': {
-      // Check if the current participant (based on combatRole) IS a leader
-      // When evaluating attacker rules, check attacker.isLeader
-      // When evaluating defender rules, check defender.isLeader
+    // Is leading - checks if unit is a leader OR has a leader attached
+    // (leader CHARACTERs have isLeader=true, bodyguard units have leaderId set)
+    case 'isLeading':
       if (context.combatRole === 'defender') {
-        return !!(context.defender as any).isLeader;
+        return !!(context.defender as any).isLeader || !!(context.defender as any).leaderId;
       }
-      return !!context.attacker.isLeader;
-    }
+      return !!context.attacker.isLeader || !!context.attacker.leaderId;
 
-    case 'being-led': {
-      // Check if the current participant (based on combatRole) is being led (has a leader)
-      // When evaluating attacker rules, check attacker.leaderId
-      // When evaluating defender rules, check defender.leaderId
-      if (context.combatRole === 'defender') {
-        return !!(context.defender as any).leaderId;
-      }
-      return !!context.attacker.leaderId;
-    }
+    // Typed ability checks
+    case 'weaponHasAbility':
+      // TODO: Implement weapon ability checking
+      return false;
 
-    case 'combat-phase': {
-      if (!params.phases || params.phases.length === 0) return true;
-
-      return params.phases.includes(context.combatPhase);
-    }
-
-    case 'combat-role': {
-      if (!params.role) return true;
-
-      // Check if the combat role matches
-      return params.role === context.combatRole;
-    }
-
-    case 'user-input': {
-      if (!params.inputId) return true;
-
-      // Get the user-provided value for this input
-      const userValue = context.userInputs[params.inputId];
-
-      // If no user input provided, condition fails
-      if (userValue === undefined || userValue === null) {
-        return false;
-      }
-
-      // Check if the user value matches the expected value
-      return userValue === params.inputValue;
-    }
+    case 'unitHasAbility':
+      // TODO: Implement unit ability checking
+      return false;
 
     default:
-      console.warn(`Unknown condition type: ${type}`);
+      console.warn(`Unknown When type:`, when);
       return false;
   }
 }
 
 /**
- * Apply an effect to the combat context
+ * Apply an effect (Fx) to the combat context
  */
-export function applyEffect(effect: RuleEffect, context: CombatContext, ruleId: string): void {
-
-  // Check effect-level conditions (if any)
-  if (effect.conditions && effect.conditions.length > 0) {
-    const conditionsMet = effect.conditions.every(condition =>
-      checkCondition(condition, context)
-    );
-    if (!conditionsMet) {
-      return; // Skip this effect if conditions aren't met
-    }
-  }
-
-  const { type, target, params } = effect;
-
-  switch (type) {
-    case 'modify-hit': {
+export function applyFx(fx: FxType, context: CombatContext, ruleId: string): void {
+  switch (fx.t) {
+    // Dice modifiers
+    case 'modHit': {
       const modifier: Modifier = {
         source: ruleId,
         stat: 'hit',
-        value: params.modifier || 0,
+        value: fx.add,
         operation: '+',
         priority: 0,
       };
@@ -163,11 +100,11 @@ export function applyEffect(effect: RuleEffect, context: CombatContext, ruleId: 
       break;
     }
 
-    case 'modify-wound': {
+    case 'modWound': {
       const modifier: Modifier = {
         source: ruleId,
         stat: 'wound',
-        value: params.modifier || 0,
+        value: fx.add,
         operation: '+',
         priority: 0,
       };
@@ -175,13 +112,12 @@ export function applyEffect(effect: RuleEffect, context: CombatContext, ruleId: 
       break;
     }
 
-    case 'modify-characteristic': {
-      if (!params.stat) return;
-
+    // Weapon stats
+    case 'modWeaponStat': {
       const modifier: Modifier = {
         source: ruleId,
-        stat: params.stat,
-        value: params.modifier || 0,
+        stat: fx.stat,
+        value: fx.add,
         operation: '+',
         priority: 0,
       };
@@ -189,35 +125,12 @@ export function applyEffect(effect: RuleEffect, context: CombatContext, ruleId: 
       break;
     }
 
-    case 'add-keyword': {
-      if (!params.keyword) return;
-
-      // Add keyword to weapon's keywords array
-      // This will be handled by the combat calculator
-      const keywordString = params.keywordValue
-        ? `${params.keyword} ${params.keywordValue}`
-        : params.keyword;
-
-      // Store as a special modifier
+    // Defensive stats
+    case 'modDefensiveStat': {
       const modifier: Modifier = {
         source: ruleId,
-        stat: `keyword:${params.keyword}`,
-        value: params.keywordValue || 0,
-        operation: 'set',
-        priority: 0,
-      };
-      context.modifiers.add(modifier);
-      break;
-    }
-
-    case 'modify-save': {
-      if (!params.stat) return;
-
-      // Only for SV and T (INV and FNP are handled as keywords)
-      const modifier: Modifier = {
-        source: ruleId,
-        stat: params.stat,
-        value: params.modifier || 0,
+        stat: fx.stat,
+        value: fx.add,
         operation: '+',
         priority: 0,
       };
@@ -225,37 +138,73 @@ export function applyEffect(effect: RuleEffect, context: CombatContext, ruleId: 
       break;
     }
 
-    case 'grant-ability': {
-      // Store ability grants as special modifiers
+    // Add typed abilities
+    case 'addWeaponAbility': {
+      // Store weapon ability as special modifier
+      const abilityKey = fx.ability.t === 'flag' ? fx.ability.id : fx.ability.t;
+      // Store the whole ability object as JSON in the value for parameterized abilities
       const modifier: Modifier = {
         source: ruleId,
-        stat: `ability:${params.ability}`,
+        stat: `weaponAbility:${abilityKey}`,
         value: 1,
         operation: 'set',
         priority: 0,
       };
       context.modifiers.add(modifier);
+      // Store ability details for extraction
+      (context as any)._abilityDetails = (context as any)._abilityDetails || {};
+      (context as any)._abilityDetails[`weaponAbility:${abilityKey}`] = fx.ability;
       break;
     }
 
+    case 'addUnitAbility': {
+      // Store unit ability as special modifier
+      const abilityKey = fx.ability.t === 'flag' ? fx.ability.id : fx.ability.t;
+      const modifier: Modifier = {
+        source: ruleId,
+        stat: `unitAbility:${abilityKey}`,
+        value: 1,
+        operation: 'set',
+        priority: 0,
+      };
+      context.modifiers.add(modifier);
+      // Store ability details for extraction
+      (context as any)._abilityDetails = (context as any)._abilityDetails || {};
+      (context as any)._abilityDetails[`unitAbility:${abilityKey}`] = fx.ability;
+      break;
+    }
+
+    // Invulnerable save
+    case 'setInvuln': {
+      const modifier: Modifier = {
+        source: ruleId,
+        stat: 'INV',
+        value: fx.n,
+        operation: 'set',
+        priority: 0,
+      };
+      context.modifiers.add(modifier);
+      break;
+    }
+
+    // Feel No Pain save
+    case 'setFNP': {
+      const modifier: Modifier = {
+        source: ruleId,
+        stat: 'FNP',
+        value: fx.n,
+        operation: 'set',
+        priority: 0,
+      };
+      context.modifiers.add(modifier);
+      break;
+    }
+
+    // Rerolls
     case 'reroll': {
-      // Store reroll grants as special modifiers
       const modifier: Modifier = {
         source: ruleId,
-        stat: `reroll:${params.rerollPhase}:${params.rerollType}`,
-        value: 1,
-        operation: 'set',
-        priority: 0,
-      };
-      context.modifiers.add(modifier);
-      break;
-    }
-
-    case 'auto-success': {
-      // Store auto-success as special modifier
-      const modifier: Modifier = {
-        source: ruleId,
-        stat: `auto:${params.autoPhase}`,
+        stat: `reroll:${fx.phase}:${fx.kind}`,
         value: 1,
         operation: 'set',
         priority: 0,
@@ -265,7 +214,33 @@ export function applyEffect(effect: RuleEffect, context: CombatContext, ruleId: 
     }
 
     default:
-      console.warn(`Unknown effect type: ${type}`);
+      console.warn(`Unknown Fx type:`, fx);
+  }
+}
+
+/**
+ * Evaluate a Block (conditional or unconditional effects)
+ */
+export function evaluateBlock(block: BlockType, context: CombatContext, ruleId: string): void {
+  switch (block.t) {
+    case 'do':
+      // Apply all effects in the block
+      for (const fx of block.fx) {
+        applyFx(fx, context, ruleId);
+      }
+      break;
+
+    case 'if':
+      // Check condition, then recursively evaluate nested blocks
+      if (evaluateWhen(block.when, context)) {
+        for (const nestedBlock of block.then) {
+          evaluateBlock(nestedBlock, context, ruleId);
+        }
+      }
+      break;
+
+    default:
+      console.warn(`Unknown Block type:`, block);
   }
 }
 
@@ -273,34 +248,41 @@ export function applyEffect(effect: RuleEffect, context: CombatContext, ruleId: 
  * Evaluate a rule and apply its effects if conditions are met
  */
 export function evaluateRule(rule: Rule, context: CombatContext): boolean {
-  // Check if all conditions are met
-  const allConditionsMet = rule.conditions.every(condition =>
-    checkCondition(condition, context)
-  );
+  // Reminder rules have no effects
+  if (rule.kind === 'reminder') {
+    // Check if the rule's conditions are met (for filtering purposes)
+    return evaluateWhen(rule.when, context);
+  }
 
-  if (!allConditionsMet) {
+  // Check if the rule's top-level conditions are met
+  if (!evaluateWhen(rule.when, context)) {
     return false;
   }
 
-  // Apply all effects from the main effects array
-  for (const effect of rule.effects) {
-    applyEffect(effect, context, rule.id);
+  // Handle passive rules
+  if (rule.kind === 'passive') {
+    for (const block of rule.then) {
+      evaluateBlock(block, context, rule.id);
+    }
+    return true;
   }
 
-  // NEW: Apply effects from selected userInput option (if any)
-  if (rule.userInput && rule.userInput.options) {
-    const selectedValue = context.userInputs[rule.userInput.id];
+  // Handle choice rules
+  if (rule.kind === 'choice') {
+    const selectedValue = context.userInputs[rule.choice.id];
     if (selectedValue !== undefined && selectedValue !== null) {
-      const selectedOption = rule.userInput.options.find(opt => opt.value === selectedValue);
-      if (selectedOption && selectedOption.effects) {
-        for (const effect of selectedOption.effects) {
-          applyEffect(effect, context, rule.id);
+      const selectedOption = rule.choice.options.find(opt => opt.v === selectedValue);
+      if (selectedOption) {
+        for (const block of selectedOption.then) {
+          evaluateBlock(block, context, rule.id);
         }
+        return true;
       }
     }
+    return false;
   }
 
-  return true;
+  return false;
 }
 
 /**
@@ -319,13 +301,18 @@ export function evaluateAllRules(rules: Rule[], context: CombatContext): Rule[] 
 }
 
 /**
- * Get added keywords from modifiers
+ * Get added keywords from modifiers (for backward compatibility with tests)
+ *
+ * In the new schema, we use typed weapon/unit abilities instead of string keywords,
+ * but this function translates them back to keyword strings for testing.
  */
 export function getAddedKeywords(context: CombatContext): string[] {
   const keywords: string[] = [];
   const allMods = context.modifiers.getAllModifiers();
+  const abilityDetails = (context as any)._abilityDetails || {};
 
   for (const [stat, mods] of allMods.entries()) {
+    // Old keyword format (for backward compatibility)
     if (stat.startsWith('keyword:')) {
       for (const mod of mods) {
         const keyword = stat.replace('keyword:', '');
@@ -333,9 +320,82 @@ export function getAddedKeywords(context: CombatContext): string[] {
         keywords.push(keywordString);
       }
     }
+
+    // New weapon ability format
+    if (stat.startsWith('weaponAbility:')) {
+      for (const mod of mods) {
+        if (mod.value > 0) {
+          const abilityDetails = (context as any)._abilityDetails?.[stat];
+          if (abilityDetails) {
+            keywords.push(formatAbility(abilityDetails));
+          } else {
+            const ability = stat.replace('weaponAbility:', '');
+            const displayName = ability
+              .replace(/([A-Z])/g, ' $1')
+              .trim()
+              .replace(/^./, (str: string) => str.toUpperCase());
+            keywords.push(displayName);
+          }
+        }
+      }
+    }
+
+    // New unit ability format
+    if (stat.startsWith('unitAbility:')) {
+      for (const mod of mods) {
+        if (mod.value > 0) {
+          const abilityDetails = (context as any)._abilityDetails?.[stat];
+          if (abilityDetails) {
+            keywords.push(formatAbility(abilityDetails));
+          } else {
+            const ability = stat.replace('unitAbility:', '');
+            const displayName = ability
+              .replace(/([A-Z])/g, ' $1')
+              .trim()
+              .replace(/^./, (str: string) => str.toUpperCase());
+            keywords.push(displayName);
+          }
+        }
+      }
+    }
   }
 
   return keywords;
+}
+
+/**
+ * Format a typed ability to a display string
+ */
+function formatAbility(ability: any): string {
+  if (ability.t === 'flag') {
+    // Flag abilities like "lethalHits" -> "Lethal Hits"
+    return ability.id
+      .replace(/([A-Z])/g, ' $1')
+      .trim()
+      .replace(/^./, (str: string) => str.toUpperCase());
+  }
+
+  // Parameterized abilities
+  switch (ability.t) {
+    case 'scouts':
+      return `Scouts ${ability.distance}`;
+    case 'feelNoPain':
+      return `Feel No Pain ${ability.threshold}`;
+    case 'deadlyDemise':
+      return `Deadly Demise ${ability.x}`;
+    case 'rapidFire':
+      return `Rapid Fire ${ability.x}`;
+    case 'sustainedHits':
+      return `Sustained Hits ${ability.x}`;
+    case 'anti':
+      return `Anti-${ability.keyword} ${ability.threshold}+`;
+    default:
+      // Default: convert camelCase to Title Case
+      return ability.t
+        .replace(/([A-Z])/g, ' $1')
+        .trim()
+        .replace(/^./, (str: string) => str.toUpperCase());
+  }
 }
 
 /**

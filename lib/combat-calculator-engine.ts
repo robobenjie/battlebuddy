@@ -205,6 +205,41 @@ export function parseUnitKeywords(keywords: string[]): { invuln: number | null; 
 }
 
 /**
+ * Explain modifiers applied to a combat context
+ * Returns human-readable explanations for each modifier
+ */
+export function explainModifiers(context: CombatContext): {
+  hit: string;
+  wound: string;
+  stats: Record<string, string>;
+  keywords: string[];
+} {
+  const explainStat = (stat: string) => {
+    const mods = context.modifiers.getModifiers(stat);
+    if (mods.length === 0) return '';
+    return mods.map(m =>
+      `${m.value > 0 ? '+' : ''}${m.value} from ${m.source}`
+    ).join(', ');
+  };
+
+  return {
+    hit: explainStat('hit'),
+    wound: explainStat('wound'),
+    stats: {
+      A: explainStat('A'),
+      S: explainStat('S'),
+      AP: explainStat('AP'),
+      D: explainStat('D'),
+      T: explainStat('T'),
+      SV: explainStat('SV'),
+      INV: explainStat('INV'),
+      FNP: explainStat('FNP')
+    },
+    keywords: getAddedKeywords(context)
+  };
+}
+
+/**
  * Calculate and merge combat modifiers from both attacker and defender perspectives
  * Returns the combined modifiers that should be applied to the combat
  */

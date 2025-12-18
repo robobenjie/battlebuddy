@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { Rule } from '../lib/rules-engine/types';
 import { CombatContext, buildCombatContext } from '../lib/rules-engine/context';
 import { evaluateRule } from '../lib/rules-engine/evaluator';
+import { getTestRule } from '../lib/rules-engine/test-rules';
 
 describe('Rules Engine - User Input Conditions', () => {
   // Helper to create a basic combat context
@@ -60,150 +61,35 @@ describe('Rules Engine - User Input Conditions', () => {
   };
 
   describe('Drive-by Dakka (toggle input)', () => {
-    const driveByDakkaRule: Rule = {
-      id: 'drive-by-dakka',
-      name: 'Drive-by Dakka',
-      description: 'Each time a model in this unit makes a ranged attack that targets a unit within 9", improve the Armour Penetration characteristic of that attack by 1.',
-      scope: 'unit',
-      conditions: [],
-      effects: [
-        {
-          type: 'modify-characteristic',
-          target: 'weapon',
-          params: {
-            stat: 'AP',
-            modifier: -1, // Improve AP by 1 means subtract 1
-          },
-          conditions: [
-            {
-              type: 'weapon-type',
-              params: {
-                weaponTypes: ['ranged'],
-              },
-            },
-            {
-              type: 'user-input',
-              params: {
-                inputId: 'within-9',
-                inputValue: true,
-              },
-            },
-          ],
-        },
-      ],
-      duration: 'permanent',
-      reactive: false,
-      userInput: {
-        type: 'toggle',
-        id: 'within-9',
-        label: 'Target within 9"',
-        defaultValue: false,
-      },
-    };
+    const driveByDakkaRule: Rule = getTestRule('drive-by-dakka')!;
 
-    it('should apply AP improvement when user confirms target is within 9"', () => {
-      const context = createTestContext({ 'within-9': true });
+    it('should apply AP improvement when user confirms Advanced', () => {
+      const context = createTestContext({ 'advanced-this-turn': 'yes' });
       const applied = evaluateRule(driveByDakkaRule, context);
 
       expect(applied).toBe(true);
       expect(context.modifiers.get('AP')).toBe(-1);
     });
 
-    it('should NOT apply AP improvement when user confirms target is NOT within 9"', () => {
-      const context = createTestContext({ 'within-9': false });
+    it('should NOT apply AP improvement when user confirms NOT Advanced', () => {
+      const context = createTestContext({ 'advanced-this-turn': 'no' });
       const applied = evaluateRule(driveByDakkaRule, context);
 
-      expect(applied).toBe(true); // Rule still applies (conditions met)
+      expect(applied).toBe(true); // Rule still applies (when conditions met)
       expect(context.modifiers.get('AP')).toBe(0); // But effect is skipped
     });
 
-    it('should NOT apply AP improvement when no user input provided', () => {
+    it('should NOT apply rule when no user input provided', () => {
       const context = createTestContext({}); // No user input
       const applied = evaluateRule(driveByDakkaRule, context);
 
-      expect(applied).toBe(true);
-      expect(context.modifiers.get('AP')).toBe(0); // Effect skipped
+      expect(applied).toBe(false); // Choice rules don't apply without input
+      expect(context.modifiers.get('AP')).toBe(0);
     });
   });
 
   describe('Shooty Power Trip (radio input)', () => {
-    const shootyPowerTripRule: Rule = {
-      id: 'shooty-power-trip',
-      name: 'Shooty Power Trip',
-      description: 'Each time this unit is selected to shoot, you can roll one D6: On a 1-2, this unit suffers D3 mortal wounds. On a 3-4, until the end of the phase, add 1 to the Strength characteristic of ranged weapons. On a 5-6, until the end of the phase, add 1 to the Attacks characteristic of ranged weapons.',
-      scope: 'unit',
-      conditions: [],
-      effects: [
-        {
-          type: 'modify-characteristic',
-          target: 'weapon',
-          params: {
-            stat: 'S',
-            modifier: 1,
-          },
-          conditions: [
-            {
-              type: 'weapon-type',
-              params: {
-                weaponTypes: ['ranged'],
-              },
-            },
-            {
-              type: 'user-input',
-              params: {
-                inputId: 'power-trip-roll',
-                inputValue: '3-4',
-              },
-            },
-          ],
-        },
-        {
-          type: 'modify-characteristic',
-          target: 'weapon',
-          params: {
-            stat: 'A',
-            modifier: 1,
-          },
-          conditions: [
-            {
-              type: 'weapon-type',
-              params: {
-                weaponTypes: ['ranged'],
-              },
-            },
-            {
-              type: 'user-input',
-              params: {
-                inputId: 'power-trip-roll',
-                inputValue: '5-6',
-              },
-            },
-          ],
-        },
-      ],
-      duration: 'permanent',
-      reactive: false,
-      userInput: {
-        type: 'radio',
-        id: 'power-trip-roll',
-        label: 'Power Trip Roll Result',
-        options: [
-          {
-            value: '1-2',
-            label: '1-2: This unit suffers D3 mortal wounds',
-          },
-          {
-            value: '3-4',
-            label: '3-4: +1 Strength',
-          },
-          {
-            value: '5-6',
-            label: '5-6: +1 Attacks',
-          },
-        ],
-        defaultValue: null,
-      },
-    };
+    const shootyPowerTripRule: Rule = getTestRule('shooty-power-trip')!;
 
     it('should apply +1 Strength when user selects 3-4 result', () => {
       const context = createTestContext({ 'power-trip-roll': '3-4' });
@@ -227,17 +113,17 @@ describe('Rules Engine - User Input Conditions', () => {
       const context = createTestContext({ 'power-trip-roll': '1-2' });
       const applied = evaluateRule(shootyPowerTripRule, context);
 
-      expect(applied).toBe(true);
+      expect(applied).toBe(true); // Rule applies but no combat modifiers
       expect(context.modifiers.get('S')).toBe(0);
       expect(context.modifiers.get('A')).toBe(0);
       // Note: Mortal wounds would be handled separately, not by modifiers
     });
 
-    it('should NOT apply any effects when no user input provided', () => {
+    it('should NOT apply rule when no user input provided', () => {
       const context = createTestContext({});
       const applied = evaluateRule(shootyPowerTripRule, context);
 
-      expect(applied).toBe(true);
+      expect(applied).toBe(false); // Choice rules don't apply without input
       expect(context.modifiers.get('S')).toBe(0);
       expect(context.modifiers.get('A')).toBe(0);
     });

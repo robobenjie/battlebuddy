@@ -6,75 +6,12 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateRule } from '../lib/rules-engine/evaluator';
 import { buildCombatContext } from '../lib/rules-engine/context';
-import { Rule, ArmyState } from '../lib/rules-engine/types';
+import { ArmyState } from '../lib/rules-engine/types';
 import { WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
+import { getTestRule } from '../lib/rules-engine/test-rules';
 
 describe('Combat Calculator - Invulnerable Save Integration', () => {
-  const waaaghInvulnRule: Rule = {
-    id: 'waaagh-invuln',
-    name: 'Waaagh! - Invulnerable Save',
-    description: 'While the Waaagh! is active, models from your army have a 5+ invulnerable save.',
-    faction: 'Orks',
-    scope: 'army',
-    conditions: [
-      {
-        type: 'combat-role',
-        params: {
-          role: 'defender',
-          categories: null,
-          weaponTypes: null,
-          range: null,
-          statuses: null,
-          armyStates: null,
-          phases: null,
-          inputId: null,
-          inputValue: null
-        },
-        operator: null
-      },
-      {
-        type: 'army-state',
-        params: {
-          armyStates: ['waaagh-active'],
-          categories: null,
-          weaponTypes: null,
-          range: null,
-          statuses: null,
-          phases: null,
-          role: null,
-          inputId: null,
-          inputValue: null
-        },
-        operator: null
-      }
-    ],
-    effects: [
-      {
-        type: 'add-keyword',
-        target: 'unit',
-        params: {
-          keyword: 'Invulnerable Save',
-          keywordValue: 5,
-          stat: null,
-          modifier: null,
-          ability: null,
-          abilityValue: null,
-          rerollType: null,
-          rerollPhase: null,
-          autoPhase: null
-        },
-        conditions: null
-      }
-    ],
-    duration: 'permanent',
-    activation: {
-      type: 'automatic',
-      phase: 'any',
-      limit: null,
-      turn: null
-    },
-    userInput: null
-  };
+  const waaaghInvulnRule = getTestRule('waaagh-invuln')!;
 
   const testWeapon: WeaponStats = {
     name: 'Boltgun',
@@ -148,13 +85,13 @@ describe('Combat Calculator - Invulnerable Save Integration', () => {
     expect(applied).toBe(true);
 
     // Extract INV modifier (same as CombatCalculatorPage)
-    const invulnKeywords = defenderContext.modifiers.getModifiers('keyword:Invulnerable Save');
-    const invMod = invulnKeywords.length > 0
-      ? Math.min(...invulnKeywords.map(m => m.value))
+    const invModifiers = defenderContext.modifiers.getModifiers('INV');
+    const invMod = invModifiers.length > 0
+      ? Math.min(...invModifiers.map(m => m.value))
       : undefined;
 
     // Verify modifier was extracted
-    expect(invulnKeywords.length).toBeGreaterThan(0);
+    expect(invModifiers.length).toBeGreaterThan(0);
     expect(invMod).toBe(5);
 
     // Apply to effectiveTargetStats (same as CombatCalculatorPage should do)
@@ -218,9 +155,9 @@ describe('Combat Calculator - Invulnerable Save Integration', () => {
     evaluateRule(waaaghInvulnRule, defenderContext);
 
     // Extract modifier
-    const invulnKeywords = defenderContext.modifiers.getModifiers('keyword:Invulnerable Save');
-    const invMod = invulnKeywords.length > 0
-      ? Math.min(...invulnKeywords.map(m => m.value))
+    const invModifiers = defenderContext.modifiers.getModifiers('INV');
+    const invMod = invModifiers.length > 0
+      ? Math.min(...invModifiers.map(m => m.value))
       : undefined;
 
     // Waaagh gives 5+ invuln

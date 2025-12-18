@@ -1,230 +1,198 @@
 /**
- * Tests for leadership conditions (is-leading, being-led)
+ * Tests for leadership conditions (isLeading)
  */
 
 import { describe, it, expect } from 'vitest';
-import { checkCondition } from '../lib/rules-engine/evaluator';
-import { CombatContext } from '../lib/rules-engine/context';
-import { RuleCondition } from '../lib/rules-engine/types';
-import { ModifierStack } from '../lib/rules-engine/modifier-stack';
+import { evaluateWhen } from '../lib/rules-engine/evaluator';
+import { buildCombatContext } from '../lib/rules-engine/context';
+import { WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
 
-// Helper to create a minimal combat context for testing
-function createTestContext(overrides: Partial<CombatContext> = {}): CombatContext {
-  return {
-    attacker: {
-      unitId: 'test-unit',
-      armyId: 'test-army',
-      categories: [],
-      isLeader: false,
-      leaderId: undefined,
-    },
-    defender: {
-      unitId: 'target-unit',
-      armyId: 'enemy-army',
-      categories: [],
-      modelCount: 10,
-      T: 4,
-      SV: 3,
-      INV: undefined,
-    },
-    weapon: {
-      name: 'Test Weapon',
-      range: 24,
-      A: '2',
-      WS: 3,
-      S: 4,
-      AP: 0,
-      D: '1',
-      keywords: []
-    },
-    game: {
-      id: 'test-game',
-      currentTurn: 1,
-      currentPhase: 'shooting'
-    },
-    combatPhase: 'shooting',
-    combatRole: 'attacker',
-    activeRules: [],
-    armyStates: [],
-    userInputs: {},
-    modifiers: new ModifierStack(),
-    modelsFiring: 1,
-    withinHalfRange: false,
-    blastBonusAttacks: 0,
-    unitHasCharged: false,
-    unitRemainedStationary: false,
-    ...overrides
-  };
-}
+const testWeapon: WeaponStats = {
+  name: 'Test Weapon',
+  range: 24,
+  A: '2',
+  WS: 3,
+  S: 4,
+  AP: 0,
+  D: '1',
+  keywords: []
+};
+
+const testTarget: TargetStats = {
+  T: 4,
+  SV: 3,
+  INV: 6,
+  modelCount: 10,
+  categories: ['INFANTRY']
+};
+
+const testGame = {
+  id: 'test-game',
+  currentTurn: 1,
+  currentPhase: 'shooting'
+};
 
 describe('Leadership Conditions', () => {
-  describe('is-leading condition', () => {
-    it('should return true when attacker is a leader (CHARACTER)', () => {
-      const condition: RuleCondition = {
-        type: 'is-leading',
-        params: {}
-      };
+  describe('isLeading condition', () => {
+    it('should return true when attacker is a leader (isLeader: true)', () => {
+      const when = { t: 'isLeading' as const };
 
-      const context = createTestContext({
+      const context = buildCombatContext({
         attacker: {
-          unitId: 'leader-unit',
+          id: 'leader-unit',
           armyId: 'test-army',
           categories: ['CHARACTER', 'INFANTRY'],
-          isLeader: true, // This unit IS a leader
-          leaderId: undefined
-        }
+          isLeader: true // This unit IS a leader
+        },
+        defender: testTarget,
+        weapon: testWeapon,
+        game: testGame,
+        combatPhase: 'shooting',
+        combatRole: 'attacker',
+        options: {
+          modelsFiring: 1,
+          withinHalfRange: false,
+          blastBonusAttacks: 0,
+          unitHasCharged: false,
+          unitRemainedStationary: false
+        },
+        rules: [],
+        armyStates: []
       });
 
-      const result = checkCondition(condition, context);
+      const result = evaluateWhen(when, context);
       expect(result).toBe(true);
     });
 
     it('should return false when attacker is not a leader', () => {
-      const condition: RuleCondition = {
-        type: 'is-leading',
-        params: {}
-      };
+      const when = { t: 'isLeading' as const };
 
-      const context = createTestContext({
+      const context = buildCombatContext({
         attacker: {
-          unitId: 'regular-unit',
+          id: 'regular-unit',
           armyId: 'test-army',
           categories: ['INFANTRY'],
-          isLeader: false, // This unit is NOT a leader
-          leaderId: undefined
-        }
+          isLeader: false // This unit is NOT a leader
+        },
+        defender: testTarget,
+        weapon: testWeapon,
+        game: testGame,
+        combatPhase: 'shooting',
+        combatRole: 'attacker',
+        options: {
+          modelsFiring: 1,
+          withinHalfRange: false,
+          blastBonusAttacks: 0,
+          unitHasCharged: false,
+          unitRemainedStationary: false
+        },
+        rules: [],
+        armyStates: []
       });
 
-      const result = checkCondition(condition, context);
+      const result = evaluateWhen(when, context);
       expect(result).toBe(false);
     });
 
-    it('should return false when attacker is being led (has leaderId)', () => {
-      const condition: RuleCondition = {
-        type: 'is-leading',
-        params: {}
-      };
+    it('should check defender when combatRole is defender', () => {
+      const when = { t: 'isLeading' as const };
 
-      const context = createTestContext({
+      const context = buildCombatContext({
         attacker: {
-          unitId: 'bodyguard-unit',
+          id: 'enemy-unit',
+          armyId: 'enemy-army',
+          categories: ['INFANTRY']
+        },
+        defender: {
+          id: 'defending-leader',
           armyId: 'test-army',
-          categories: ['INFANTRY'],
-          isLeader: false, // This unit is not a leader
-          leaderId: 'some-leader-id' // But it HAS a leader
-        }
+          categories: ['CHARACTER', 'INFANTRY'],
+          isLeader: true, // Defender IS a leader
+          T: 4,
+          SV: 3,
+          INV: 6,
+          modelCount: 1
+        },
+        weapon: testWeapon,
+        game: testGame,
+        combatPhase: 'melee',
+        combatRole: 'defender', // Checking defender's leadership
+        options: {
+          modelsFiring: 1,
+          withinHalfRange: false,
+          blastBonusAttacks: 0,
+          unitHasCharged: false,
+          unitRemainedStationary: false
+        },
+        rules: [],
+        armyStates: []
       });
 
-      const result = checkCondition(condition, context);
-      expect(result).toBe(false);
-    });
-  });
-
-  describe('being-led condition', () => {
-    it('should return true when attacker has a leader', () => {
-      const condition: RuleCondition = {
-        type: 'being-led',
-        params: {}
-      };
-
-      const context = createTestContext({
-        attacker: {
-          unitId: 'bodyguard-unit',
-          armyId: 'test-army',
-          categories: ['INFANTRY'],
-          isLeader: false,
-          leaderId: 'some-leader-id' // This unit HAS a leader
-        }
-      });
-
-      const result = checkCondition(condition, context);
+      const result = evaluateWhen(when, context);
       expect(result).toBe(true);
     });
-
-    it('should return false when attacker has no leader', () => {
-      const condition: RuleCondition = {
-        type: 'being-led',
-        params: {}
-      };
-
-      const context = createTestContext({
-        attacker: {
-          unitId: 'regular-unit',
-          armyId: 'test-army',
-          categories: ['INFANTRY'],
-          isLeader: false,
-          leaderId: undefined // No leader
-        }
-      });
-
-      const result = checkCondition(condition, context);
-      expect(result).toBe(false);
-    });
-
-    it('should return false when attacker is a leader themselves', () => {
-      const condition: RuleCondition = {
-        type: 'being-led',
-        params: {}
-      };
-
-      const context = createTestContext({
-        attacker: {
-          unitId: 'leader-unit',
-          armyId: 'test-army',
-          categories: ['CHARACTER'],
-          isLeader: true, // This is a leader
-          leaderId: undefined // Leaders don't have leaders
-        }
-      });
-
-      const result = checkCondition(condition, context);
-      expect(result).toBe(false);
-    });
   });
 
-  describe('Leader ability application (Waaagh! Energy scenario)', () => {
-    it('should allow leader-only effects to apply when is-leading is true', () => {
-      // Simulate a CHARACTER model with Waaagh! Energy ability
-      const isLeadingCondition: RuleCondition = {
-        type: 'is-leading',
-        params: {}
-      };
+  describe('Leader ability application (integration test)', () => {
+    it('should allow leader-only effects to apply when isLeading is true', () => {
+      // This simulates a rule like "While this model is leading a unit, add 1 to hit"
+      const leaderCondition = { t: 'isLeading' as const };
 
-      const context = createTestContext({
+      const context = buildCombatContext({
         attacker: {
-          unitId: 'warboss',
+          id: 'warboss',
           armyId: 'ork-army',
-          categories: ['CHARACTER', 'INFANTRY', 'GRENADES'],
-          isLeader: true,
-          leaderId: undefined
-        }
+          categories: ['CHARACTER', 'INFANTRY'],
+          isLeader: true
+        },
+        defender: testTarget,
+        weapon: testWeapon,
+        game: testGame,
+        combatPhase: 'shooting',
+        combatRole: 'attacker',
+        options: {
+          modelsFiring: 1,
+          withinHalfRange: false,
+          blastBonusAttacks: 0,
+          unitHasCharged: false,
+          unitRemainedStationary: false
+        },
+        rules: [],
+        armyStates: []
       });
 
-      // The is-leading condition should pass
-      const canApplyAbility = checkCondition(isLeadingCondition, context);
-      expect(canApplyAbility).toBe(true);
+      const shouldApply = evaluateWhen(leaderCondition, context);
+      expect(shouldApply).toBe(true);
     });
 
-    it('should prevent leader-only effects when is-leading is false', () => {
-      // Simulate a regular model trying to use Waaagh! Energy
-      const isLeadingCondition: RuleCondition = {
-        type: 'is-leading',
-        params: {}
-      };
+    it('should prevent leader-only effects when isLeading is false', () => {
+      const leaderCondition = { t: 'isLeading' as const };
 
-      const context = createTestContext({
+      const context = buildCombatContext({
         attacker: {
-          unitId: 'boyz',
+          id: 'ork-boy',
           armyId: 'ork-army',
-          categories: ['INFANTRY', 'GRENADES'],
-          isLeader: false, // Not a CHARACTER
-          leaderId: 'warboss-id' // Being led by a warboss
-        }
+          categories: ['INFANTRY'],
+          isLeader: false // Regular unit, not a leader
+        },
+        defender: testTarget,
+        weapon: testWeapon,
+        game: testGame,
+        combatPhase: 'shooting',
+        combatRole: 'attacker',
+        options: {
+          modelsFiring: 1,
+          withinHalfRange: false,
+          blastBonusAttacks: 0,
+          unitHasCharged: false,
+          unitRemainedStationary: false
+        },
+        rules: [],
+        armyStates: []
       });
 
-      // The is-leading condition should fail
-      const canApplyAbility = checkCondition(isLeadingCondition, context);
-      expect(canApplyAbility).toBe(false);
+      const shouldApply = evaluateWhen(leaderCondition, context);
+      expect(shouldApply).toBe(false);
     });
   });
 });

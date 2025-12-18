@@ -154,7 +154,7 @@ describe('Example Rules Integration', () => {
       const context = createTestContext({
         weapon: { name: 'Dakka Gun', range: 24, AP: -1, A: '2', WS: 3, S: 4, D: '1', keywords: [] },
         userInputs: {
-          'advanced-this-turn': true
+          'advanced-this-turn': 'yes'
         },
       });
 
@@ -168,7 +168,7 @@ describe('Example Rules Integration', () => {
       const context = createTestContext({
         weapon: { name: 'Dakka Gun', range: 24, AP: -1, A: '2', WS: 3, S: 4, D: '1', keywords: [] },
         userInputs: {
-          'advanced-this-turn': false
+          'advanced-this-turn': 'no'
         },
       });
 
@@ -182,7 +182,7 @@ describe('Example Rules Integration', () => {
       const context = createTestContext({
         weapon: { name: 'Choppa', range: 0, AP: -1, A: '2', WS: 3, S: 4, D: '1', keywords: [] },
         userInputs: {
-          'advanced-this-turn': true
+          'advanced-this-turn': 'yes'
         },
       });
 
@@ -410,8 +410,8 @@ describe('Example Rules Integration', () => {
     });
 
     it('should have manual activation in movement phase', () => {
-      expect(rule.activation.type).toBe('manual');
-      expect(rule.activation.phase).toBe('movement');
+      expect(rule.trigger.t).toBe('manual');
+      expect(rule.trigger.phase).toBe('movement');
     });
   });
 
@@ -491,8 +491,8 @@ describe('Example Rules Integration', () => {
     });
   });
 
-  describe('Waaagh! Call (army-state)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'waaagh-call')!;
+  describe('Waaagh! Attacks (army-state)', () => {
+    const rule = EXAMPLE_RULES.find(r => r.id === 'waaagh-attacks')!;
 
     it('should add +1 Attacks when Waaagh is active', () => {
       const context = createTestContext({
@@ -551,16 +551,15 @@ describe('Example Rules Integration', () => {
     });
 
     it('should have manual activation in movement phase', () => {
-      expect(rule.activation.type).toBe('manual');
-      expect(rule.activation.phase).toBe('movement');
-      expect(rule.activation.turn).toBe('own');
-      expect(rule.activation.limit).toBe(null); // Can use multiple times
+      expect(rule.trigger.t).toBe('manual');
+      expect(rule.trigger.phase).toBe('movement');
+      expect(rule.trigger.turn).toBe('own');
+      expect(rule.trigger.limit).toBe('none'); // Can use multiple times
     });
 
-    it('should have no conditions or effects', () => {
-      expect(rule.conditions).toHaveLength(0);
-      expect(rule.effects).toHaveLength(0);
-      expect(rule.userInput).toBe(null);
+    it('should have no effects (reminder rule)', () => {
+      expect(rule.kind).toBe('reminder');
+      expect(rule.when.t).toBe('true'); // Always applies
     });
   });
 
@@ -581,16 +580,15 @@ describe('Example Rules Integration', () => {
     });
 
     it('should have manual activation in charge phase', () => {
-      expect(rule.activation.type).toBe('manual');
-      expect(rule.activation.phase).toBe('charge');
-      expect(rule.activation.turn).toBe('own');
-      expect(rule.activation.limit).toBe(null);
+      expect(rule.trigger.t).toBe('manual');
+      expect(rule.trigger.phase).toBe('charge');
+      expect(rule.trigger.turn).toBe('own');
+      expect(rule.trigger.limit).toBe('none');
     });
 
-    it('should have no conditions or effects', () => {
-      expect(rule.conditions).toHaveLength(0);
-      expect(rule.effects).toHaveLength(0);
-      expect(rule.userInput).toBe(null);
+    it('should have no effects (reminder rule)', () => {
+      expect(rule.kind).toBe('reminder');
+      expect(rule.when.t).toBe('true'); // Always applies
     });
 
     it('should have same name and description as movement version', () => {
@@ -600,36 +598,34 @@ describe('Example Rules Integration', () => {
     });
   });
 
-  describe('Krumpin\' Time (Feel No Pain)', () => {
+  describe('Krumpin\' Time (melee strength bonus)', () => {
     const rule = EXAMPLE_RULES.find(r => r.id === 'krumpin-time')!;
 
-    it('should add Feel No Pain 5 keyword when Waaagh is active', () => {
+    it('should add +1 Strength to melee attacks', () => {
       const context = createTestContext({
-        armyStates: ['waaagh-active'],
-        combatRole: 'defender', // FNP is a defensive ability
+        weapon: { name: 'Choppa', range: 0, S: 4, A: '2', WS: 3, AP: 0, D: '1', keywords: [] },
+        combatPhase: 'melee',
       });
 
       evaluateRule(rule, context);
 
-      const keywords = getAddedKeywords(context);
-      expect(keywords).toContain('Feel No Pain 5');
+      expect(context.modifiers.get('S')).toBe(1);
     });
 
-    it('should not apply when Waaagh is not active', () => {
+    it('should not apply to ranged weapons', () => {
       const context = createTestContext({
-        armyStates: [],
-        combatRole: 'defender', // FNP is a defensive ability
+        weapon: { name: 'Slugga', range: 12, S: 4, A: '2', WS: 3, AP: 0, D: '1', keywords: [] },
+        combatPhase: 'shooting',
       });
 
       const applied = evaluateRule(rule, context);
 
       expect(applied).toBe(false);
-      const keywords = getAddedKeywords(context);
-      expect(keywords).not.toContain('Feel No Pain 5');
+      expect(context.modifiers.get('S')).toBe(0);
     });
 
-    it('should target unit, not weapon', () => {
-      expect(rule.effects[0].target).toBe('unit');
+    it('should target unit scope', () => {
+      expect(rule.scope).toBe('unit');
     });
   });
 });

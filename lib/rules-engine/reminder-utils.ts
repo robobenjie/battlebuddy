@@ -2,11 +2,61 @@
  * Utility functions for filtering and displaying ability reminders
  */
 
-import { Rule } from './types';
+import { Rule, WhenType } from './types';
 import { getAllUnitRules } from './load-rules';
 
 export type TurnContext = 'own' | 'opponent' | 'both';
 export type PhaseType = 'command' | 'movement' | 'shooting' | 'charge' | 'fight' | 'before-game-start';
+
+/**
+ * Check if a when clause has an army state requirement
+ */
+function hasArmyStateRequirement(when: WhenType): boolean {
+  if (!when) return false;
+
+  switch (when.t) {
+    case 'armyState':
+      return true;
+    case 'all':
+    case 'any':
+      return when.xs.some((x: WhenType) => hasArmyStateRequirement(x));
+    case 'not':
+      return hasArmyStateRequirement(when.x);
+    default:
+      return false;
+  }
+}
+
+/**
+ * Check if a when clause's army state requirement is satisfied
+ */
+function checkArmyStateRequirement(when: WhenType, armyStates: any[]): boolean {
+  if (!when) return true;
+
+  switch (when.t) {
+    case 'armyState':
+      // Check if any of the required states are active
+      return when.is.some((requiredState: string) =>
+        armyStates.some(armyState => armyState.state === requiredState)
+      );
+    case 'all':
+      // All conditions must be met
+      return when.xs.every((x: WhenType) =>
+        !hasArmyStateRequirement(x) || checkArmyStateRequirement(x, armyStates)
+      );
+    case 'any':
+      // At least one condition must be met
+      return when.xs.some((x: WhenType) =>
+        !hasArmyStateRequirement(x) || checkArmyStateRequirement(x, armyStates)
+      );
+    case 'not':
+      // Negation of the condition
+      return !hasArmyStateRequirement(when.x) || !checkArmyStateRequirement(when.x, armyStates);
+    default:
+      // Non-army-state conditions are assumed to be true for this check
+      return true;
+  }
+}
 
 /**
  * Get reminder rules for a unit that match the current phase and turn
@@ -23,15 +73,15 @@ export function getUnitReminders(
   // Filter for reminder-type rules that match phase and turn
   const filteredRules = allRules.filter((rule: Rule) => {
     // If rule has explicit activation, check phase and turn
-    if (rule.activation) {
+    if (rule.trigger) {
       // Match phase
-      if (rule.activation.phase !== currentPhase && rule.activation.phase !== 'any') {
+      if (rule.trigger.phase !== currentPhase && rule.trigger.phase !== 'any') {
         return false;
       }
 
       // Match turn context
       // null or undefined means 'both' (applies on any turn)
-      const ruleTurn = rule.activation.turn ?? 'both';
+      const ruleTurn = rule.trigger.turn ?? 'both';
       if (!(turnContext === 'both' || ruleTurn === 'both' || ruleTurn === turnContext)) {
         return false;
       }
@@ -39,16 +89,15 @@ export function getUnitReminders(
     // Rules without activation field are always shown (no phase/turn filtering)
 
     // Filter out rules that require army states that aren't active
-    if (rule.conditions) {
-      const armyStateCondition = rule.conditions.find(c => c.type === 'army-state');
-      if (armyStateCondition) {
-        const requiredStates = armyStateCondition.params?.armyStates || [];
-        const hasRequiredState = requiredStates.some((requiredState: string) =>
-          armyStates?.some((state: any) => state.state === requiredState)
-        );
-        if (!hasRequiredState) {
-          return false;
-        }
+    if (rule.when && hasArmyStateRequirement(rule.when)) {
+      // If no army states provided, rule cannot be active
+      if (!armyStates || armyStates.length === 0) {
+        return false;
+      }
+
+      // Check if the required army state is active
+      if (!checkArmyStateRequirement(rule.when, armyStates)) {
+        return false;
       }
     }
 
@@ -117,10 +166,10 @@ export function getReactiveUnits(
       // Check if any rule is reactive and matches the current phase
       const hasReactiveAbility = allRules.some((rule: Rule) => {
         // Must be marked as reactive
-        if (!rule.reactive) return false;
+        if (rule.trigger?.t !== 'reactive') return false;
 
-        // If rule has activation.phase, it must match current phase
-        if (rule.activation?.phase && rule.activation.phase !== 'any' && rule.activation.phase !== currentPhase) {
+        // If rule has trigger.phase, it must match current phase
+        if (rule.trigger?.phase && rule.trigger.phase !== 'any' && rule.trigger.phase !== currentPhase) {
           return false;
         }
 

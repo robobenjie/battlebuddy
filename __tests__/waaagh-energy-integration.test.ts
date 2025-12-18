@@ -4,189 +4,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { evaluateRule, checkCondition } from '../lib/rules-engine/evaluator';
+import { evaluateRule } from '../lib/rules-engine/evaluator';
 import { buildCombatContext } from '../lib/rules-engine/context';
 import { Rule } from '../lib/rules-engine/types';
 import { WeaponStats, TargetStats, CombatOptions } from '../lib/combat-calculator-engine';
+import { getTestRule } from '../lib/rules-engine/test-rules';
 
-// Waaagh! Energy rule with current structure
-const waaaghEnergyRule: Rule = {
-  "id": "waaagh-energy",
-  "name": "Waaagh! Energy",
-  "description": "While this model is leading a unit, add 1 to the Strength and Damage characteristics of this model's 'Eadbanger weapon for every 5 models in that unit (rounding down), but while that unit contains 10 or more models, that weapon has the [HAZARDOUS] ability.",
-  "faction": "Orks",
-  "scope": "model",
-  "conditions": [
-    {
-      "type": "is-leading",
-      "params": {}
-    }
-  ],
-  "effects": [
-    // 5-9 models: +1 S
-    {
-      "type": "modify-characteristic",
-      "target": "weapon",
-      "params": {
-        "stat": "S",
-        "modifier": 1
-      },
-      "conditions": [
-        {
-          "type": "user-input",
-          "params": {
-            "inputId": "unit-size",
-            "inputValue": "5-9"
-          }
-        }
-      ]
-    },
-    // 5-9 models: +1 D
-    {
-      "type": "modify-characteristic",
-      "target": "weapon",
-      "params": {
-        "stat": "D",
-        "modifier": 1
-      },
-      "conditions": [
-        {
-          "type": "user-input",
-          "params": {
-            "inputId": "unit-size",
-            "inputValue": "5-9"
-          }
-        }
-      ]
-    },
-    // 10-14 models: +2 S
-    {
-      "type": "modify-characteristic",
-      "target": "weapon",
-      "params": {
-        "stat": "S",
-        "modifier": 2
-      },
-      "conditions": [
-        {
-          "type": "user-input",
-          "params": {
-            "inputId": "unit-size",
-            "inputValue": "10-14"
-          }
-        }
-      ]
-    },
-    // 10-14 models: +2 D
-    {
-      "type": "modify-characteristic",
-      "target": "weapon",
-      "params": {
-        "stat": "D",
-        "modifier": 2
-      },
-      "conditions": [
-        {
-          "type": "user-input",
-          "params": {
-            "inputId": "unit-size",
-            "inputValue": "10-14"
-          }
-        }
-      ]
-    },
-    // 10-14 models: HAZARDOUS
-    {
-      "type": "add-keyword",
-      "target": "weapon",
-      "params": {
-        "keyword": "Hazardous"
-      },
-      "conditions": [
-        {
-          "type": "user-input",
-          "params": {
-            "inputId": "unit-size",
-            "inputValue": "10-14"
-          }
-        }
-      ]
-    },
-    // 20+ models: +4 S
-    {
-      "type": "modify-characteristic",
-      "target": "weapon",
-      "params": {
-        "stat": "S",
-        "modifier": 4
-      },
-      "conditions": [
-        {
-          "type": "user-input",
-          "params": {
-            "inputId": "unit-size",
-            "inputValue": "20+"
-          }
-        }
-      ]
-    },
-    // 20+ models: +4 D
-    {
-      "type": "modify-characteristic",
-      "target": "weapon",
-      "params": {
-        "stat": "D",
-        "modifier": 4
-      },
-      "conditions": [
-        {
-          "type": "user-input",
-          "params": {
-            "inputId": "unit-size",
-            "inputValue": "20+"
-          }
-        }
-      ]
-    },
-    // 20+ models: HAZARDOUS
-    {
-      "type": "add-keyword",
-      "target": "weapon",
-      "params": {
-        "keyword": "Hazardous"
-      },
-      "conditions": [
-        {
-          "type": "user-input",
-          "params": {
-            "inputId": "unit-size",
-            "inputValue": "20+"
-          }
-        }
-      ]
-    }
-  ],
-  "duration": {
-    "type": "permanent"
-  },
-  "activation": {
-    "phase": "any",
-    "trigger": "automatic"
-  },
-  "userInput": {
-    "type": "radio",
-    "id": "unit-size",
-    "label": "Unit size (models in led unit)",
-    "defaultValue": "0-4",
-    "options": [
-      { "value": "0-4", "label": "0-4 models (+0)" },
-      { "value": "5-9", "label": "5-9 models (+1 S/D)" },
-      { "value": "10-14", "label": "10-14 models (+2 S/D, HAZARDOUS)" },
-      { "value": "15-19", "label": "15-19 models (+3 S/D, HAZARDOUS)" },
-      { "value": "20+", "label": "20+ models (+4 S/D, HAZARDOUS)" }
-    ]
-  }
-};
+// Waaagh! Energy rule from test-rules.json
+const waaaghEnergyRule: Rule = getTestRule('waaagh-energy')!;
 
 describe('Waaagh! Energy Integration (Current Structure)', () => {
   const testWeapon: WeaponStats = {
@@ -214,22 +39,24 @@ describe('Waaagh! Energy Integration (Current Structure)', () => {
     currentPhase: 'fight'
   };
 
-  describe('Rule structure and userInput', () => {
-    it('should have userInput field with radio type', () => {
-      expect(waaaghEnergyRule.userInput).toBeDefined();
-      expect(waaaghEnergyRule.userInput?.type).toBe('radio');
-      expect(waaaghEnergyRule.userInput?.id).toBe('unit-size');
+  describe('Rule structure', () => {
+    it('should be a choice rule with unit-size options', () => {
+      expect(waaaghEnergyRule.kind).toBe('choice');
+      expect(waaaghEnergyRule.choice).toBeDefined();
+      expect(waaaghEnergyRule.choice?.id).toBe('unit-size');
     });
 
-    it('should have 5 options in userInput', () => {
-      expect(waaaghEnergyRule.userInput?.options).toHaveLength(5);
-      expect(waaaghEnergyRule.userInput?.options?.[0].value).toBe('0-4');
-      expect(waaaghEnergyRule.userInput?.options?.[4].value).toBe('20+');
+    it('should have 4 options', () => {
+      expect(waaaghEnergyRule.choice?.options).toHaveLength(4);
+      expect(waaaghEnergyRule.choice?.options?.[0].v).toBe('0-4');
+      expect(waaaghEnergyRule.choice?.options?.[3].v).toBe('15+');
     });
 
-    it('should have is-leading condition', () => {
-      const hasIsLeading = waaaghEnergyRule.conditions.some(c => c.type === 'is-leading');
-      expect(hasIsLeading).toBe(true);
+    it('should have isLeading condition', () => {
+      expect(waaaghEnergyRule.when).toBeDefined();
+      // Check for isLeading in the when clause
+      const whenStr = JSON.stringify(waaaghEnergyRule.when);
+      expect(whenStr).toContain('isLeading');
     });
   });
 
@@ -333,12 +160,12 @@ describe('Waaagh! Energy Integration (Current Structure)', () => {
       expect(sMod).toBe(2);
       expect(dMod).toBe(2);
 
-      // Check for HAZARDOUS keyword
-      const keywordMod = context.modifiers.getModifiers('keyword:Hazardous');
-      expect(keywordMod.length).toBeGreaterThan(0);
+      // Check for HAZARDOUS weapon ability
+      const abilityMod = context.modifiers.getModifiers('weaponAbility:hazardous');
+      expect(abilityMod.length).toBeGreaterThan(0);
     });
 
-    it('should apply +4 S/D and HAZARDOUS when 20+ models selected', () => {
+    it('should apply +3 S/D and HAZARDOUS when 15+ models selected', () => {
       const context = buildCombatContext({
         attacker: {
           id: 'warboss',
@@ -356,7 +183,7 @@ describe('Waaagh! Energy Integration (Current Structure)', () => {
           blastBonusAttacks: 0,
           unitHasCharged: false,
           unitRemainedStationary: false,
-          userInputs: { 'unit-size': '20+' }
+          userInputs: { 'unit-size': '15+' }
         },
         rules: [waaaghEnergyRule],
         armyStates: []
@@ -367,12 +194,12 @@ describe('Waaagh! Energy Integration (Current Structure)', () => {
 
       const sMod = context.modifiers.get('S');
       const dMod = context.modifiers.get('D');
-      expect(sMod).toBe(4);
-      expect(dMod).toBe(4);
+      expect(sMod).toBe(3);
+      expect(dMod).toBe(3);
 
-      // Check for HAZARDOUS keyword
-      const keywordMod = context.modifiers.getModifiers('keyword:Hazardous');
-      expect(keywordMod.length).toBeGreaterThan(0);
+      // Check for HAZARDOUS weapon ability
+      const abilityMod = context.modifiers.getModifiers('weaponAbility:hazardous');
+      expect(abilityMod.length).toBeGreaterThan(0);
     });
   });
 
