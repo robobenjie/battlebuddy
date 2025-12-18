@@ -3,7 +3,7 @@
  */
 
 import { Rule } from './rules-engine';
-import { getOrkArmyRules, getOrkDetachmentRules, getRulesForUnit } from './rules-engine/load-rules';
+// DEPRECATED: Rule matching functions removed - rules now stored in InstantDB database
 
 export interface ImportedRule {
   name: string;
@@ -297,18 +297,10 @@ function normalizeRuleName(name: string): string {
  */
 export function matchRuleToImplementation(importedRule: ImportedRule, faction: string): Rule | null {
   // Get all available rules for this faction
+  // DEPRECATED: Rules are now stored in InstantDB database
+  // This function returns undefined to indicate no static rule match
+  // Rules should be queried from the database instead
   let availableRules: Rule[] = [];
-
-  if (faction.toLowerCase() === 'orks') {
-    availableRules = [
-      ...getOrkArmyRules(),
-      ...getOrkDetachmentRules(),
-    ];
-
-    // For unit rules, we'd need to check all possible units
-    // This is a simplified version - in practice, you might want to cache this
-    // or organize rules differently
-  }
 
   const normalizedImportName = normalizeRuleName(importedRule.name);
 
@@ -325,7 +317,8 @@ export function matchRuleToImplementation(importedRule: ImportedRule, faction: s
 
 /**
  * Get all available unit rules (for matching)
+ * DEPRECATED: Rules are now stored in InstantDB database
  */
 export function getAllUnitRuleImplementations(unitName: string): Rule[] {
-  return getRulesForUnit(unitName);
+  return [];
 }

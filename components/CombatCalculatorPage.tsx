@@ -542,8 +542,10 @@ export default function CombatCalculatorPage({
 
     // Build separate contexts for attacker and defender rules with their respective army states
     console.log('🔍 Building attacker context with armyStates:', attackerArmyStates, 'length:', attackerArmyStates.length);
+    const isLeaderValue = !!(unit?.bodyguardUnits && unit.bodyguardUnits.length > 0);
+    console.log('🔍 Setting isLeader for unit:', unit?.name, 'bodyguardUnits.length:', unit?.bodyguardUnits?.length, 'isLeader:', isLeaderValue);
     const attackerContext = buildCombatContext({
-      attacker: { ...unit, armyId: currentArmyId },
+      attacker: { ...unit, armyId: currentArmyId, isLeader: isLeaderValue },
       defender: selectedTarget || effectiveTargetStats,
       weapon: weaponStats,
       game: game,
@@ -563,8 +565,8 @@ export default function CombatCalculatorPage({
 
     console.log('🔍 Building defender context with armyStates:', defenderArmyStates, 'length:', defenderArmyStates.length);
     const defenderContext = buildCombatContext({
-      attacker: { ...unit, armyId: currentArmyId },
-      defender: selectedTarget || effectiveTargetStats,
+      attacker: { ...unit, armyId: currentArmyId, isLeader: !!(unit?.bodyguardUnits && unit.bodyguardUnits.length > 0) },
+      defender: selectedTarget ? { ...selectedTarget, isLeader: !!(selectedTarget?.bodyguardUnits && selectedTarget.bodyguardUnits.length > 0) } : effectiveTargetStats,
       weapon: weaponStats,
       game: game,
       combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',

@@ -37,7 +37,7 @@ export const EXAMPLE_RULES: Rule[] = TEST_RULES
 export const EXAMPLE_EXPLANATIONS: Record<string, string> = TEST_RULES
   .filter(r => r.isExample)
   .reduce((acc, r) => {
-    acc[r.name] = r.exampleReason;
+    acc[r.rule.id] = r.exampleReason;
     return acc;
   }, {} as Record<string, string>);
 

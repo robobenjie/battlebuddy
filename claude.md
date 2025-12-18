@@ -1,3 +1,14 @@
+# Basic usage:
+- After completing a feature, run tests with `npm test` and check for typescript errors with `npm build`
+- When informed of a bug always try to create a failing test, verify the test is failing and then fix the bug.
+- Never put rules-jon in a test: tests should reference rules in lib/rules-engine/test-rules.json
+
+
+# How to test Rules Engine:
+## IMPORTANT: all rules for unit tests should be in lib/rules-engine/test-rules.json
+When creating a new unit test, never put the rule in the unit test: instead find a rule in test-rules.json or add one if needed. That way all our rules in all tests can be validated and the schema can be migrated together. We want to avoid old versions of rules masking bugs by keeping unit tests passing when we update rules formats.
+
+
 # InstantDB Performance Best Practices
 
 This document captures performance lessons learned while building BattleBuddy with InstantDB.
@@ -149,60 +160,6 @@ When experiencing slow updates in InstantDB:
 3. **Remove unused queries** - Don't load entities you don't actually use
 4. **Test in isolation** - Create simple test pages to isolate performance issues
 5. **Check all active queries** - Remember that multiple components may have active queries that all get re-evaluated on updates
-
-## Debugging Performance Issues
-
-### Create Isolated Test Pages
-
-When debugging performance, create a minimal test page that isolates the issue:
-
-```typescript
-// Example: Simple counter to test baseline performance
-export default function PerfTestPage() {
-  const { data } = db.useQuery({
-    perfCounters: {}
-  });
-
-  const counter = data?.perfCounters?.[0];
-
-  const increment = () => {
-    const tBefore = performance.now();
-    db.transact(
-      db.tx.perfCounters[counter.id].update({
-        value: (counter.value || 0) + 1
-      })
-    );
-    const tAfter = performance.now();
-    console.log(`db.transact() took: ${(tAfter - tBefore).toFixed(2)}ms`);
-  };
-
-  // ... UI
-}
-```
-
-### Timing Measurements
-
-Use `performance.now()` for accurate timing:
-
-```typescript
-const tBefore = performance.now();
-db.transact(/* ... */);
-const tAfter = performance.now();
-console.log(`Operation took: ${(tAfter - tBefore).toFixed(2)}ms`);
-```
-
-### Test Offline
-
-Test with WiFi off to rule out network latency as the cause:
-- If performance is the same online and offline, it's a local query evaluation issue
-- If performance is worse online, it's a network/sync issue
-
-## Our Specific Fixes
-
-1. **Separated players query from armies query** in `/app/game/[code]/page.tsx`
-2. **Added gameId scoping** to all armies queries
-3. **Removed massive unscoped query** in `CurrentGamesPage.tsx` that was loading all entities
-4. **Result:** 300-370ms → ~9ms (40x speedup)
 
 ## Conclusion
 

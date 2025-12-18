@@ -115,7 +115,12 @@ export function buildCombatContext(params: {
       armyId: attacker.armyId,
       categories: attacker.categories || [],
       leaderId: getLeaderId(attacker),
-      isLeader: isCharacter(attacker),
+      // Use passed-in isLeader if available, otherwise check if unit is a CHARACTER
+      isLeader: (() => {
+        const result = attacker.isLeader !== undefined ? attacker.isLeader : isCharacter(attacker);
+        console.log('🔍 buildCombatContext: attacker.isLeader input:', attacker.isLeader, 'isCharacter:', isCharacter(attacker), 'final result:', result);
+        return result;
+      })(),
     },
 
     defender: {
@@ -127,7 +132,8 @@ export function buildCombatContext(params: {
       SV: defender.models?.[0]?.SV || 0,
       INV: defender.models?.[0]?.INV,
       leaderId: getLeaderId(defender),
-      isLeader: isCharacter(defender),
+      // Use passed-in isLeader if available, otherwise check if unit is a CHARACTER
+      isLeader: defender.isLeader !== undefined ? defender.isLeader : isCharacter(defender),
     },
 
     weapon,

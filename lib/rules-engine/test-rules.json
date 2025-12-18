@@ -1426,6 +1426,288 @@
         },
         "userInput": null
       }
+    },
+    {
+      "name": "might-is-right",
+      "isExample": true,
+      "exampleReason": "Demonstrates is-leading condition for CHARACTER units that lead bodyguard units. Shows scope: 'unit' rule that applies to the led unit when the leader is attacking.",
+      "rule": {
+        "id": "might-is-right-hit",
+        "name": "Might is Right",
+        "description": "While this model is leading a unit, each time a model in that unit makes a melee attack, add 1 to the Hit roll.",
+        "faction": "Orks",
+        "scope": "unit",
+        "conditions": [
+          {
+            "type": "is-leading",
+            "params": {
+              "categories": null,
+              "weaponTypes": null,
+              "range": null,
+              "statuses": null,
+              "armyStates": null,
+              "phases": null,
+              "role": null,
+              "inputId": null,
+              "inputValue": null
+            },
+            "operator": null
+          },
+          {
+            "type": "weapon-type",
+            "params": {
+              "categories": null,
+              "weaponTypes": ["melee"],
+              "range": null,
+              "statuses": null,
+              "armyStates": null,
+              "phases": null,
+              "role": null,
+              "inputId": null,
+              "inputValue": null
+            },
+            "operator": null
+          }
+        ],
+        "effects": [
+          {
+            "type": "modify-hit",
+            "target": "self",
+            "params": {
+              "modifier": 1,
+              "stat": null,
+              "keyword": null,
+              "keywordValue": null,
+              "ability": null,
+              "abilityValue": null,
+              "rerollType": null,
+              "rerollPhase": null,
+              "autoPhase": null
+            },
+            "conditions": null
+          }
+        ],
+        "duration": "permanent",
+        "activation": {
+          "type": "automatic",
+          "phase": "fight",
+          "turn": null,
+          "limit": null
+        },
+        "userInput": null,
+        "reactive": false
+      }
+    },
+    {
+      "name": "da-biggest-and-da-best",
+      "isExample": false,
+      "exampleReason": "",
+      "rule": {
+        "id": "da-biggest-and-da-best",
+        "name": "Da Biggest and da Best",
+        "description": "Test rule for scope filtering - model-level attack bonus",
+        "faction": "Orks",
+        "scope": "model",
+        "conditions": [],
+        "effects": [
+          {
+            "type": "modify-characteristic",
+            "target": "weapon",
+            "params": {
+              "stat": "A",
+              "modifier": 4,
+              "keyword": null,
+              "keywordValue": null,
+              "ability": null,
+              "abilityValue": null,
+              "rerollType": null,
+              "rerollPhase": null,
+              "autoPhase": null
+            },
+            "conditions": null
+          }
+        ],
+        "duration": "permanent",
+        "activation": null,
+        "userInput": null,
+        "reactive": false
+      }
+    },
+    {
+      "name": "inspiring-presence",
+      "isExample": false,
+      "exampleReason": "",
+      "rule": {
+        "id": "inspiring-presence",
+        "name": "Inspiring Presence",
+        "description": "Test rule for scope filtering - unit-level wound bonus attached to model",
+        "faction": "Orks",
+        "scope": "unit",
+        "conditions": [],
+        "effects": [
+          {
+            "type": "modify-wound",
+            "target": "self",
+            "params": {
+              "modifier": 1,
+              "stat": null,
+              "keyword": null,
+              "keywordValue": null,
+              "ability": null,
+              "abilityValue": null,
+              "rerollType": null,
+              "rerollPhase": null,
+              "autoPhase": null
+            },
+            "conditions": null
+          }
+        ],
+        "duration": "permanent",
+        "activation": null,
+        "userInput": null,
+        "reactive": false
+      }
+    },
+    {
+      "name": "mob-rule",
+      "isExample": false,
+      "exampleReason": "",
+      "rule": {
+        "id": "mob-rule",
+        "name": "Mob Rule",
+        "description": "Test rule for scope filtering - unit-level wound bonus",
+        "faction": "Orks",
+        "scope": "unit",
+        "conditions": [],
+        "effects": [
+          {
+            "type": "modify-wound",
+            "target": "self",
+            "params": {
+              "modifier": 1,
+              "stat": null,
+              "keyword": null,
+              "keywordValue": null,
+              "ability": null,
+              "abilityValue": null,
+              "rerollType": null,
+              "rerollPhase": null,
+              "autoPhase": null
+            },
+            "conditions": null
+          }
+        ],
+        "duration": "permanent",
+        "activation": null,
+        "userInput": null,
+        "reactive": false
+      }
+    },
+    {
+      "name": "boy-specific",
+      "isExample": false,
+      "exampleReason": "",
+      "rule": {
+        "id": "boy-specific",
+        "name": "Boy Specific Ability",
+        "description": "Test rule for scope filtering - model-level reminder",
+        "faction": "Orks",
+        "scope": "model",
+        "conditions": [],
+        "effects": [],
+        "duration": "permanent",
+        "activation": null,
+        "userInput": null,
+        "reactive": false
+      }
+    },
+    {
+      "name": "mob-mentality",
+      "isExample": false,
+      "exampleReason": "",
+      "rule": {
+        "id": "mob-mentality",
+        "name": "Mob Mentality",
+        "description": "Test rule for scope filtering - unit-level hit bonus attached to model",
+        "faction": "Orks",
+        "scope": "unit",
+        "conditions": [],
+        "effects": [
+          {
+            "type": "modify-hit",
+            "target": "self",
+            "params": {
+              "modifier": 1,
+              "stat": null,
+              "keyword": null,
+              "keywordValue": null,
+              "ability": null,
+              "abilityValue": null,
+              "rerollType": null,
+              "rerollPhase": null,
+              "autoPhase": null
+            },
+            "conditions": null
+          }
+        ],
+        "duration": "permanent",
+        "activation": null,
+        "userInput": null,
+        "reactive": false
+      }
+    },
+    {
+      "name": "boy-model-only",
+      "isExample": false,
+      "exampleReason": "",
+      "rule": {
+        "id": "boy-model-only",
+        "name": "Boy Model Only",
+        "description": "Test rule for scope filtering - model-level reminder",
+        "faction": "Orks",
+        "scope": "model",
+        "conditions": [],
+        "effects": [],
+        "duration": "permanent",
+        "activation": null,
+        "userInput": null,
+        "reactive": false
+      }
+    },
+    {
+      "name": "inspiring-aura",
+      "isExample": false,
+      "exampleReason": "",
+      "rule": {
+        "id": "inspiring-aura",
+        "name": "Inspiring Aura",
+        "description": "Test rule for scope filtering - unit-level wound bonus",
+        "faction": "Orks",
+        "scope": "unit",
+        "conditions": [],
+        "effects": [
+          {
+            "type": "modify-wound",
+            "target": "self",
+            "params": {
+              "modifier": 1,
+              "stat": null,
+              "keyword": null,
+              "keywordValue": null,
+              "ability": null,
+              "abilityValue": null,
+              "rerollType": null,
+              "rerollPhase": null,
+              "autoPhase": null
+            },
+            "conditions": null
+          }
+        ],
+        "duration": "permanent",
+        "activation": null,
+        "userInput": null,
+        "reactive": false
+      }
     }
   ]
 }

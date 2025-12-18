@@ -8,6 +8,14 @@ import { getAllUnitRules } from '../load-rules';
 import { Rule } from '../types';
 import { evaluateRule } from '../evaluator';
 import { buildCombatContext } from '../context';
+import { getTestRule } from '../test-rules';
+
+// Helper to create a ruleObject string from test-rules.json
+const getRuleObject = (ruleName: string): string => {
+  const rule = getTestRule(ruleName);
+  if (!rule) throw new Error(`Rule ${ruleName} not found in test-rules.json`);
+  return JSON.stringify(rule);
+};
 import { EXAMPLE_RULES } from '../test-rules';
 
 describe('Scope-based rule filtering', () => {
@@ -33,18 +41,7 @@ describe('Scope-based rule filtering', () => {
             unitRules: [
               {
                 name: 'Might is Right',
-                ruleObject: JSON.stringify({
-                  id: 'might-is-right',
-                  name: 'Might is Right',
-                  scope: 'unit',
-                  conditions: [],
-                  effects: [
-                    {
-                      type: 'modify-hit',
-                      params: { modifier: 1 }
-                    }
-                  ]
-                })
+                ruleObject: getRuleObject('might-is-right')
               }
             ],
             models: [
@@ -53,18 +50,7 @@ describe('Scope-based rule filtering', () => {
                 modelRules: [
                   {
                     name: 'Da Biggest and da Best',
-                    ruleObject: JSON.stringify({
-                      id: 'da-biggest-and-da-best',
-                      name: 'Da Biggest and da Best',
-                      scope: 'model',
-                      conditions: [],
-                      effects: [
-                        {
-                          type: 'modify-characteristic',
-                          params: { stat: 'A', modifier: 4 }
-                        }
-                      ]
-                    })
+                    ruleObject: getRuleObject('da-biggest-and-da-best')
                   }
                 ]
               }
@@ -77,7 +63,7 @@ describe('Scope-based rule filtering', () => {
       const ruleIds = rules.map(r => r.id);
 
       // Boys should get "Might is Right" (scope: unit) from the Warboss
-      expect(ruleIds).toContain('might-is-right');
+      expect(ruleIds).toContain('might-is-right-hit');
 
       // Boys should NOT get "Da Biggest and da Best" (scope: model) from the Warboss
       expect(ruleIds).not.toContain('da-biggest-and-da-best');
@@ -94,18 +80,7 @@ describe('Scope-based rule filtering', () => {
         unitRules: [
           {
             name: 'Might is Right',
-            ruleObject: JSON.stringify({
-              id: 'might-is-right',
-              name: 'Might is Right',
-              scope: 'unit',
-              conditions: [],
-              effects: [
-                {
-                  type: 'modify-hit',
-                  params: { modifier: 1 }
-                }
-              ]
-            })
+            ruleObject: getRuleObject('might-is-right')
           }
         ],
         models: [
@@ -114,18 +89,7 @@ describe('Scope-based rule filtering', () => {
             modelRules: [
               {
                 name: 'Da Biggest and da Best',
-                ruleObject: JSON.stringify({
-                  id: 'da-biggest-and-da-best',
-                  name: 'Da Biggest and da Best',
-                  scope: 'model',
-                  conditions: [],
-                  effects: [
-                    {
-                      type: 'modify-characteristic',
-                      params: { stat: 'A', modifier: 4 }
-                    }
-                  ]
-                })
+                ruleObject: getRuleObject('da-biggest-and-da-best')
               }
             ]
           }
@@ -138,7 +102,7 @@ describe('Scope-based rule filtering', () => {
       const ruleIds = rules.map(r => r.id);
 
       // Warboss should get both rules when attacking alone
-      expect(ruleIds).toContain('might-is-right');
+      expect(ruleIds).toContain('might-is-right-hit');
       expect(ruleIds).toContain('da-biggest-and-da-best');
     });
   });
@@ -170,18 +134,7 @@ describe('Scope-based rule filtering', () => {
                 modelRules: [
                   {
                     name: 'Inspiring Presence',
-                    ruleObject: JSON.stringify({
-                      id: 'inspiring-presence',
-                      name: 'Inspiring Presence',
-                      scope: 'unit', // Unit-level rule attached to model
-                      conditions: [],
-                      effects: [
-                        {
-                          type: 'modify-wound',
-                          params: { modifier: 1 }
-                        }
-                      ]
-                    })
+                    ruleObject: getRuleObject('inspiring-presence')
                   }
                 ]
               }
@@ -208,18 +161,7 @@ describe('Scope-based rule filtering', () => {
         unitRules: [
           {
             name: 'Might is Right',
-            ruleObject: JSON.stringify({
-              id: 'might-is-right',
-              name: 'Might is Right',
-              scope: 'unit',
-              conditions: [],
-              effects: [
-                {
-                  type: 'modify-hit',
-                  params: { modifier: 1 }
-                }
-              ]
-            })
+            ruleObject: getRuleObject('might-is-right')
           }
         ],
         models: [
@@ -228,18 +170,7 @@ describe('Scope-based rule filtering', () => {
             modelRules: [
               {
                 name: 'Da Biggest and da Best',
-                ruleObject: JSON.stringify({
-                  id: 'da-biggest-and-da-best',
-                  name: 'Da Biggest and da Best',
-                  scope: 'model',
-                  conditions: [],
-                  effects: [
-                    {
-                      type: 'modify-characteristic',
-                      params: { stat: 'A', modifier: 4 }
-                    }
-                  ]
-                })
+                ruleObject: getRuleObject('da-biggest-and-da-best')
               }
             ]
           }
@@ -252,18 +183,7 @@ describe('Scope-based rule filtering', () => {
             unitRules: [
               {
                 name: 'Mob Rule',
-                ruleObject: JSON.stringify({
-                  id: 'mob-rule',
-                  name: 'Mob Rule',
-                  scope: 'unit',
-                  conditions: [],
-                  effects: [
-                    {
-                      type: 'modify-wound',
-                      params: { modifier: 1 }
-                    }
-                  ]
-                })
+                ruleObject: getRuleObject('mob-rule')
               }
             ],
             models: [
@@ -272,13 +192,7 @@ describe('Scope-based rule filtering', () => {
                 modelRules: [
                   {
                     name: 'Boy Specific Ability',
-                    ruleObject: JSON.stringify({
-                      id: 'boy-specific',
-                      name: 'Boy Specific Ability',
-                      scope: 'model',
-                      conditions: [],
-                      effects: []
-                    })
+                    ruleObject: getRuleObject('boy-specific')
                   }
                 ]
               }
@@ -291,7 +205,7 @@ describe('Scope-based rule filtering', () => {
       const ruleIds = rules.map(r => r.id);
 
       // Warboss should get its own unit and model rules
-      expect(ruleIds).toContain('might-is-right');
+      expect(ruleIds).toContain('might-is-right-hit');
       expect(ruleIds).toContain('da-biggest-and-da-best');
 
       // Warboss should get scope: "unit" rules from bodyguards
@@ -329,28 +243,11 @@ describe('Scope-based rule filtering', () => {
                 modelRules: [
                   {
                     name: 'Mob Mentality',
-                    ruleObject: JSON.stringify({
-                      id: 'mob-mentality',
-                      name: 'Mob Mentality',
-                      scope: 'unit', // Unit-level rule attached to boy model
-                      conditions: [],
-                      effects: [
-                        {
-                          type: 'modify-hit',
-                          params: { modifier: 1 }
-                        }
-                      ]
-                    })
+                    ruleObject: getRuleObject('mob-mentality')
                   },
                   {
                     name: 'Boy Model Only',
-                    ruleObject: JSON.stringify({
-                      id: 'boy-model-only',
-                      name: 'Boy Model Only',
-                      scope: 'model', // Model-level rule
-                      conditions: [],
-                      effects: []
-                    })
+                    ruleObject: getRuleObject('boy-model-only')
                   }
                 ]
               }
@@ -398,42 +295,9 @@ describe('Scope-based rule filtering', () => {
                   {
                     name: 'Mixed Rules Array',
                     ruleObject: JSON.stringify([
-                      {
-                        id: 'might-is-right',
-                        name: 'Might is Right',
-                        scope: 'unit',
-                        conditions: [],
-                        effects: [
-                          {
-                            type: 'modify-hit',
-                            params: { modifier: 1 }
-                          }
-                        ]
-                      },
-                      {
-                        id: 'da-biggest-and-da-best',
-                        name: 'Da Biggest and da Best',
-                        scope: 'model',
-                        conditions: [],
-                        effects: [
-                          {
-                            type: 'modify-characteristic',
-                            params: { stat: 'A', modifier: 4 }
-                          }
-                        ]
-                      },
-                      {
-                        id: 'inspiring-aura',
-                        name: 'Inspiring Aura',
-                        scope: 'unit',
-                        conditions: [],
-                        effects: [
-                          {
-                            type: 'modify-wound',
-                            params: { modifier: 1 }
-                          }
-                        ]
-                      }
+                      getTestRule('might-is-right'),
+                      getTestRule('da-biggest-and-da-best'),
+                      getTestRule('inspiring-aura')
                     ])
                   }
                 ]
@@ -447,7 +311,7 @@ describe('Scope-based rule filtering', () => {
       const ruleIds = rules.map(r => r.id);
 
       // Boys should get BOTH scope: "unit" rules from the array
-      expect(ruleIds).toContain('might-is-right');
+      expect(ruleIds).toContain('might-is-right-hit');
       expect(ruleIds).toContain('inspiring-aura');
 
       // Boys should NOT get the scope: "model" rule
@@ -478,24 +342,7 @@ describe('Scope-based rule filtering', () => {
             unitRules: [
               {
                 name: 'Might is Right',
-                ruleObject: JSON.stringify({
-                  id: 'might-is-right',
-                  name: 'Might is Right',
-                  scope: 'unit',
-                  conditions: [
-                    {
-                      type: 'weapon-type',
-                      params: { weaponTypes: ['melee'] }
-                    }
-                  ],
-                  effects: [
-                    {
-                      type: 'modify-hit',
-                      target: 'self',
-                      params: { modifier: 1 }
-                    }
-                  ]
-                })
+                ruleObject: getRuleObject('might-is-right')
               }
             ],
             models: [
@@ -510,7 +357,7 @@ describe('Scope-based rule filtering', () => {
 
       // Get rules for the Boys unit (should include "Might is Right" from Warboss)
       const rules = getAllUnitRules(boysUnit);
-      const mightIsRight = rules.find(r => r.id === 'might-is-right');
+      const mightIsRight = rules.find(r => r.id === 'might-is-right-hit');
 
       // Verify the rule was loaded
       expect(mightIsRight).toBeDefined();
