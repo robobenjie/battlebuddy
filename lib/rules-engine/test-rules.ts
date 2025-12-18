@@ -20,7 +20,7 @@ export interface TestRule {
 /**
  * All test rules (both examples and test-specific rules)
  */
-export const TEST_RULES: TestRule[] = testRulesData.rules as TestRule[];
+export const TEST_RULES: TestRule[] = testRulesData.rules as any;
 
 /**
  * Example rules used for OpenAI training

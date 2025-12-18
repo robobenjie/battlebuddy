@@ -23,12 +23,62 @@ export default function RulesManagerPage() {
   const [aiMessage, setAiMessage] = useState<string | null>(null);
   const [aiDeclineMessage, setAiDeclineMessage] = useState<{ ruleName: string; message: string } | null>(null);
 
-  // Query all rules
+  // Query all rules with linked units to get unit names
   const { data, isLoading } = db.useQuery({
-    rules: {}
+    rules: {
+      rulesUnits: {
+        $: {}
+      },
+      rulesModels: {
+        unit: {}
+      },
+      rulesWeapons: {
+        model: {
+          unit: {}
+        }
+      }
+    }
   });
 
-  const allRules = (data?.rules || []) as Rule[];
+  const allRules = (data?.rules || []) as any[];
+
+  // Helper to get display name based on rule scope
+  const getRuleSourceName = (rule: any): string => {
+    // For army-level rules, show army name (from faction)
+    if (rule.scope === 'army') {
+      return rule.faction || '';
+    }
+
+    // For detachment-level rules, show detachment name
+    // TODO: Add detachment support when we have detachment data
+    if (rule.scope === 'detachment') {
+      return rule.faction || '';
+    }
+
+    // For unit/model/weapon level rules, show unit names
+    const unitNames = new Set<string>();
+
+    // Get units directly linked to this rule
+    rule.rulesUnits?.forEach((unit: any) => {
+      if (unit?.name) unitNames.add(unit.name);
+    });
+
+    // Get units from models linked to this rule
+    rule.rulesModels?.forEach((model: any) => {
+      if (model?.unit?.name) unitNames.add(model.unit.name);
+    });
+
+    // Get units from weapons linked to this rule
+    rule.rulesWeapons?.forEach((weapon: any) => {
+      if (weapon?.model?.unit?.name) unitNames.add(weapon.model.unit.name);
+    });
+
+    const names = Array.from(unitNames);
+
+    if (names.length === 0) return rule.faction || '';
+    if (names.length <= 3) return names.join(', ');
+    return `${names.slice(0, 3).join(', ')}...`;
+  };
 
   // Separate into implemented and not implemented
   const implementedRules = allRules.filter(r => r.ruleObject);
@@ -225,7 +275,7 @@ export default function RulesManagerPage() {
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-white truncate">{rule.name}</div>
                     <div className="text-xs text-gray-400">
-                      {rule.faction && <span className="mr-2">{rule.faction}</span>}
+                      {getRuleSourceName(rule) && <span className="mr-2">{getRuleSourceName(rule)}</span>}
                       {rule.scope && <span className="mr-2">({rule.scope})</span>}
                     </div>
                     {rule.rawText && (
@@ -262,7 +312,7 @@ export default function RulesManagerPage() {
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-white truncate">{rule.name}</div>
                     <div className="text-xs text-gray-400">
-                      {rule.faction && <span className="mr-2">{rule.faction}</span>}
+                      {getRuleSourceName(rule) && <span className="mr-2">{getRuleSourceName(rule)}</span>}
                       {rule.scope && <span className="mr-2">({rule.scope})</span>}
                     </div>
                     {rule.rawText && (
