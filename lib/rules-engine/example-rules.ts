@@ -47,6 +47,8 @@ export const EXAMPLE_EXPLANATIONS: Record<string, string> = {
   'waaagh-charge-after-advance': 'Part 4 of Waaagh!. Shows a reminder-only rule that grants an ability we can\'t calculate. Together, these 4 Waaagh! rules show how to decompose complex faction abilities into independent, testable pieces.',
 
   'krumpin-time': 'Demonstrates Feel No Pain keyword. Shows how to grant defensive abilities that trigger after damage is rolled. FNP is calculated in the combat engine after saves.',
+
+  'skulking-horrors': 'Reactive ability example. Shows how to mark abilities that trigger during opponent\'s turn using reactive: true. This is a reminder-only rule that activates during opponent\'s movement phase.',
 };
 
 export const EXAMPLE_RULES = [
@@ -303,6 +305,7 @@ export const EXAMPLE_RULES = [
       ]
     },
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "automatic",
       "phase": "any",
@@ -387,6 +390,7 @@ export const EXAMPLE_RULES = [
       ]
     },
     "duration": "turn",
+    "reactive": false,
     "activation": {
       "type": "automatic",
       "phase": "shooting",
@@ -453,6 +457,7 @@ export const EXAMPLE_RULES = [
       }
     ],
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "automatic",
       "phase": "shooting",
@@ -537,6 +542,7 @@ export const EXAMPLE_RULES = [
       }
     ],
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "automatic",
       "phase": "shooting",
@@ -621,6 +627,7 @@ export const EXAMPLE_RULES = [
       }
     ],
     "duration": "turn",
+    "reactive": false,
     "activation": {
       "type": "automatic",
       "phase": "charge",
@@ -767,6 +774,7 @@ export const EXAMPLE_RULES = [
       }
     ],
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "automatic",
       "phase": "any",
@@ -784,6 +792,7 @@ export const EXAMPLE_RULES = [
     "conditions": [],
     "effects": [],
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "manual",
       "phase": "movement",
@@ -896,6 +905,7 @@ export const EXAMPLE_RULES = [
       ]
     },
     "duration": "phase",
+    "reactive": false,
     "activation": {
       "type": "manual",
       "phase": "shooting",
@@ -979,6 +989,7 @@ export const EXAMPLE_RULES = [
       }
     ],
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "automatic",
       "phase": "fight",
@@ -996,6 +1007,7 @@ export const EXAMPLE_RULES = [
     "conditions": [],
     "effects": [],
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "manual",
       "phase": "movement",
@@ -1013,6 +1025,7 @@ export const EXAMPLE_RULES = [
     "conditions": [],
     "effects": [],
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "manual",
       "phase": "charge",
@@ -1093,6 +1106,7 @@ export const EXAMPLE_RULES = [
       }
     ],
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "automatic",
       "phase": "any",
@@ -1173,6 +1187,7 @@ export const EXAMPLE_RULES = [
       }
     ],
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "automatic",
       "phase": "any",
@@ -1238,6 +1253,7 @@ export const EXAMPLE_RULES = [
       }
     ],
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "automatic",
       "phase": "any",
@@ -1271,6 +1287,7 @@ export const EXAMPLE_RULES = [
     ],
     "effects": [],
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "manual",
       "phase": "charge",
@@ -1336,11 +1353,30 @@ export const EXAMPLE_RULES = [
       }
     ],
     "duration": "permanent",
+    "reactive": false,
     "activation": {
       "type": "automatic",
       "phase": "any",
       "limit": null,
       "turn": "both"
+    },
+    "userInput": null
+  },
+  {
+    "id": "skulking-horrors",
+    "name": "Skulking Horrors",
+    "description": "Once per turn, when an enemy unit ends a Normal, Advance or Fall Back move within 9\" of this unit, if this unit is not within Engagement Range of one or more enemy units, it can make a Normal move of up to D6\".",
+    "faction": "Tyranids",
+    "scope": "unit",
+    "conditions": [],
+    "effects": [],
+    "duration": "permanent",
+    "reactive": true,
+    "activation": {
+      "type": "manual",
+      "phase": "movement",
+      "turn": "opponent",
+      "limit": "once-per-turn"
     },
     "userInput": null
   }

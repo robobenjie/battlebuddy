@@ -165,6 +165,7 @@ export interface Rule {
   duration: RuleDuration;
   activation?: RuleActivation;
   userInput?: RuleUserInput; // Optional user input requirement
+  reactive: boolean; // Whether this is a reactive ability (triggers on opponent's turn)
 }
 
 /**

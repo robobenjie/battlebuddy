@@ -5,7 +5,8 @@ import { db } from '../../lib/db';
 import { id } from '@instantdb/react';
 import UnitCard from '../ui/UnitCard';
 import { formatUnitForCard, sortUnitsByPriority } from '../../lib/unit-utils';
-import { getUnitsWithReminders } from '../../lib/rules-engine/reminder-utils';
+import { getReactiveUnits } from '../../lib/rules-engine/reminder-utils';
+import ReactiveAbilitiesSection from '../ui/ReactiveAbilitiesSection';
 import { UNIT_FULL_QUERY, UNIT_BASIC_QUERY } from '../../lib/query-fragments';
 
 interface ChargePhaseProps {
@@ -75,8 +76,8 @@ export default function ChargePhase({ gameId, army, currentPlayer, currentUser, 
   // Get non-active player armies
   const nonActiveArmies = allGameArmies.filter((a: any) => a.id !== army.id);
 
-  // Get units with reactive charge abilities (opponent turn)
-  const reactiveUnits = getUnitsWithReminders(nonActiveArmies, 'charge', 'opponent')
+  // Get units with reactive charge abilities (marked with reactive: true)
+  const reactiveUnits = getReactiveUnits(nonActiveArmies, 'charge')
     .filter((unit: any) => !destroyedUnitIds.has(unit.id));
 
   // Helper function to check if unit has charged this player's turn
@@ -242,37 +243,11 @@ export default function ChargePhase({ gameId, army, currentPlayer, currentUser, 
       </div>
 
       {/* Reactive Abilities Section */}
-      {reactiveUnits.length > 0 && (
-        <div className="space-y-4">
-          <div className="bg-gray-800 rounded-lg p-4 border-l-4 border-purple-500">
-            <h3 className="text-lg font-semibold text-purple-300 mb-1">Reactive Abilities</h3>
-            <p className="text-gray-400 text-sm">
-              Opponent units with reactive charge abilities this phase
-            </p>
-          </div>
-
-          {reactiveUnits.map(unit => {
-            const unitData = formatUnitForCard(unit);
-            return (
-              <div key={unit.id} className="bg-gray-800/50 rounded-lg overflow-hidden border border-purple-500/30">
-                <UnitCard
-                  unit={unitData.unit}
-                  expandable={true}
-                  defaultExpanded={false}
-                  className="border-0"
-                  currentPhase="charge"
-                  currentTurn="opponent"
-                />
-                <div className="border-t border-gray-700/50 p-3 bg-gray-900/30">
-                  <p className="text-xs text-gray-400 italic">
-                    {unit.armyName ? `${unit.armyName} - ` : ''}No action buttons for opponent units
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <ReactiveAbilitiesSection
+        reactiveUnits={reactiveUnits}
+        currentPhase="charge"
+        phaseLabel="charge"
+      />
     </div>
   );
 }

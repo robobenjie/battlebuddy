@@ -98,3 +98,40 @@ export function getUnitsWithReminders(
 
   return unitsWithReminders;
 }
+
+/**
+ * Get all units from armies that have reactive abilities for the given phase
+ * Reactive abilities are marked with reactive: true in the rule definition
+ */
+export function getReactiveUnits(
+  armies: any[],
+  currentPhase: PhaseType
+): any[] {
+  const reactiveUnits: any[] = [];
+
+  for (const army of armies || []) {
+    for (const unit of army.units || []) {
+      // Get all rules for this unit
+      const allRules = getAllUnitRules(unit);
+
+      // Check if any rule is reactive and matches the current phase
+      const hasReactiveAbility = allRules.some((rule: Rule) => {
+        // Must be marked as reactive
+        if (!rule.reactive) return false;
+
+        // If rule has activation.phase, it must match current phase
+        if (rule.activation?.phase && rule.activation.phase !== 'any' && rule.activation.phase !== currentPhase) {
+          return false;
+        }
+
+        return true;
+      });
+
+      if (hasReactiveAbility) {
+        reactiveUnits.push({ ...unit, armyName: army.name, armyId: army.id });
+      }
+    }
+  }
+
+  return reactiveUnits;
+}

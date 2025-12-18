@@ -92,6 +92,7 @@ describe('Rules Engine - User Input Conditions', () => {
         },
       ],
       duration: 'permanent',
+      reactive: false,
       userInput: {
         type: 'toggle',
         id: 'within-9',
@@ -181,6 +182,7 @@ describe('Rules Engine - User Input Conditions', () => {
         },
       ],
       duration: 'permanent',
+      reactive: false,
       userInput: {
         type: 'radio',
         id: 'power-trip-roll',

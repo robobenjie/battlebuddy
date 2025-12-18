@@ -126,7 +126,8 @@ export const RuleSchema = z.object({
   effects: z.array(RuleEffectSchema),
   duration: RuleDurationSchema,
   activation: z.union([RuleActivationSchema, z.null()]),
-  userInput: z.union([RuleUserInputSchema, z.null()])
+  userInput: z.union([RuleUserInputSchema, z.null()]),
+  reactive: z.boolean()
 }).strict();
 
 // Response schema for OpenAI API

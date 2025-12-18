@@ -5,10 +5,11 @@ import { db } from '../../lib/db';
 import { id } from '@instantdb/react';
 import UnitCard from '../ui/UnitCard';
 import { formatUnitForCard, getUnitMovement, getModifiedMovement, sortUnitsByPriority } from '../../lib/unit-utils';
-import { getUnitsWithReminders, getUnitReminders } from '../../lib/rules-engine/reminder-utils';
+import { getUnitReminders, getReactiveUnits } from '../../lib/rules-engine/reminder-utils';
 import ReminderBadge from '../ui/ReminderBadge';
 import { useRulePopup } from '../ui/RulePopup';
 import RulePopup from '../ui/RulePopup';
+import ReactiveAbilitiesSection from '../ui/ReactiveAbilitiesSection';
 import { UNIT_FULL_QUERY, UNIT_BASIC_QUERY } from '../../lib/query-fragments';
 
 interface MovementPhaseProps {
@@ -118,8 +119,8 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
   // Get non-active player armies
   const nonActiveArmies = allGameArmies.filter((a: any) => a.id !== army.id);
 
-  // Get units with reactive movement abilities (opponent turn)
-  const reactiveUnits = getUnitsWithReminders(nonActiveArmies, 'movement', 'opponent')
+  // Get units with reactive movement abilities (marked with reactive: true)
+  const reactiveUnits = getReactiveUnits(nonActiveArmies, 'movement')
     .filter((unit: any) => !destroyedUnitIds.has(unit.id));
 
   // Helper function to check if unit has moved this player's turn
@@ -324,37 +325,11 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
       </div>
 
       {/* Reactive Abilities Section */}
-      {reactiveUnits.length > 0 && (
-        <div className="space-y-4">
-          <div className="bg-gray-800 rounded-lg p-4 border-l-4 border-purple-500">
-            <h3 className="text-lg font-semibold text-purple-300 mb-1">Reactive Abilities</h3>
-            <p className="text-gray-400 text-sm">
-              Opponent units with reactive movement abilities this phase
-            </p>
-          </div>
-
-          {reactiveUnits.map(unit => {
-            const unitData = formatUnitForCard(unit);
-            return (
-              <div key={unit.id} className="bg-gray-800/50 rounded-lg overflow-hidden border border-purple-500/30">
-                <UnitCard
-                  unit={unitData.unit}
-                  expandable={true}
-                  defaultExpanded={false}
-                  className="border-0"
-                  currentPhase="movement"
-                  currentTurn="opponent"
-                />
-                <div className="border-t border-gray-700/50 p-3 bg-gray-900/30">
-                  <p className="text-xs text-gray-400 italic">
-                    {unit.armyName ? `${unit.armyName} - ` : ''}No action buttons for opponent units
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <ReactiveAbilitiesSection
+        reactiveUnits={reactiveUnits}
+        currentPhase="movement"
+        phaseLabel="movement"
+      />
 
       {/* Rule Popup */}
       <RulePopup
