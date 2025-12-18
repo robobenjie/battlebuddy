@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { Rule, RuleEffect, RuleCondition } from '../lib/rules-engine/types';
 import { RuleSchema, validateRule, parseRule } from '../lib/rules-engine/rule-schema';
-import { EXAMPLE_RULES } from '../lib/rules-engine/example-rules';
+import { EXAMPLE_RULES } from '../lib/rules-engine/test-rules';
 
 describe('Rule Schema Validation', () => {
   describe('Required Fields', () => {

@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { EXAMPLE_RULES } from '../lib/rules-engine/example-rules';
+import { EXAMPLE_RULES } from '../lib/rules-engine/test-rules';
 import { buildCombatContext } from '../lib/rules-engine/context';
 import { evaluateRule, getAddedKeywords } from '../lib/rules-engine/evaluator';
 

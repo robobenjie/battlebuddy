@@ -8,7 +8,7 @@ import { getAllUnitRules } from '../load-rules';
 import { Rule } from '../types';
 import { evaluateRule } from '../evaluator';
 import { buildCombatContext } from '../context';
-import { EXAMPLE_RULES } from '../example-rules';
+import { EXAMPLE_RULES } from '../test-rules';
 
 describe('Scope-based rule filtering', () => {
   describe('When bodyguard unit (boys) attacks with attached leader (warboss)', () => {

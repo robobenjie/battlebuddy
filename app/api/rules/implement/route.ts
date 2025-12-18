@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { OpenAIResponseSchema } from '@/lib/rules-engine/rule-schema';
-import { EXAMPLE_RULES, EXAMPLE_EXPLANATIONS } from '@/lib/rules-engine/example-rules';
+import { EXAMPLE_RULES, EXAMPLE_EXPLANATIONS } from '@/lib/rules-engine/test-rules';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
