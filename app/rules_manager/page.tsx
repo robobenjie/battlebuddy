@@ -384,7 +384,7 @@ export default function RulesManagerPage() {
                   <div className="relative border border-gray-700 rounded focus-within:border-red-500 bg-gray-900 max-h-[70vh] overflow-auto">
                     <div className="flex min-h-[16rem]">
                       {/* Line numbers */}
-                      <div className="sticky left-0 flex-shrink-0 bg-gray-950 text-gray-500 font-mono text-sm pt-4 pb-3 px-2 pr-2 select-none border-r border-gray-700">
+                      <div className="flex-shrink-0 bg-gray-950 text-gray-500 font-mono text-sm pt-3 pb-3 px-2 pr-2 select-none border-r border-gray-700">
                         {(ruleObjectText || ' ').split('\n').map((_, i) => (
                           <div key={i} className="text-right leading-6 px-1">
                             {i + 1}
@@ -395,7 +395,7 @@ export default function RulesManagerPage() {
                       <textarea
                         value={ruleObjectText}
                         onChange={(e) => setRuleObjectText(e.target.value)}
-                        className="flex-1 bg-transparent text-white font-mono text-sm p-3 pl-3 focus:outline-none resize-none leading-6 overflow-hidden"
+                        className="flex-1 bg-transparent text-white font-mono text-sm p-3 pl-3 focus:outline-none resize-none leading-6"
                         placeholder={`[
   {
     "type": "modifyAdvance",

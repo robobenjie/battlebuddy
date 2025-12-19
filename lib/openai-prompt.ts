@@ -97,7 +97,20 @@ export function buildSystemPrompt(): string {
     '  "message": "This rule affects roster building and unit attachment. It should be handled during army list creation.",',
     '  "rules": null',
     '}',
-    ''
+    '',
+    '=== EXAMPLE (NON-IMPLEMENTABLE): Unknown Keyword ===',
+    'INPUT:',
+    'Name: Winged Strike',
+    'Rule Text:',
+    'When shooting at AIRCRAFT, ranged weapons this unit had gain ARMOR_BUSTER 3.',
+    '',
+    'OUTPUT:',
+    '{',
+    '  "implementable": false,',
+    '  "message": "This ability confers a keyword, ARMOR_BUSTER, that looks like it effects combat, but is not in our schema.",',
+    '  "rules": null',
+    '}',
+    '',
   ].join('\n');
 
   const systemPrompt = [
