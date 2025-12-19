@@ -24,10 +24,6 @@ export function evaluateWhen(when: WhenType, context: CombatContext): boolean {
     case 'not':
       return !evaluateWhen(when.x, context);
 
-    // Combat role
-    case 'combatRole':
-      return context.combatRole === when.v;
-
     // Weapon type
     case 'weaponType': {
       const weaponType = context.weapon.range === 0 ? 'melee' : 'ranged';
@@ -59,8 +55,9 @@ export function evaluateWhen(when: WhenType, context: CombatContext): boolean {
         )
       );
 
-    // Is leading - checks if unit is a leader OR has a leader attached
+    // Is leading - checks if the unit whose rules are being evaluated is a leader OR has a leader attached
     // (leader CHARACTERs have isLeader=true, bodyguard units have leaderId set)
+    // Use combatRole to determine which unit's leadership status to check
     case 'isLeading':
       if (context.combatRole === 'defender') {
         return !!(context.defender as any).isLeader || !!(context.defender as any).leaderId;
@@ -87,8 +84,11 @@ export function evaluateWhen(when: WhenType, context: CombatContext): boolean {
  */
 export function applyFx(fx: FxType, context: CombatContext, ruleId: string): void {
   switch (fx.t) {
-    // Dice modifiers
+    // Dice modifiers - offensive (only apply when this unit is attacking)
     case 'modHit': {
+      // Only apply offensive modifiers in attacker context
+      if (context.combatRole !== 'attacker') break;
+
       const modifier: Modifier = {
         source: ruleId,
         stat: 'hit',
@@ -101,6 +101,40 @@ export function applyFx(fx: FxType, context: CombatContext, ruleId: string): voi
     }
 
     case 'modWound': {
+      // Only apply offensive modifiers in attacker context
+      if (context.combatRole !== 'attacker') break;
+
+      const modifier: Modifier = {
+        source: ruleId,
+        stat: 'wound',
+        value: fx.add,
+        operation: '+',
+        priority: 0,
+      };
+      context.modifiers.add(modifier);
+      break;
+    }
+
+    // Dice modifiers - defensive (only apply when this unit is being attacked)
+    case 'modHitAgainst': {
+      // Only apply defensive modifiers in defender context
+      if (context.combatRole !== 'defender') break;
+
+      const modifier: Modifier = {
+        source: ruleId,
+        stat: 'hit',
+        value: fx.add,
+        operation: '+',
+        priority: 0,
+      };
+      context.modifiers.add(modifier);
+      break;
+    }
+
+    case 'modWoundAgainst': {
+      // Only apply defensive modifiers in defender context
+      if (context.combatRole !== 'defender') break;
+
       const modifier: Modifier = {
         source: ruleId,
         stat: 'wound',

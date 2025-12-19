@@ -74,8 +74,9 @@ export function getUnitReminders(
   const filteredRules = allRules.filter((rule: Rule) => {
     // If rule has explicit activation, check phase and turn
     if (rule.trigger) {
-      // Match phase
-      if (rule.trigger.phase !== currentPhase && rule.trigger.phase !== 'any') {
+      // Match phase (can be a single phase or array of phases)
+      const phases = Array.isArray(rule.trigger.phase) ? rule.trigger.phase : [rule.trigger.phase];
+      if (!phases.includes(currentPhase as any) && !phases.includes('any')) {
         return false;
       }
 
@@ -168,9 +169,12 @@ export function getReactiveUnits(
         // Must be marked as reactive
         if (rule.trigger?.t !== 'reactive') return false;
 
-        // If rule has trigger.phase, it must match current phase
-        if (rule.trigger?.phase && rule.trigger.phase !== 'any' && rule.trigger.phase !== currentPhase) {
-          return false;
+        // If rule has trigger.phase, it must match current phase (can be single or array)
+        if (rule.trigger?.phase) {
+          const phases = Array.isArray(rule.trigger.phase) ? rule.trigger.phase : [rule.trigger.phase];
+          if (!phases.includes(currentPhase as any) && !phases.includes('any')) {
+            return false;
+          }
         }
 
         return true;

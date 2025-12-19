@@ -3,7 +3,7 @@
     {
       "name": "bomb-squigs",
       "isExample": true,
-      "exampleReason": "Reminder-only rule with manual activation and once-per-battle limit. Shows that rules can have empty conditions/effects arrays when they just need to remind the player.",
+      "exampleReason": "Reminder-only rule with manual activation.",
       "rule": {
         "id": "bomb-squigs",
         "name": "Bomb Squigs",
@@ -16,53 +16,40 @@
           "turn": "own",
           "limit": "once-per-battle"
         },
-        "when": {"t": "true"},
+        "when": {
+          "t": "true"
+        },
         "kind": "reminder"
       }
     },
     {
-      "name": "wild-ride-movement",
+      "name": "wild-ride",
       "isExample": true,
-      "exampleReason": "Reminder-only rule showing that many abilities that can't be calculated in combat should still be implemented as reminders. Even if we can't compute the effect, we can remind the player at the right time. NOTE: This rule activates in TWO phases (movement and charge), so we create TWO rule objects with the same name but different phase values.",
+      "exampleReason": "Example of a reminder in multiple phases.",
       "rule": {
-        "id": "wild-ride-movement",
+        "id": "wild-ride",
         "name": "Wild Ride",
         "description": "You can ignore any or all modifiers to this unit's Move characteristic and to Advance and Charge rolls made for this unit.",
         "faction": "Orks",
         "scope": "unit",
         "trigger": {
           "t": "manual",
-          "phase": "movement",
+          "phase": [
+            "movement",
+            "charge"
+          ],
           "turn": "own",
           "limit": "none"
         },
-        "when": {"t": "true"},
-        "kind": "reminder"
-      }
-    },
-    {
-      "name": "wild-ride-charge",
-      "isExample": true,
-      "exampleReason": "Second part of Wild Ride rule. Shows that a single written rule often needs to be split into multiple rule objects when it activates in different phases. Both rules share the same name and description but have different activation phases.",
-      "rule": {
-        "id": "wild-ride-charge",
-        "name": "Wild Ride",
-        "description": "You can ignore any or all modifiers to this unit's Move characteristic and to Advance and Charge rolls made for this unit.",
-        "faction": "Orks",
-        "scope": "unit",
-        "trigger": {
-          "t": "manual",
-          "phase": "charge",
-          "turn": "own",
-          "limit": "none"
+        "when": {
+          "t": "true"
         },
-        "when": {"t": "true"},
         "kind": "reminder"
       }
     },
     {
       "name": "waaagh-charge-after-advance",
-      "isExample": true,
+      "isExample": false,
       "exampleReason": "Part 4 of Waaagh!. Shows a reminder-only rule that grants an ability we can't calculate. Together, these 4 Waaagh! rules show how to decompose complex faction abilities into independent, testable pieces.",
       "rule": {
         "id": "waaagh-charge-after-advance",
@@ -78,7 +65,9 @@
         },
         "when": {
           "t": "armyState",
-          "is": ["waaagh-active"]
+          "is": [
+            "waaagh-active"
+          ]
         },
         "kind": "reminder"
       }
@@ -86,7 +75,7 @@
     {
       "name": "might-is-right",
       "isExample": true,
-      "exampleReason": "Demonstrates is-leading condition for CHARACTER units that lead bodyguard units. Shows scope: 'unit' rule that applies to the led unit when the leader is attacking.",
+      "exampleReason": "Example of a leader aura.",
       "rule": {
         "id": "might-is-right-hit",
         "name": "Might is Right",
@@ -102,8 +91,15 @@
         "when": {
           "t": "all",
           "xs": [
-            {"t": "isLeading"},
-            {"t": "weaponType", "any": ["melee"]}
+            {
+              "t": "isLeading"
+            },
+            {
+              "t": "weaponType",
+              "any": [
+                "melee"
+              ]
+            }
           ]
         },
         "kind": "passive",
@@ -111,7 +107,10 @@
           {
             "t": "do",
             "fx": [
-              {"t": "modHit", "add": 1}
+              {
+                "t": "modHit",
+                "add": 1
+              }
             ]
           }
         ]
@@ -136,9 +135,18 @@
         "when": {
           "t": "all",
           "xs": [
-            {"t": "combatRole", "v": "attacker"},
-            {"t": "weaponType", "any": ["ranged"]},
-            {"t": "targetCategory", "any": ["VEHICLE"]}
+            {
+              "t": "weaponType",
+              "any": [
+                "ranged"
+              ]
+            },
+            {
+              "t": "targetCategory",
+              "any": [
+                "VEHICLE"
+              ]
+            }
           ]
         },
         "kind": "passive",
@@ -146,7 +154,11 @@
           {
             "t": "do",
             "fx": [
-              {"t": "reroll", "phase": "wound", "kind": "ones"}
+              {
+                "t": "reroll",
+                "phase": "wound",
+                "kind": "ones"
+              }
             ]
           }
         ]
@@ -169,10 +181,9 @@
           "limit": "none"
         },
         "when": {
-          "t": "all",
-          "xs": [
-            {"t": "combatRole", "v": "attacker"},
-            {"t": "weaponType", "any": ["ranged"]}
+          "t": "weaponType",
+          "any": [
+            "ranged"
           ]
         },
         "kind": "passive",
@@ -180,7 +191,13 @@
           {
             "t": "do",
             "fx": [
-              {"t": "addWeaponAbility", "ability": {"t": "flag", "id": "lethalHits"}}
+              {
+                "t": "addWeaponAbility",
+                "ability": {
+                  "t": "flag",
+                  "id": "lethalHits"
+                }
+              }
             ]
           }
         ]
@@ -205,9 +222,18 @@
         "when": {
           "t": "all",
           "xs": [
-            {"t": "combatRole", "v": "attacker"},
-            {"t": "weaponType", "any": ["melee"]},
-            {"t": "unitStatus", "has": ["charged"]}
+            {
+              "t": "weaponType",
+              "any": [
+                "melee"
+              ]
+            },
+            {
+              "t": "unitStatus",
+              "has": [
+                "charged"
+              ]
+            }
           ]
         },
         "kind": "passive",
@@ -215,7 +241,11 @@
           {
             "t": "do",
             "fx": [
-              {"t": "modWeaponStat", "stat": "S", "add": 1}
+              {
+                "t": "modWeaponStat",
+                "stat": "S",
+                "add": 1
+              }
             ]
           }
         ]
@@ -238,10 +268,9 @@
           "limit": "none"
         },
         "when": {
-          "t": "all",
-          "xs": [
-            {"t": "combatRole", "v": "attacker"},
-            {"t": "weaponType", "any": ["melee"]}
+          "t": "weaponType",
+          "any": [
+            "melee"
           ]
         },
         "kind": "passive",
@@ -249,7 +278,11 @@
           {
             "t": "do",
             "fx": [
-              {"t": "modWeaponStat", "stat": "A", "add": 4}
+              {
+                "t": "modWeaponStat",
+                "stat": "A",
+                "add": 4
+              }
             ]
           }
         ]
@@ -272,15 +305,17 @@
           "limit": "none"
         },
         "when": {
-          "t": "combatRole",
-          "v": "attacker"
+          "t": "true"
         },
         "kind": "passive",
         "then": [
           {
             "t": "do",
             "fx": [
-              {"t": "modWound", "add": 1}
+              {
+                "t": "modWound",
+                "add": 1
+              }
             ]
           }
         ]
@@ -303,15 +338,17 @@
           "limit": "none"
         },
         "when": {
-          "t": "combatRole",
-          "v": "attacker"
+          "t": "true"
         },
         "kind": "passive",
         "then": [
           {
             "t": "do",
             "fx": [
-              {"t": "modWound", "add": 1}
+              {
+                "t": "modWound",
+                "add": 1
+              }
             ]
           }
         ]
@@ -334,15 +371,17 @@
           "limit": "none"
         },
         "when": {
-          "t": "combatRole",
-          "v": "attacker"
+          "t": "true"
         },
         "kind": "passive",
         "then": [
           {
             "t": "do",
             "fx": [
-              {"t": "modHit", "add": 1}
+              {
+                "t": "modHit",
+                "add": 1
+              }
             ]
           }
         ]
@@ -365,15 +404,17 @@
           "limit": "none"
         },
         "when": {
-          "t": "combatRole",
-          "v": "attacker"
+          "t": "true"
         },
         "kind": "passive",
         "then": [
           {
             "t": "do",
             "fx": [
-              {"t": "modWound", "add": 1}
+              {
+                "t": "modWound",
+                "add": 1
+              }
             ]
           }
         ]
@@ -395,7 +436,9 @@
           "turn": "both",
           "limit": "none"
         },
-        "when": {"t": "true"},
+        "when": {
+          "t": "true"
+        },
         "kind": "reminder"
       }
     },
@@ -415,13 +458,15 @@
           "turn": "both",
           "limit": "none"
         },
-        "when": {"t": "true"},
+        "when": {
+          "t": "true"
+        },
         "kind": "reminder"
       }
     },
     {
       "name": "waaagh-call",
-      "isExample": true,
+      "isExample": false,
       "exampleReason": "Part 1 of Waaagh! ability. Shows manual activation with once-per-battle limit. Demonstrates activating army-wide state. This reminder tells the player to activate the Waaagh! state, which the other 3 Waaagh! rules depend on.",
       "rule": {
         "id": "waaagh-call",
@@ -435,13 +480,15 @@
           "turn": "own",
           "limit": "once-per-battle"
         },
-        "when": {"t": "true"},
+        "when": {
+          "t": "true"
+        },
         "kind": "reminder"
       }
     },
     {
       "name": "waaagh-strength",
-      "isExample": true,
+      "isExample": false,
       "exampleReason": "Part 2 of Waaagh!. Shows army-state conditions (waaagh-active) and weapon stat modification. Demonstrates how global faction abilities affect combat.",
       "rule": {
         "id": "waaagh-strength",
@@ -458,9 +505,18 @@
         "when": {
           "t": "all",
           "xs": [
-            {"t": "combatRole", "v": "attacker"},
-            {"t": "armyState", "is": ["waaagh-active"]},
-            {"t": "weaponType", "any": ["melee"]}
+            {
+              "t": "armyState",
+              "is": [
+                "waaagh-active"
+              ]
+            },
+            {
+              "t": "weaponType",
+              "any": [
+                "melee"
+              ]
+            }
           ]
         },
         "kind": "passive",
@@ -468,7 +524,11 @@
           {
             "t": "do",
             "fx": [
-              {"t": "modWeaponStat", "stat": "S", "add": 1}
+              {
+                "t": "modWeaponStat",
+                "stat": "S",
+                "add": 1
+              }
             ]
           }
         ]
@@ -476,7 +536,7 @@
     },
     {
       "name": "waaagh-attacks",
-      "isExample": true,
+      "isExample": false,
       "exampleReason": "Part 3 of Waaagh!. Same pattern as waaagh-strength but for Attacks characteristic. Shows how decomposing complex rules makes them easier to test and maintain.",
       "rule": {
         "id": "waaagh-attacks",
@@ -493,9 +553,18 @@
         "when": {
           "t": "all",
           "xs": [
-            {"t": "combatRole", "v": "attacker"},
-            {"t": "armyState", "is": ["waaagh-active"]},
-            {"t": "weaponType", "any": ["melee"]}
+            {
+              "t": "armyState",
+              "is": [
+                "waaagh-active"
+              ]
+            },
+            {
+              "t": "weaponType",
+              "any": [
+                "melee"
+              ]
+            }
           ]
         },
         "kind": "passive",
@@ -503,7 +572,11 @@
           {
             "t": "do",
             "fx": [
-              {"t": "modWeaponStat", "stat": "A", "add": 1}
+              {
+                "t": "modWeaponStat",
+                "stat": "A",
+                "add": 1
+              }
             ]
           }
         ]
@@ -511,7 +584,7 @@
     },
     {
       "name": "waaagh-toughness",
-      "isExample": true,
+      "isExample": false,
       "exampleReason": "Part 4 of Waaagh! (defensive). Shows modDefensiveStat effect for Toughness. Demonstrates defensive stat modification during Waaagh! when unit is being attacked.",
       "rule": {
         "id": "waaagh-toughness",
@@ -526,10 +599,9 @@
           "limit": "none"
         },
         "when": {
-          "t": "all",
-          "xs": [
-            {"t": "combatRole", "v": "defender"},
-            {"t": "armyState", "is": ["waaagh-active"]}
+          "t": "armyState",
+          "is": [
+            "waaagh-active"
           ]
         },
         "kind": "passive",
@@ -537,7 +609,11 @@
           {
             "t": "do",
             "fx": [
-              {"t": "modDefensiveStat", "stat": "T", "add": 1}
+              {
+                "t": "modDefensiveStat",
+                "stat": "T",
+                "add": 1
+              }
             ]
           }
         ]
@@ -546,7 +622,7 @@
     {
       "name": "waaagh-invuln",
       "isExample": true,
-      "exampleReason": "Part 5 of Waaagh! (defensive). Shows setInvuln effect and defensive timing. Demonstrates that Waaagh! has both offensive and defensive benefits.",
+      "exampleReason": "An example of how to check for waaagh-active state. (Waaagh is special cased in the app logic)",
       "rule": {
         "id": "waaagh-invuln",
         "name": "Waaagh!",
@@ -561,14 +637,19 @@
         },
         "when": {
           "t": "armyState",
-          "is": ["waaagh-active"]
+          "is": [
+            "waaagh-active"
+          ]
         },
         "kind": "passive",
         "then": [
           {
             "t": "do",
             "fx": [
-              {"t": "setInvuln", "n": 5}
+              {
+                "t": "setInvuln",
+                "n": 5
+              }
             ]
           }
         ]
@@ -576,7 +657,7 @@
     },
     {
       "name": "krumpin-time",
-      "isExample": true,
+      "isExample": false,
       "exampleReason": "Another stat modification rule. Shows basic pattern with no special conditions beyond combat role and weapon type.",
       "rule": {
         "id": "krumpin-time",
@@ -591,10 +672,9 @@
           "limit": "none"
         },
         "when": {
-          "t": "all",
-          "xs": [
-            {"t": "combatRole", "v": "attacker"},
-            {"t": "weaponType", "any": ["melee"]}
+          "t": "weaponType",
+          "any": [
+            "melee"
           ]
         },
         "kind": "passive",
@@ -602,7 +682,11 @@
           {
             "t": "do",
             "fx": [
-              {"t": "modWeaponStat", "stat": "S", "add": 1}
+              {
+                "t": "modWeaponStat",
+                "stat": "S",
+                "add": 1
+              }
             ]
           }
         ]
@@ -611,37 +695,28 @@
     {
       "name": "skulking-horrors",
       "isExample": true,
-      "exampleReason": "Reactive rule that modifies wound rolls. Shows defensive reactive trigger type.",
+      "exampleReason": "Reactive rule reminder.",
       "rule": {
         "id": "skulking-horrors",
         "name": "Skulking Horrors",
-        "description": "Each time an attack targets this unit, subtract 1 from the Wound roll.",
-        "faction": "Chaos",
+        "description": "Once per turn, when an enemy unit ends a Normal, Advance or Fall Back move within 9\" of this unit, if this unit is not within Engagement Range of one or more enemy units, it can make a Normal move of up to D6",
+        "faction": "Tyranids",
         "scope": "unit",
         "trigger": {
           "t": "reactive",
-          "phase": "any",
+          "phase": "movement",
           "turn": "opponent",
           "limit": "none"
         },
         "when": {
-          "t": "combatRole",
-          "v": "defender"
+          "t": "true"
         },
-        "kind": "passive",
-        "then": [
-          {
-            "t": "do",
-            "fx": [
-              {"t": "modWound", "add": -1}
-            ]
-          }
-        ]
+        "kind": "reminder"
       }
     },
     {
       "name": "drive-by-dakka",
-      "isExample": true,
+      "isExample": false,
       "exampleReason": "Toggle-based user input. Shows how to handle player-declared state (Advanced this turn?). Demonstrates turn-based state tracking.",
       "rule": {
         "id": "drive-by-dakka",
@@ -656,22 +731,28 @@
           "limit": "none"
         },
         "when": {
-          "t": "all",
-          "xs": [
-            {"t": "combatRole", "v": "attacker"},
-            {"t": "weaponType", "any": ["ranged"]}
+          "t": "weaponType",
+          "any": [
+            "ranged"
           ]
         },
         "kind": "choice",
         "choice": {
           "id": "advanced-this-turn",
           "prompt": "Advanced this turn?",
-          "lifetime": {"t": "turn"},
+          "lifetime": {
+            "t": "turn"
+          },
           "options": [
             {
               "v": "no",
               "label": "No",
-              "then": [{"t": "do", "fx": []}]
+              "then": [
+                {
+                  "t": "do",
+                  "fx": []
+                }
+              ]
             },
             {
               "v": "yes",
@@ -680,7 +761,11 @@
                 {
                   "t": "do",
                   "fx": [
-                    {"t": "modWeaponStat", "stat": "AP", "add": -1}
+                    {
+                      "t": "modWeaponStat",
+                      "stat": "AP",
+                      "add": -1
+                    }
                   ]
                 }
               ]
@@ -713,7 +798,11 @@
           {
             "t": "do",
             "fx": [
-              {"t": "modWeaponStat", "stat": "D", "add": 2}
+              {
+                "t": "modWeaponStat",
+                "stat": "D",
+                "add": 2
+              }
             ]
           }
         ]
@@ -736,27 +825,38 @@
           "limit": "none"
         },
         "when": {
-          "t": "all",
-          "xs": [
-            {"t": "combatRole", "v": "attacker"},
-            {"t": "weaponType", "any": ["ranged"]}
+          "t": "weaponType",
+          "any": [
+            "ranged"
           ]
         },
         "kind": "choice",
         "choice": {
           "id": "power-trip-roll",
           "prompt": "D6 Roll Result",
-          "lifetime": {"t": "roll"},
+          "lifetime": {
+            "t": "roll"
+          },
           "options": [
             {
               "v": "no-roll",
               "label": "Not activated",
-              "then": [{"t": "do", "fx": []}]
+              "then": [
+                {
+                  "t": "do",
+                  "fx": []
+                }
+              ]
             },
             {
               "v": "1-2",
               "label": "1-2 (D3 mortal wounds)",
-              "then": [{"t": "do", "fx": []}]
+              "then": [
+                {
+                  "t": "do",
+                  "fx": []
+                }
+              ]
             },
             {
               "v": "3-4",
@@ -765,7 +865,11 @@
                 {
                   "t": "do",
                   "fx": [
-                    {"t": "modWeaponStat", "stat": "S", "add": 1}
+                    {
+                      "t": "modWeaponStat",
+                      "stat": "S",
+                      "add": 1
+                    }
                   ]
                 }
               ]
@@ -777,7 +881,11 @@
                 {
                   "t": "do",
                   "fx": [
-                    {"t": "modWeaponStat", "stat": "A", "add": 1}
+                    {
+                      "t": "modWeaponStat",
+                      "stat": "A",
+                      "add": 1
+                    }
                   ]
                 }
               ]
@@ -789,7 +897,7 @@
     {
       "name": "waaagh-energy",
       "isExample": true,
-      "exampleReason": "Demonstrates radio input with multiple options based on unit size. Shows how effects scale with context (more models = stronger ability, but we can just ask the player for complicated conditional state). Example of leader-only effects using scope.",
+      "exampleReason": "Demonstrates radio input. Shows how effects scale with context (more models = stronger ability), but we can just ask the player for complicated conditional state.",
       "rule": {
         "id": "waaagh-energy",
         "name": "Waaagh! Energy",
@@ -803,22 +911,25 @@
           "limit": "none"
         },
         "when": {
-          "t": "all",
-          "xs": [
-            {"t": "combatRole", "v": "attacker"},
-            {"t": "isLeading"}
-          ]
+          "t": "isLeading"
         },
         "kind": "choice",
         "choice": {
           "id": "unit-size",
           "prompt": "Unit size (models in led unit)",
-          "lifetime": {"t": "game"},
+          "lifetime": {
+            "t": "game"
+          },
           "options": [
             {
               "v": "0-4",
               "label": "0-4 models (+0)",
-              "then": [{"t": "do", "fx": []}]
+              "then": [
+                {
+                  "t": "do",
+                  "fx": []
+                }
+              ]
             },
             {
               "v": "5-9",
@@ -827,8 +938,16 @@
                 {
                   "t": "do",
                   "fx": [
-                    {"t": "modWeaponStat", "stat": "S", "add": 1},
-                    {"t": "modWeaponStat", "stat": "D", "add": 1}
+                    {
+                      "t": "modWeaponStat",
+                      "stat": "S",
+                      "add": 1
+                    },
+                    {
+                      "t": "modWeaponStat",
+                      "stat": "D",
+                      "add": 1
+                    }
                   ]
                 }
               ]
@@ -840,9 +959,23 @@
                 {
                   "t": "do",
                   "fx": [
-                    {"t": "modWeaponStat", "stat": "S", "add": 2},
-                    {"t": "modWeaponStat", "stat": "D", "add": 2},
-                    {"t": "addWeaponAbility", "ability": {"t": "flag", "id": "hazardous"}}
+                    {
+                      "t": "modWeaponStat",
+                      "stat": "S",
+                      "add": 2
+                    },
+                    {
+                      "t": "modWeaponStat",
+                      "stat": "D",
+                      "add": 2
+                    },
+                    {
+                      "t": "addWeaponAbility",
+                      "ability": {
+                        "t": "flag",
+                        "id": "hazardous"
+                      }
+                    }
                   ]
                 }
               ]
@@ -854,9 +987,23 @@
                 {
                   "t": "do",
                   "fx": [
-                    {"t": "modWeaponStat", "stat": "S", "add": 3},
-                    {"t": "modWeaponStat", "stat": "D", "add": 3},
-                    {"t": "addWeaponAbility", "ability": {"t": "flag", "id": "hazardous"}}
+                    {
+                      "t": "modWeaponStat",
+                      "stat": "S",
+                      "add": 3
+                    },
+                    {
+                      "t": "modWeaponStat",
+                      "stat": "D",
+                      "add": 3
+                    },
+                    {
+                      "t": "addWeaponAbility",
+                      "ability": {
+                        "t": "flag",
+                        "id": "hazardous"
+                      }
+                    }
                   ]
                 }
               ]
@@ -866,11 +1013,11 @@
       }
     },
     {
-      "name": "super-runts",
+      "name": "super-runts-scouts",
       "isExample": true,
-      "exampleReason": "Demonstrates multiple effects with different conditions. Shows how to use if blocks to handle effect-level conditions (offensive +1 hit/wound, defensive -1 wound). Also shows parameterized unit ability (Scouts 9\").",
+      "exampleReason": "Part 1 of Super Runts. Grants Scouts 9\" ability. Shows parameterized unit ability.",
       "rule": {
-        "id": "super-runts",
+        "id": "super-runts-scouts",
         "name": "Super Runts",
         "description": "While this model is leading a unit: Models in that unit have the Scouts 9\" ability. Each time a model in that unit makes an attack, add 1 to the Hit roll and add 1 to the Wound roll. Each time an attack targets that unit, subtract 1 from the Wound roll.",
         "faction": "Orks",
@@ -889,31 +1036,53 @@
           {
             "t": "do",
             "fx": [
-              {"t": "addUnitAbility", "ability": {"t": "scouts", "distance": 9}}
-            ]
-          },
-          {
-            "t": "if",
-            "when": {"t": "combatRole", "v": "attacker"},
-            "then": [
               {
-                "t": "do",
-                "fx": [
-                  {"t": "modHit", "add": 1},
-                  {"t": "modWound", "add": 1}
-                ]
+                "t": "addUnitAbility",
+                "ability": {
+                  "t": "scouts",
+                  "distance": 9
+                }
               }
             ]
-          },
+          }
+        ]
+      }
+    },
+    {
+      "name": "super-runts-offense",
+      "isExample": true,
+      "exampleReason": "Part 2 of Super Runts shows offensive modifiers using modHit and modWound and modWoundAgainst. Engine will apply the modifiers at the right time.",
+      "rule": {
+        "id": "super-runts-offense",
+        "name": "Super Runts",
+        "description": "While this model is leading a unit: Models in that unit have the Scouts 9\" ability. Each time a model in that unit makes an attack, add 1 to the Hit roll and add 1 to the Wound roll. Each time an attack targets that unit, subtract 1 from the Wound roll.",
+        "faction": "Orks",
+        "scope": "unit",
+        "trigger": {
+          "t": "automatic",
+          "phase": "any",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "isLeading"
+        },
+        "kind": "passive",
+        "then": [
           {
-            "t": "if",
-            "when": {"t": "combatRole", "v": "defender"},
-            "then": [
+            "t": "do",
+            "fx": [
               {
-                "t": "do",
-                "fx": [
-                  {"t": "modWound", "add": -1}
-                ]
+                "t": "modHit",
+                "add": 1
+              },
+              {
+                "t": "modWound",
+                "add": 1
+              },
+              {
+                "t": "modWoundAgainst",
+                "add": -1
               }
             ]
           }

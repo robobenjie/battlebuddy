@@ -15,7 +15,7 @@ export const Phase = z.enum(["command", "movement", "shooting", "charge", "fight
 
 export const Trigger = z.object({
   t: TriggerType,
-  phase: Phase,
+  phase: z.union([Phase, z.array(Phase).min(1)]), // Single phase or array of phases
   turn: Turn,
   limit: Limit,
 }).strict();
@@ -77,7 +77,6 @@ export const Atom = z.union([
   z.object({ t: z.literal("true") }).strict(),
   z.object({ t: z.literal("false") }).strict(),
 
-  z.object({ t: z.literal("combatRole"), v: z.enum(["attacker", "defender"]) }).strict(),
   z.object({ t: z.literal("weaponType"), any: z.array(z.enum(["ranged", "melee"])).min(1) }).strict(),
   z.object({ t: z.literal("targetCategory"), any: z.array(z.string()).min(1) }).strict(),
   z.object({ t: z.literal("unitStatus"), has: z.array(z.string()).min(1) }).strict(),
@@ -106,9 +105,13 @@ export const WeaponStat = z.enum(["S", "AP", "A", "D"]);
 export const DefensiveStat = z.enum(["T", "SV"]);
 
 export const Fx = z.union([
-  // Dice modifiers (offensive and defensive)
+  // Dice modifiers - offensive (when this unit attacks)
   z.object({ t: z.literal("modHit"), add: z.number().int() }).strict(),
   z.object({ t: z.literal("modWound"), add: z.number().int() }).strict(),
+
+  // Dice modifiers - defensive (when this unit is attacked)
+  z.object({ t: z.literal("modHitAgainst"), add: z.number().int() }).strict(),
+  z.object({ t: z.literal("modWoundAgainst"), add: z.number().int() }).strict(),
 
   // Weapon stats (offensive)
   z.object({ t: z.literal("modWeaponStat"), stat: WeaponStat, add: z.number().int() }).strict(),

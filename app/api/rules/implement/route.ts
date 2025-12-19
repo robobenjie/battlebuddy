@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { OpenAIResponseSchema } from '@/lib/rules-engine/rule-schema';
-import { EXAMPLE_RULES, EXAMPLE_EXPLANATIONS } from '@/lib/rules-engine/test-rules';
+import { buildSystemPrompt, buildUserPrompt } from '@/lib/openai-prompt';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -39,23 +39,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build system prompt with examples
+    // Build prompts using shared functions
     const systemPrompt = buildSystemPrompt();
+    const userPrompt = buildUserPrompt({ ruleName, ruleText, faction, scope });
 
-    // Build user prompt
-    const userPrompt = `
-RULE NAME: ${ruleName}
-${faction ? `FACTION: ${faction}` : ''}
-${scope ? `SCOPE: ${scope}` : ''}
-
-RULE TEXT:
-${ruleText}
-
-Please convert this into a structured rule following the schema. 
-Rules are mostly used to remind players of the rules at the appropriate time (e.g. an ability that triggers after they move).
-The app also support automatic rolling of combat, so rules that affect combat calculations should be implemented modifying attributes and keywords for combat (and movement speed).
-
-If this rule cannot be implemented as a reminder in a particular phase or can affect combat calculations in a way that is not expressible by the schema, respond with a message explaining why it cannot be implemented in the combat rules engine.`
     // Call OpenAI with structured output using Zod schema
     const completion = await openai.chat.completions.parse({
       model: 'gpt-5.2',
@@ -101,140 +88,4 @@ If this rule cannot be implemented as a reminder in a particular phase or can af
       { status: 500 }
     );
   }
-}
-
-function buildSystemPrompt(): string {
-  // Group rules by name to show multi-rule examples
-  const groupedExamples: { name: string; rules: any[]; }[] = [];
-  let currentGroup: { name: string; rules: any[]; } | null = null;
-
-  for (const rule of EXAMPLE_RULES) {
-    if (!currentGroup || currentGroup.name !== rule.name) {
-      // Start new group
-      currentGroup = { name: rule.name, rules: [rule] };
-      groupedExamples.push(currentGroup);
-    } else {
-      // Add to existing group
-      currentGroup.rules.push(rule);
-    }
-  }
-
-  // Format examples for the prompt
-  const exampleTexts = groupedExamples.map((group, index) => {
-    const exampleNumber = index + 1;
-    const firstRule = group.rules[0];
-    const factionLine = firstRule.faction ? 'Faction: ' + firstRule.faction : '';
-
-    // Get explanations for all rules in group
-    const explanations = group.rules
-      .map(r => EXAMPLE_EXPLANATIONS[r.id])
-      .filter(e => e)
-      .join(' ');
-
-    // Create rules array JSON
-    const rulesArrayJson = JSON.stringify(group.rules, null, 2);
-
-    const lines = [
-      '=== EXAMPLE ' + exampleNumber + ': ' + group.name + (group.rules.length > 1 ? ` (${group.rules.length} rules)` : '') + ' ===',
-      explanations ? 'WHY: ' + explanations : null,
-      '',
-      'INPUT:',
-      'Name: ' + group.name,
-      factionLine,
-      'Scope: ' + firstRule.scope,
-      '',
-      'Rule Text:',
-      firstRule.description,
-      '',
-      'OUTPUT:',
-      '{',
-      '  "implementable": true,',
-      '  "message": "",',
-      '  "rules": ' + rulesArrayJson,
-      '}',
-      ''
-    ];
-
-    return lines.filter(line => line !== null && line !== undefined).join('\n');
-  }).join('\n');
-
-  // Add the non-implementable example
-  const nonImplementableExample = [
-    '=== EXAMPLE (NON-IMPLEMENTABLE): Unit Attachment ===',
-    'INPUT:',
-    'Name: Gretchin Alternative Attachment',
-    'Rule Text:',
-    'If a CHARACTER unit from your army with the Leader ability can be attached to a LOOTAS unit, it can be attached to this unit instead.',
-    '',
-    'OUTPUT:',
-    '{',
-    '  "implementable": false,',
-    '  "message": "This rule affects roster building and unit attachment. It should be handled during army list creation.",',
-    '  "rules": null',
-    '}',
-    ''
-  ].join('\n');
-
-  const systemPrompt = [
-    'You are an expert at converting Warhammer 40,000 (10th Edition) rules text into structured JSON for a deterministic combat rules engine.',
-    '',
-    'IMPORTANT GUIDELINES:',
-    '1. Most rules are just reminders that show up at the appropriate time (e.g. an ability that triggers after they move).',
-    '2. The app also support automatic rolling of combat, so rules that affect combat calculations should be implemented modifying attributes and keywords for combat (and movement speed).',
-    '3. Be precise - only extract explicitly stated rules, do not infer',
-    '4. If the rule does not modify dice rolls in combat, and it is not clear how to represent it in the schema, it should probably be implemented as a reminder in a particular phase, even if it modifies other attributes or has other rule effects.',
-    '5. If it is not clear how a rule can be implemented in the schema, respond with a message explaining why it cannot be implemented in the combat rules engine.',
-    '6. IMPORTANT: A single written rule often needs MULTIPLE rule objects. Return an array with multiple rules when:',
-    '   - The rule has multiple independent effects (e.g., Waaagh! grants +1 Strength AND +1 Attacks AND 5+ invuln)',
-    '   - The rule activates in multiple phases (e.g., Wild Ride applies in both movement and charge phases)',
-    '',
-    'KEY SCHEMA CONCEPTS:',
-    '',
-    '',
-    '**Scope**: What the rule applies to',
-    '- model: The rule is specific to a model (not the rest of the unit).',
-    '- unit: The rule applies to the entire unit (most leader rules that modify the unit being led).',
-    '- army: The rule applies to the entire army.',
-    '- detachment: The rule applies to the entire detachment.',
-    '- weapon: The rule applies to the weapon.',
-    '',
-    '**Conditions** (rule-level): Must ALL be true for rule to apply',
-    '- target-category: Target has specific keyword (VEHICLE, MONSTER, etc.)',
-    '- weapon-type: Weapon is ranged or melee',
-    '- unit-status: Unit has status (charged, remained-stationary, etc.)',
-    '- is-leading: Model is leading a unit',
-    '- combat-role: Unit is attacker or defender',
-    '',
-    '**Effects**: What happens when conditions are met',
-    '- modify-hit: Modify hit roll threshold (+1 to hit = modifier: 1)',
-    '- modify-wound: Modify wound roll threshold',
-    '- modify-characteristic: Modify weapon/model stat (S, A, AP, D, WS)',
-    '- add-keyword: Add weapon keyword (Lethal Hits, Sustained Hits 1, etc.)',
-    '- reroll: Allow rerolls (hit/wound/damage, all/failed/ones)',
-    '',
-    '**User Input** (NEW SCHEMA): For rules requiring player decisions',
-    '- Type: toggle (yes/no), radio (pick one), select (pick multiple)',
-    '- Effects for this kind of rule go in userInput.options[].effects, NOT in effect.conditions',
-    '- Example: "5-9 models" option has effects: [{ type: \'modify-characteristic\', params: { stat: \'S\', modifier: 1 }}]',
-    '',
-    '**Effect-level conditions**: Conditions on individual effects (e.g., combat-role for attacker/defender)',
-    '',
-    '**Activation**: When/how the rule activates',
-    '- type: manual or automatic',
-    '- phase: movement, shooting, charge, fight, any',
-    '- limit: once-per-battle, once-per-turn, unlimited',
-    '',
-    '**Duration**: How long effects last',
-    '- permanent: Always active',
-    '- turn: Until end of turn',
-    '- phase: Until end of phase',
-    '',
-    'Here are validated examples of correctly implemented rules:',
-    exampleTexts,
-    nonImplementableExample,
-    '',
-    'Now, convert the following rule following these examples and guidelines.'
-  ].join('\n');
-
-  return systemPrompt;
 }

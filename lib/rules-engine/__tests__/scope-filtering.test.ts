@@ -423,9 +423,9 @@ describe('Scope-based rule filtering', () => {
     });
 
     it('should apply "Super Runts" (-1 to wound defensively) when Gretchin with Zogrod leader are attacked', () => {
-      // Get the Super Runts rule from example-rules.ts
-      const superRuntsRule = EXAMPLE_RULES.find(r => r.id === 'super-runts');
-      expect(superRuntsRule).toBeDefined();
+      // Get the Super Runts combat rule from example-rules.ts (now contains both offensive and defensive)
+      const superRuntsCombatRule = EXAMPLE_RULES.find(r => r.id === 'super-runts-offense');
+      expect(superRuntsCombatRule).toBeDefined();
 
       // Mock data: Gretchin unit with attached Zogrod leader
       const gretchinUnit = {
@@ -453,7 +453,7 @@ describe('Scope-based rule filtering', () => {
             unitRules: [
               {
                 name: 'Super Runts',
-                ruleObject: JSON.stringify(superRuntsRule)
+                ruleObject: JSON.stringify(superRuntsCombatRule)
               }
             ],
             models: [
@@ -492,9 +492,9 @@ describe('Scope-based rule filtering', () => {
         type: 'ranged' as const
       };
 
-      // Get rules for the Gretchin unit (should include "Super Runts" from Zogrod)
+      // Get rules for the Gretchin unit (should include "Super Runts" combat rule from Zogrod)
       const rules = getAllUnitRules(gretchinUnit);
-      const loadedSuperRunts = rules.find(r => r.id === 'super-runts');
+      const loadedSuperRunts = rules.find(r => r.id === 'super-runts-offense');
 
       // Verify the rule was loaded
       expect(loadedSuperRunts).toBeDefined();

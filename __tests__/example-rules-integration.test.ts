@@ -1,12 +1,12 @@
 /**
- * Integration tests for EXAMPLE_RULES
+ * Integration tests for ALL_TEST_RULES
  *
  * Verifies that the example rules we show to OpenAI actually work correctly
  * in the combat engine and produce the expected effects.
  */
 
 import { describe, it, expect } from 'vitest';
-import { EXAMPLE_RULES } from '../lib/rules-engine/test-rules';
+import { ALL_TEST_RULES } from '../lib/rules-engine/test-rules';
 import { buildCombatContext } from '../lib/rules-engine/context';
 import { evaluateRule, getAddedKeywords } from '../lib/rules-engine/evaluator';
 
@@ -82,7 +82,7 @@ describe('Example Rules Integration', () => {
   };
 
   describe('Waaagh! Energy (radio input)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'waaagh-energy')!;
+    const rule = ALL_TEST_RULES.find(r => r.id === 'waaagh-energy')!;
 
     it('should not modify weapon when 0-4 models selected', () => {
       const context = createTestContext({
@@ -148,7 +148,7 @@ describe('Example Rules Integration', () => {
   });
 
   describe('Drive-by Dakka (toggle input)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'drive-by-dakka')!;
+    const rule = ALL_TEST_RULES.find(r => r.id === 'drive-by-dakka')!;
 
     it('should improve AP by 1 when advanced', () => {
       const context = createTestContext({
@@ -195,7 +195,7 @@ describe('Example Rules Integration', () => {
   });
 
   describe('Dakka Dakka Dakka (automatic)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'dakka-dakka-dakka')!;
+    const rule = ALL_TEST_RULES.find(r => r.id === 'dakka-dakka-dakka')!;
 
     it('should add Lethal Hits to ranged weapons', () => {
       const context = createTestContext({
@@ -223,7 +223,7 @@ describe('Example Rules Integration', () => {
   });
 
   describe('Tank Hunter (automatic)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'tank-hunter')!;
+    const rule = ALL_TEST_RULES.find(r => r.id === 'tank-hunter')!;
 
     it('should add reroll wounds of 1 against VEHICLE targets', () => {
       const context = createTestContext({
@@ -282,7 +282,7 @@ describe('Example Rules Integration', () => {
   });
 
   describe('Furious Charge (unit status)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'furious-charge')!;
+    const rule = ALL_TEST_RULES.find(r => r.id === 'furious-charge')!;
 
     it('should add +1 Strength when charged', () => {
       const context = createTestContext({
@@ -325,7 +325,8 @@ describe('Example Rules Integration', () => {
   });
 
   describe('Super Runts (leader abilities)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'super-runts')!;
+    const scoutsRule = ALL_TEST_RULES.find(r => r.id === 'super-runts-scouts')!;
+    const combatRule = ALL_TEST_RULES.find(r => r.id === 'super-runts-offense')!; // Now contains both offensive and defensive
 
     it('should add Scouts 9" keyword to the whole unit (leader attacking)', () => {
       const context = createTestContext({
@@ -333,7 +334,7 @@ describe('Example Rules Integration', () => {
         attacker: { id: 'zogrod-1', armyId: 'army-1', categories: ['CHARACTER', 'Infantry'] },
       });
 
-      evaluateRule(rule, context);
+      evaluateRule(scoutsRule, context);
 
       // Scouts keyword applies to whole unit when leader is leading
       const keywords = getAddedKeywords(context);
@@ -344,10 +345,9 @@ describe('Example Rules Integration', () => {
       const context = createTestContext({
         weapon: { name: 'Power Klaw', range: 0, A: '3', WS: 3, S: 8, AP: -2, D: '2', keywords: [] },
         attacker: { id: 'zogrod-1', armyId: 'army-1', categories: ['CHARACTER', 'Infantry'] },
-        combatRole: 'attacker',
       });
 
-      evaluateRule(rule, context);
+      evaluateRule(combatRule, context);
 
       expect(context.modifiers.get('hit')).toBe(1);
     });
@@ -356,10 +356,9 @@ describe('Example Rules Integration', () => {
       const context = createTestContext({
         weapon: { name: 'Power Klaw', range: 0, A: '3', WS: 3, S: 8, AP: -2, D: '2', keywords: [] },
         attacker: { id: 'zogrod-1', armyId: 'army-1', categories: ['CHARACTER', 'Infantry'] },
-        combatRole: 'attacker',
       });
 
-      evaluateRule(rule, context);
+      evaluateRule(combatRule, context);
 
       expect(context.modifiers.get('wound')).toBe(1);
     });
@@ -369,12 +368,12 @@ describe('Example Rules Integration', () => {
         weapon: { name: 'Bolter', range: 24, A: '2', WS: 3, S: 4, AP: 0, D: '1', keywords: [] },
         attacker: { id: 'unit-enemy', armyId: 'army-2', categories: ['Infantry'] },
         defender: { id: 'zogrod-1', armyId: 'army-1', categories: ['CHARACTER', 'Infantry'], models: [{ T: 4, SV: 4 }] },
-        combatRole: 'defender',
+        combatRole: 'defender', // Evaluating defender's rules
       });
 
-      evaluateRule(rule, context);
+      evaluateRule(combatRule, context); // Same rule now has both offensive and defensive effects
 
-      // When defending, the wound modifier should be -1
+      // When defending, the wound modifier should be -1 (from modWoundAgainst)
       expect(context.modifiers.get('wound')).toBe(-1);
     });
 
@@ -382,10 +381,9 @@ describe('Example Rules Integration', () => {
       const context = createTestContext({
         weapon: { name: 'Power Klaw', range: 0, A: '3', WS: 3, S: 8, AP: -2, D: '2', keywords: [] },
         attacker: { id: 'gretchin-1', armyId: 'army-1', categories: ['Infantry'] }, // Not a CHARACTER
-        combatRole: 'attacker',
       });
 
-      const applied = evaluateRule(rule, context);
+      const applied = evaluateRule(combatRule, context);
 
       // Rule doesn't apply - is-leading condition not met (not a leader)
       expect(applied).toBe(false);
@@ -394,7 +392,7 @@ describe('Example Rules Integration', () => {
   });
 
   describe('Bomb Squigs (reminder-only rule)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'bomb-squigs')!;
+    const rule = ALL_TEST_RULES.find(r => r.id === 'bomb-squigs')!;
 
     it('should not modify any combat stats', () => {
       const context = createTestContext({});
@@ -416,7 +414,7 @@ describe('Example Rules Integration', () => {
   });
 
   describe('Shooty Power Trip (radio with multiple outcomes)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'shooty-power-trip')!;
+    const rule = ALL_TEST_RULES.find(r => r.id === 'shooty-power-trip')!;
 
     it('should add +1 Strength when 3-4 rolled', () => {
       const context = createTestContext({
@@ -492,7 +490,7 @@ describe('Example Rules Integration', () => {
   });
 
   describe('Waaagh! Attacks (army-state)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'waaagh-attacks')!;
+    const rule = ALL_TEST_RULES.find(r => r.id === 'waaagh-attacks')!;
 
     it('should add +1 Attacks when Waaagh is active', () => {
       const context = createTestContext({
@@ -533,8 +531,8 @@ describe('Example Rules Integration', () => {
     });
   });
 
-  describe('Wild Ride (Movement)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'wild-ride-movement')!;
+  describe('Wild Ride', () => {
+    const rule = ALL_TEST_RULES.find(r => r.id === 'wild-ride')!;
 
     it('should be a reminder-only rule that always applies', () => {
       const context = createTestContext({});
@@ -550,9 +548,9 @@ describe('Example Rules Integration', () => {
       expect(context.modifiers.get('Move')).toBe(0);
     });
 
-    it('should have manual activation in movement phase', () => {
+    it('should have manual activation in both movement and charge phases', () => {
       expect(rule.trigger.t).toBe('manual');
-      expect(rule.trigger.phase).toBe('movement');
+      expect(rule.trigger.phase).toEqual(['movement', 'charge']);
       expect(rule.trigger.turn).toBe('own');
       expect(rule.trigger.limit).toBe('none'); // Can use multiple times
     });
@@ -563,43 +561,8 @@ describe('Example Rules Integration', () => {
     });
   });
 
-  describe('Wild Ride (Charge)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'wild-ride-charge')!;
-
-    it('should be a reminder-only rule that always applies', () => {
-      const context = createTestContext({});
-
-      const applied = evaluateRule(rule, context);
-
-      // Rule applies (no conditions to fail)
-      expect(applied).toBe(true);
-
-      // But it has no effects (reminder only)
-      const keywords = getAddedKeywords(context);
-      expect(keywords).toHaveLength(0);
-    });
-
-    it('should have manual activation in charge phase', () => {
-      expect(rule.trigger.t).toBe('manual');
-      expect(rule.trigger.phase).toBe('charge');
-      expect(rule.trigger.turn).toBe('own');
-      expect(rule.trigger.limit).toBe('none');
-    });
-
-    it('should have no effects (reminder rule)', () => {
-      expect(rule.kind).toBe('reminder');
-      expect(rule.when.t).toBe('true'); // Always applies
-    });
-
-    it('should have same name and description as movement version', () => {
-      const movementRule = EXAMPLE_RULES.find(r => r.id === 'wild-ride-movement')!;
-      expect(rule.name).toBe(movementRule.name);
-      expect(rule.description).toBe(movementRule.description);
-    });
-  });
-
   describe('Krumpin\' Time (melee strength bonus)', () => {
-    const rule = EXAMPLE_RULES.find(r => r.id === 'krumpin-time')!;
+    const rule = ALL_TEST_RULES.find(r => r.id === 'krumpin-time')!;
 
     it('should add +1 Strength to melee attacks', () => {
       const context = createTestContext({
