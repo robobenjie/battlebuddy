@@ -172,6 +172,19 @@ export function applyFx(fx: FxType, context: CombatContext, ruleId: string): voi
       break;
     }
 
+    // Movement stat
+    case 'modMove': {
+      const modifier: Modifier = {
+        source: ruleId,
+        stat: 'M',
+        value: fx.add,
+        operation: '+',
+        priority: 0,
+      };
+      context.modifiers.add(modifier);
+      break;
+    }
+
     // Add typed abilities
     case 'addWeaponAbility': {
       // Store weapon ability as special modifier

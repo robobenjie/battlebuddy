@@ -166,7 +166,7 @@
     },
     {
       "name": "dakka-dakka-dakka",
-      "isExample": true,
+      "isExample": false,
       "exampleReason": "Simple automatic keyword addition. Shows the most basic pattern: check weapon type condition, add keyword. No user input needed.",
       "rule": {
         "id": "dakka-dakka-dakka",
@@ -205,7 +205,7 @@
     },
     {
       "name": "furious-charge",
-      "isExample": true,
+      "isExample": false,
       "exampleReason": "Shows unit-status conditions (charged) and temporary duration (turn). Demonstrates abilities that trigger based on unit actions.",
       "rule": {
         "id": "furious-charge",
@@ -253,12 +253,12 @@
     },
     {
       "name": "da-biggest-and-da-best",
-      "isExample": false,
-      "exampleReason": "",
+      "isExample": true,
+      "exampleReason": "Show how to check for army state conditions (like Waaagh!).",
       "rule": {
         "id": "da-biggest-and-da-best",
         "name": "Da Biggest and da Best",
-        "description": "+4 Attacks",
+        "description": "While the Waaagh! is active for your army, add 4 to the Attacks characteristic of this model’s melee weapons.",
         "faction": "Orks",
         "scope": "model",
         "trigger": {
@@ -268,9 +268,20 @@
           "limit": "none"
         },
         "when": {
-          "t": "weaponType",
-          "any": [
-            "melee"
+          "t": "all",
+          "xs": [
+            {
+              "t": "weaponType",
+              "any": [
+                "melee"
+              ]
+            },
+            {
+              "t": "armyState",
+              "is": [
+                "waaagh-active"
+              ]
+            }
           ]
         },
         "kind": "passive",
@@ -621,7 +632,7 @@
     },
     {
       "name": "waaagh-invuln",
-      "isExample": true,
+      "isExample": false,
       "exampleReason": "An example of how to check for waaagh-active state. (Waaagh is special cased in the app logic)",
       "rule": {
         "id": "waaagh-invuln",
@@ -716,14 +727,14 @@
     },
     {
       "name": "drive-by-dakka",
-      "isExample": false,
-      "exampleReason": "Toggle-based user input. Shows how to handle player-declared state (Advanced this turn?). Demonstrates turn-based state tracking.",
+      "isExample": true,
+      "exampleReason": "Demonstrates using a choice for range checking. Since the app cannot automatically determine if a target is within 9\", this requires player input as a choice.",
       "rule": {
         "id": "drive-by-dakka",
         "name": "Drive-by Dakka",
-        "description": "Each time this model makes a ranged attack, if it Advanced this turn, improve the Armour Penetration characteristic of that attack by 1.",
+        "description": "Each time a model in this unit makes a ranged attack that targets a unit within 9\", improve the Armour Penetration characteristic of that attack by 1.",
         "faction": "Orks",
-        "scope": "model",
+        "scope": "unit",
         "trigger": {
           "t": "automatic",
           "phase": "shooting",
@@ -738,10 +749,10 @@
         },
         "kind": "choice",
         "choice": {
-          "id": "advanced-this-turn",
-          "prompt": "Advanced this turn?",
+          "id": "target-within-9",
+          "prompt": "Is the target within 9\"?",
           "lifetime": {
-            "t": "turn"
+            "t": "roll"
           },
           "options": [
             {
@@ -811,7 +822,7 @@
     {
       "name": "shooty-power-trip",
       "isExample": true,
-      "exampleReason": "Radio input representing die roll outcomes with multiple effects. Shows that not all options need effects (1-2 causes mortal wounds, handled outside combat calculator). Demonstrates random ability outcomes (ask the player).",
+      "exampleReason": "Radio input representing die roll outcomes with multiple effects.",
       "rule": {
         "id": "shooty-power-trip",
         "name": "Shooty Power Trip",
@@ -1087,6 +1098,64 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "name": "special-dose",
+      "isExample": false,
+      "exampleReason": "Movement phase rule that modifies Move characteristic based on army state. Tests modMove effect and movement phase filtering.",
+      "rule": {
+        "id": "special-dose",
+        "name": "Special Dose",
+        "description": "Adds 6\" to Move when Waaagh! is active",
+        "faction": "Orks",
+        "scope": "model",
+        "trigger": {
+          "t": "automatic",
+          "phase": "movement",
+          "turn": "own",
+          "limit": "none"
+        },
+        "when": {
+          "t": "armyState",
+          "is": [
+            "waaagh"
+          ]
+        },
+        "kind": "passive",
+        "then": [
+          {
+            "t": "do",
+            "fx": [
+              {
+                "t": "modMove",
+                "add": 6
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "get-da-good-bitz",
+      "isExample": true,
+      "exampleReason": "Objective control rules are usually reminders.",
+      "rule": {
+        "id": "get-da-good-bitz",
+        "name": "Get Da Good Bitz",
+        "description": "At the end of your Command phase, if this unit is within range of an objective marker you control, that objective marker remains under your control, even if you have no models within range of it, until your opponent controls it at the start or end of any turn.",
+        "faction": "Orks",
+        "scope": "unit",
+        "trigger": {
+          "t": "reactive",
+          "phase": "command",
+          "turn": "own",
+          "limit": "none"
+        },
+        "when": {
+          "t": "true"
+        },
+        "kind": "reminder"
       }
     }
   ]

@@ -60,19 +60,19 @@ describe('Rules Engine - User Input Conditions', () => {
     });
   };
 
-  describe('Drive-by Dakka (toggle input)', () => {
+  describe('Drive-by Dakka (range check choice)', () => {
     const driveByDakkaRule: Rule = getTestRule('drive-by-dakka')!;
 
-    it('should apply AP improvement when user confirms Advanced', () => {
-      const context = createTestContext({ 'advanced-this-turn': 'yes' });
+    it('should apply AP improvement when target is within 9"', () => {
+      const context = createTestContext({ 'target-within-9': 'yes' });
       const applied = evaluateRule(driveByDakkaRule, context);
 
       expect(applied).toBe(true);
       expect(context.modifiers.get('AP')).toBe(-1);
     });
 
-    it('should NOT apply AP improvement when user confirms NOT Advanced', () => {
-      const context = createTestContext({ 'advanced-this-turn': 'no' });
+    it('should NOT apply AP improvement when target is beyond 9"', () => {
+      const context = createTestContext({ 'target-within-9': 'no' });
       const applied = evaluateRule(driveByDakkaRule, context);
 
       expect(applied).toBe(true); // Rule still applies (when conditions met)

@@ -122,14 +122,10 @@ export function buildSystemPrompt(): string {
     '3. Be precise - only extract explicitly stated rules, do not infer',
     '4. If the rule does not modify dice rolls in combat, and it is not clear how to represent it in the schema, it should probably be implemented as a reminder in a particular phase, even if it modifies other attributes or has other rule effects.',
     '5. If it is not clear how a rule can be implemented in the schema, respond with a message explaining why it cannot be implemented in the combat rules engine.',
-    '6. IMPORTANT: A single written rule may needs MULTIPLE rule objects. Return an array with multiple rules when:',
-    '   - The rule has multiple independent effects (e.g., Waaagh! grants <+1 Strenght and +1 Attacks> AND <5+ invuln>)',
+    '6. A single written rule may needs MULTIPLE rule objects. Return an array with multiple rules when:',
+    '   - The rule has multiple independent effects with different triggers.',
+    '',
     'KEY SCHEMA CONCEPTS:',
-    '',
-    '',
-    '# Rules Schema v2 – Authoring Instructions',
-    'You are converting Warhammer 40k rules text into a **strictly typed JSON rules schema** using OpenAI Structured Outputs.',
-    'Your output **must exactly conform** to the schema. If a rule cannot be represented, fail cleanly.',
     '',
     '# 1) Scope',
     'What the rule applies to:',
@@ -142,7 +138,7 @@ export function buildSystemPrompt(): string {
     '# 2) Rule Kind',
     'Each rule must be exactly one:',
     '- `passive` – automatic mechanical effects',
-    '- `choice` – player decision affects mechanics',
+    '- `choice` – player decision or measurement affects mechanics',
     '- `reminder` – informational only (no mechanics)',
     '',
     '# 3) Trigger',
@@ -180,8 +176,6 @@ export function buildSystemPrompt(): string {
     'Abilities are **canonical enums**, not free strings:',
     '- Examples: `lethalHits`, `hazardous`, `sustainedHits(x)`, `scouts(distance)`',
     '',
-    '**Never invent new ability IDs.**',
-    'If an ability is unsupported, fail cleanly.',
     '# 7) Choice Rules',
     'Use `kind:"choice"` when a player decision or state the app can\'t know about (like a die roll or wound count or distance to a target etc.) affects mechanics.',
     '',
@@ -192,9 +186,6 @@ export function buildSystemPrompt(): string {
     'All mechanical effects of a choice go **inside the option**.', 
     '# 8) Reminder Rules',
     'Use `kind:"reminder"` for rules with **no mechanical effects**:',
-    '- charge-after-advance prompts',
-    '- reactive opponent-turn reminders',
-    'Reminder rules never include `then`.',
     '',
     '# 9) Failure Handling',
     'If a rule cannot be represented:',
@@ -212,7 +203,17 @@ export function buildSystemPrompt(): string {
     '',
     '**Rule of thumb:**',
     '> If it validates, it should work. If it can’t work, fail cleanly.',
+    '> If the schema can\'t check a condition for a combat rule, it should be a `choice` for the player to check.',
+    ' Things that should be a `choice`:',
+    ' - A die roll',
+    ' - A wound count',
+    ' - A distance to a target or particular unit',
+    ' - Some states (like Synapse for Tyranids)',
+    ' - If a unit is on or near an objective marker',
     '',
+    'Most rules can be represented:',
+    '- If the effect is not in the schema, probably it should be a reminder.',
+    '- If the trigger is not in the schema, probably it should be a choice.',
     '',
     exampleTexts,
     nonImplementableExample,
@@ -250,8 +251,13 @@ export function buildUserPrompt(params: {
   ruleText: string;
   faction?: string;
   scope?: string;
+  asReminder?: boolean;
 }): string {
-  const { ruleName, ruleText, faction, scope } = params;
+  const { ruleName, ruleText, faction, scope, asReminder } = params;
+
+  const reminderSuggestion = asReminder
+    ? '\n\nNOTE: The user has specified that this rule is acceptable to implement as a reminder-only rule (kind: "reminder"). Please implement it as a reminder that triggers at the appropriate phase, even if it does not directly affect combat calculations.'
+    : '';
 
   return `
 RULE NAME: ${ruleName}
@@ -265,5 +271,5 @@ Please convert this into a structured rule following the schema.
 Rules are mostly used to remind players of the rules at the appropriate time (e.g. an ability that triggers after they move).
 The app also support automatic rolling of combat, so rules that affect combat calculations should be implemented modifying attributes and keywords for combat (and movement speed).
 
-If this rule cannot be implemented as a reminder in a particular phase or can affect combat calculations in a way that is not expressible by the schema, respond with a message explaining why it cannot be implemented in the combat rules engine.`;
+If this rule cannot be implemented as a reminder in a particular phase or can affect combat calculations in a way that is not expressible by the schema, respond with a message explaining why it cannot be implemented in the combat rules engine.${reminderSuggestion}`;
 }

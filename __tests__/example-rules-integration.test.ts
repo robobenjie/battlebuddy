@@ -147,14 +147,14 @@ describe('Example Rules Integration', () => {
     });
   });
 
-  describe('Drive-by Dakka (toggle input)', () => {
+  describe('Drive-by Dakka (range check choice)', () => {
     const rule = ALL_TEST_RULES.find(r => r.id === 'drive-by-dakka')!;
 
-    it('should improve AP by 1 when advanced', () => {
+    it('should improve AP by 1 when target is within 9"', () => {
       const context = createTestContext({
         weapon: { name: 'Dakka Gun', range: 24, AP: -1, A: '2', WS: 3, S: 4, D: '1', keywords: [] },
         userInputs: {
-          'advanced-this-turn': 'yes'
+          'target-within-9': 'yes'
         },
       });
 
@@ -164,17 +164,17 @@ describe('Example Rules Integration', () => {
       expect(context.modifiers.get('AP')).toBe(-1);
     });
 
-    it('should not improve AP when not advanced', () => {
+    it('should not improve AP when target is beyond 9"', () => {
       const context = createTestContext({
         weapon: { name: 'Dakka Gun', range: 24, AP: -1, A: '2', WS: 3, S: 4, D: '1', keywords: [] },
         userInputs: {
-          'advanced-this-turn': 'no'
+          'target-within-9': 'no'
         },
       });
 
       evaluateRule(rule, context);
 
-      // Toggle set to false - no effect
+      // Range check set to no - no effect
       expect(context.modifiers.get('AP')).toBe(0);
     });
 

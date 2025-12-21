@@ -91,7 +91,7 @@ export default function RulesManagerPage() {
     setAiMessage(null);
   };
 
-  const handleAiImplement = async (rule: Rule) => {
+  const handleAiImplement = async (rule: Rule, asReminder: boolean = false) => {
     if (!rule.rawText) {
       setError('No rule text available for AI implementation');
       return;
@@ -109,7 +109,8 @@ export default function RulesManagerPage() {
           ruleName: rule.name,
           ruleText: rule.rawText,
           faction: rule.faction,
-          scope: rule.scope
+          scope: rule.scope,
+          asReminder // Add flag to indicate reminder-only implementation
         })
       });
 
@@ -475,29 +476,45 @@ export default function RulesManagerPage() {
                 <div className="text-sm text-gray-400 mb-6">
                   This rule cannot be automatically implemented in the combat calculator.
                   You may still implement it manually if you believe it affects combat calculations,
-                  or you can use it as a reminder in the rules list.
+                  implement it as a reminder-only rule, or dismiss this message.
                 </div>
 
-                <div className="flex justify-end gap-3">
+                <div className="flex justify-between items-center gap-3">
                   <button
                     onClick={() => setAiDeclineMessage(null)}
                     className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded transition-colors"
                   >
                     Close
                   </button>
-                  <button
-                    onClick={() => {
-                      // Find the rule and open manual implementation
-                      const rule = allRules.find(r => r.name === aiDeclineMessage.ruleName);
-                      if (rule) {
-                        handleEdit(rule);
-                        setAiDeclineMessage(null);
-                      }
-                    }}
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded transition-colors"
-                  >
-                    Implement Manually
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={async () => {
+                        // Find the rule and implement as reminder
+                        const rule = allRules.find(r => r.name === aiDeclineMessage.ruleName);
+                        if (rule) {
+                          setAiDeclineMessage(null);
+                          await handleAiImplement(rule, true);
+                        }
+                      }}
+                      disabled={isImplementing}
+                      className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition-colors"
+                    >
+                      {isImplementing ? 'Generating...' : 'Implement as Reminder'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Find the rule and open manual implementation
+                        const rule = allRules.find(r => r.name === aiDeclineMessage.ruleName);
+                        if (rule) {
+                          handleEdit(rule);
+                          setAiDeclineMessage(null);
+                        }
+                      }}
+                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded transition-colors"
+                    >
+                      Implement Manually
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

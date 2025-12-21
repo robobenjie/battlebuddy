@@ -103,6 +103,7 @@ export const When: z.ZodType<any> = z.lazy(() =>
  */
 export const WeaponStat = z.enum(["S", "AP", "A", "D"]);
 export const DefensiveStat = z.enum(["T", "SV"]);
+export const MovementStat = z.enum(["M"]);
 
 export const Fx = z.union([
   // Dice modifiers - offensive (when this unit attacks)
@@ -118,6 +119,9 @@ export const Fx = z.union([
 
   // Defensive stats
   z.object({ t: z.literal("modDefensiveStat"), stat: DefensiveStat, add: z.number().int() }).strict(),
+
+  // Movement stat
+  z.object({ t: z.literal("modMove"), add: z.number().int() }).strict(),
 
   // Add typed abilities (no stringly-typed keywords)
   z.object({ t: z.literal("addWeaponAbility"), ability: WeaponAbility }).strict(),
