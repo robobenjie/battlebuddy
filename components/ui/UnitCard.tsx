@@ -8,7 +8,7 @@ import RulePopup, { useRulePopup } from './RulePopup';
 import RuleTip from './RuleTip';
 import ReminderBadge from './ReminderBadge';
 import { getWeaponCount, getModelsForUnit, getWeaponsForUnit, getUnitDisplayName } from '../../lib/unit-utils';
-import { getUnitReminders, PhaseType, TurnContext } from '../../lib/rules-engine/reminder-utils';
+import { getUnitReminders, deduplicateRemindersByName, PhaseType, TurnContext } from '../../lib/rules-engine/reminder-utils';
 
 interface UnitCardProps {
   unit: {
@@ -97,9 +97,12 @@ export default function UnitCard({
   const weapons = getWeaponsForUnit(unit);
 
   // Get reminder rules for this unit if phase and turn are provided
-  const reminders = (currentPhase && currentTurn)
+  const rawReminders = (currentPhase && currentTurn)
     ? getUnitReminders(unit, currentPhase, currentTurn, armyStates)
     : [];
+
+  // Deduplicate reminders by name (e.g., multiple Waaagh! rules should show as one badge)
+  const reminders = deduplicateRemindersByName(rawReminders);
 
   // Helper: group weapons by name+type (optionally add more fields for uniqueness)
   function groupWeapons(weapons: any[]) {

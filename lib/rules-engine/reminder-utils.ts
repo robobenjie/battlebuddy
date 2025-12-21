@@ -150,6 +150,39 @@ export function getUnitsWithReminders(
 }
 
 /**
+ * Deduplicate reminders by name for display purposes
+ * Some abilities like Waaagh! are split into multiple rules with the same name
+ * When displaying reminder badges, we only want to show each unique name once
+ *
+ * When multiple rules have the same name, we combine their descriptions
+ */
+export function deduplicateRemindersByName(reminders: Rule[]): Rule[] {
+  const seen = new Map<string, Rule>();
+
+  for (const reminder of reminders) {
+    const existing = seen.get(reminder.name);
+    if (!existing) {
+      // First time seeing this name
+      seen.set(reminder.name, reminder);
+    } else {
+      // Already have a rule with this name - combine descriptions if different
+      if (existing.description !== reminder.description) {
+        // Combine the descriptions
+        const combinedDescription = `${existing.description}\n\n${reminder.description}`;
+        seen.set(reminder.name, {
+          ...existing,
+          description: combinedDescription,
+          // Use a combined ID to maintain uniqueness
+          id: `${existing.id}+${reminder.id}`
+        });
+      }
+    }
+  }
+
+  return Array.from(seen.values());
+}
+
+/**
  * Get all units from armies that have reactive abilities for the given phase
  * Reactive abilities are marked with reactive: true in the rule definition
  */

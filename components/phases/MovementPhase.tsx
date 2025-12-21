@@ -5,7 +5,7 @@ import { db } from '../../lib/db';
 import { id } from '@instantdb/react';
 import UnitCard from '../ui/UnitCard';
 import { formatUnitForCard, getUnitMovement, getModifiedMovement, sortUnitsByPriority } from '../../lib/unit-utils';
-import { getUnitReminders, getReactiveUnits } from '../../lib/rules-engine/reminder-utils';
+import { getUnitReminders, deduplicateRemindersByName, getReactiveUnits } from '../../lib/rules-engine/reminder-utils';
 import ReminderBadge from '../ui/ReminderBadge';
 import { useRulePopup } from '../ui/RulePopup';
 import RulePopup from '../ui/RulePopup';
@@ -246,7 +246,8 @@ export default function MovementPhase({ gameId, army, currentPlayer, currentUser
           const hasActions = hasActionsThisTurn(unit.id);
 
           // Get reminders for this unit
-          const unitReminders = getUnitReminders(unit, 'movement', 'own', armyStates);
+          const rawReminders = getUnitReminders(unit, 'movement', 'own', armyStates);
+          const unitReminders = deduplicateRemindersByName(rawReminders);
 
           return (
             <div key={unit.id} className={`bg-gray-800 rounded-lg overflow-hidden ${!isActivePlayer ? 'opacity-60' : ''}`}>

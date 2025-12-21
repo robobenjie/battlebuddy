@@ -9,7 +9,7 @@ import CombatCalculatorPage from '../CombatCalculatorPage';
 import ReminderBadge from '../ui/ReminderBadge';
 import { useRulePopup } from '../ui/RulePopup';
 import RulePopup from '../ui/RulePopup';
-import { getUnitReminders } from '../../lib/rules-engine/reminder-utils';
+import { getUnitReminders, deduplicateRemindersByName } from '../../lib/rules-engine/reminder-utils';
 import { UNIT_FULL_QUERY } from '../../lib/query-fragments';
 
 interface FightPhaseProps {
@@ -237,7 +237,8 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
 
     // Get fight phase reminders for this unit
     const armyStates = unitArmy?.states || [];
-    const unitReminders = getUnitReminders(unit, 'fight', turnContext, armyStates);
+    const rawReminders = getUnitReminders(unit, 'fight', turnContext, armyStates);
+    const unitReminders = deduplicateRemindersByName(rawReminders);
 
     return (
       <div key={unit.id} className="py-2">

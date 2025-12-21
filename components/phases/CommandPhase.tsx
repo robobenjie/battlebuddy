@@ -8,7 +8,7 @@ import ReminderBadge from '../ui/ReminderBadge';
 import { useRulePopup } from '../ui/RulePopup';
 import RulePopup from '../ui/RulePopup';
 import ReactiveAbilitiesSection from '../ui/ReactiveAbilitiesSection';
-import { getUnitReminders, getReactiveUnits } from '../../lib/rules-engine/reminder-utils';
+import { getUnitReminders, deduplicateRemindersByName, getReactiveUnits } from '../../lib/rules-engine/reminder-utils';
 import { formatUnitForCard } from '../../lib/unit-utils';
 
 interface CommandPhaseProps {
@@ -284,7 +284,8 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
 
           {unitsWithReminders.map(unit => {
             const unitData = formatUnitForCard(unit);
-            const unitReminders = getUnitReminders(unit, 'command', 'own', armyStates);
+            const rawReminders = getUnitReminders(unit, 'command', 'own', armyStates);
+            const unitReminders = deduplicateRemindersByName(rawReminders);
 
             return (
               <div key={unit.id} className={`bg-gray-800 rounded-lg overflow-hidden ${!isCurrentPlayer ? 'opacity-60' : ''}`}>
