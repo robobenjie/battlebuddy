@@ -1,15 +1,16 @@
 /**
- * Reusable component for displaying active rules and their effects
+ * Reusable component for displaying active rules
+ *
+ * Note: This component now works with the new rules schema which uses
+ * `then` blocks instead of a simple `effects` array. Since the effects
+ * are now more complex (with conditionals, choices, etc.), we just display
+ * the rule name and description rather than trying to parse all possible effects.
  */
 
 interface ActiveRule {
   id: string;
   name: string;
   description: string;
-  effects: Array<{
-    type: string;
-    params: any;
-  }>;
 }
 
 interface ActiveRulesDisplayProps {
@@ -19,24 +20,16 @@ interface ActiveRulesDisplayProps {
 export default function ActiveRulesDisplay({ rules }: ActiveRulesDisplayProps) {
   if (rules.length === 0) return null;
 
-  // Group rules by name and merge their effects
-  const groupedRules = new Map<string, ActiveRule>();
+  // Group rules by name (remove duplicates)
+  const uniqueRulesMap = new Map<string, ActiveRule>();
 
   for (const rule of rules) {
-    if (groupedRules.has(rule.name)) {
-      // Merge effects for rules with the same name
-      const existing = groupedRules.get(rule.name)!;
-      existing.effects = [...existing.effects, ...rule.effects];
-    } else {
-      // First occurrence of this rule name
-      groupedRules.set(rule.name, {
-        ...rule,
-        effects: [...rule.effects] // Create a copy of effects array
-      });
+    if (!uniqueRulesMap.has(rule.name)) {
+      uniqueRulesMap.set(rule.name, rule);
     }
   }
 
-  const uniqueRules = Array.from(groupedRules.values());
+  const uniqueRules = Array.from(uniqueRulesMap.values());
 
   return (
     <div className="bg-gray-800 rounded-lg overflow-hidden">
@@ -47,41 +40,7 @@ export default function ActiveRulesDisplay({ rules }: ActiveRulesDisplayProps) {
         {uniqueRules.map((rule, index) => (
           <div key={index} className="text-xs">
             <p className="font-medium text-gray-300 mb-0.5">{rule.name}</p>
-            <p className="text-gray-500 mb-1 leading-snug">{rule.description}</p>
-            <div className="flex flex-wrap gap-1">
-              {rule.effects.map((effect, effIndex) => {
-                let effectText = '';
-
-                // Helper to format modifier with proper sign
-                const formatModifier = (modifier: number) => {
-                  return modifier >= 0 ? `+${modifier}` : `${modifier}`;
-                };
-
-                if (effect.type === 'modify-hit' && effect.params.modifier !== undefined) {
-                  effectText = `${formatModifier(effect.params.modifier)} to Hit`;
-                } else if (effect.type === 'modify-wound' && effect.params.modifier !== undefined) {
-                  effectText = `${formatModifier(effect.params.modifier)} to Wound`;
-                } else if (effect.type === 'modify-characteristic' && effect.params.modifier !== undefined) {
-                  effectText = `${formatModifier(effect.params.modifier)} ${effect.params.stat}`;
-                } else if (effect.type === 'add-keyword') {
-                  effectText = effect.params.keywordValue
-                    ? `${effect.params.keyword} ${effect.params.keywordValue}`
-                    : effect.params.keyword;
-                }
-
-                if (effectText) {
-                  return (
-                    <span
-                      key={effIndex}
-                      className="bg-gray-700 text-gray-300 text-xs px-1.5 py-0.5 rounded"
-                    >
-                      {effectText}
-                    </span>
-                  );
-                }
-                return null;
-              })}
-            </div>
+            <p className="text-gray-500 leading-snug">{rule.description}</p>
           </div>
         ))}
       </div>

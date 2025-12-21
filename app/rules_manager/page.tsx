@@ -22,6 +22,7 @@ export default function RulesManagerPage() {
   const [error, setError] = useState<string | null>(null);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
   const [aiDeclineMessage, setAiDeclineMessage] = useState<{ ruleName: string; message: string } | null>(null);
+  const [userInstructions, setUserInstructions] = useState('');
 
   // Query all rules with linked units to get unit names
   const { data, isLoading } = db.useQuery({
@@ -91,7 +92,7 @@ export default function RulesManagerPage() {
     setAiMessage(null);
   };
 
-  const handleAiImplement = async (rule: Rule, asReminder: boolean = false) => {
+  const handleAiImplement = async (rule: Rule, asReminder: boolean = false, aiExplanation?: string, userResponse?: string) => {
     if (!rule.rawText) {
       setError('No rule text available for AI implementation');
       return;
@@ -110,7 +111,9 @@ export default function RulesManagerPage() {
           ruleText: rule.rawText,
           faction: rule.faction,
           scope: rule.scope,
-          asReminder // Add flag to indicate reminder-only implementation
+          asReminder, // Add flag to indicate reminder-only implementation
+          aiExplanation, // Previous AI explanation (if retrying)
+          userResponse // User's instructions for retry
         })
       });
 
@@ -473,15 +476,32 @@ export default function RulesManagerPage() {
                   <div className="text-sm text-orange-100 whitespace-pre-wrap">{aiDeclineMessage.message}</div>
                 </div>
 
-                <div className="text-sm text-gray-400 mb-6">
+                <div className="text-sm text-gray-400 mb-4">
                   This rule cannot be automatically implemented in the combat calculator.
-                  You may still implement it manually if you believe it affects combat calculations,
-                  implement it as a reminder-only rule, or dismiss this message.
+                  You may provide additional instructions below and retry, implement it as a reminder-only rule,
+                  implement it manually, or dismiss this message.
+                </div>
+
+                {/* User Instructions Textarea */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Additional Instructions (Optional):
+                  </label>
+                  <textarea
+                    value={userInstructions}
+                    onChange={(e) => setUserInstructions(e.target.value)}
+                    placeholder="Provide additional context or instructions for the AI to reconsider (e.g., 'This rule can be implemented as a reminder that shows during the shooting phase')"
+                    className="w-full bg-gray-900 text-white border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500 resize-none"
+                    rows={3}
+                  />
                 </div>
 
                 <div className="flex justify-between items-center gap-3">
                   <button
-                    onClick={() => setAiDeclineMessage(null)}
+                    onClick={() => {
+                      setAiDeclineMessage(null);
+                      setUserInstructions('');
+                    }}
                     className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded transition-colors"
                   >
                     Close
@@ -489,17 +509,35 @@ export default function RulesManagerPage() {
                   <div className="flex gap-3">
                     <button
                       onClick={async () => {
+                        // Find the rule and retry with user instructions
+                        const rule = allRules.find(r => r.name === aiDeclineMessage.ruleName);
+                        if (rule) {
+                          const aiExplanation = aiDeclineMessage.message;
+                          const userResponse = userInstructions.trim();
+                          setAiDeclineMessage(null);
+                          setUserInstructions('');
+                          await handleAiImplement(rule, false, aiExplanation, userResponse || undefined);
+                        }
+                      }}
+                      disabled={isImplementing}
+                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition-colors"
+                    >
+                      {isImplementing ? 'Retrying...' : 'Retry with Instructions'}
+                    </button>
+                    <button
+                      onClick={async () => {
                         // Find the rule and implement as reminder
                         const rule = allRules.find(r => r.name === aiDeclineMessage.ruleName);
                         if (rule) {
                           setAiDeclineMessage(null);
+                          setUserInstructions('');
                           await handleAiImplement(rule, true);
                         }
                       }}
                       disabled={isImplementing}
                       className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition-colors"
                     >
-                      {isImplementing ? 'Generating...' : 'Implement as Reminder'}
+                      {isImplementing ? 'Generating...' : 'As Reminder'}
                     </button>
                     <button
                       onClick={() => {
@@ -508,11 +546,12 @@ export default function RulesManagerPage() {
                         if (rule) {
                           handleEdit(rule);
                           setAiDeclineMessage(null);
+                          setUserInstructions('');
                         }
                       }}
                       className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded transition-colors"
                     >
-                      Implement Manually
+                      Manual
                     </button>
                   </div>
                 </div>

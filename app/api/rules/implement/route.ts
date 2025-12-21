@@ -20,6 +20,8 @@ interface ImplementRequest {
   faction?: string;
   scope?: string;
   asReminder?: boolean;
+  aiExplanation?: string;
+  userResponse?: string;
 }
 
 interface ImplementResponse {
@@ -31,7 +33,7 @@ interface ImplementResponse {
 export async function POST(request: NextRequest) {
   try {
     const body: ImplementRequest = await request.json();
-    const { ruleName, ruleText, faction, scope, asReminder } = body;
+    const { ruleName, ruleText, faction, scope, asReminder, aiExplanation, userResponse } = body;
 
     if (!ruleName || !ruleText) {
       return NextResponse.json(
@@ -42,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     // Build prompts using shared functions
     const systemPrompt = buildSystemPrompt();
-    const userPrompt = buildUserPrompt({ ruleName, ruleText, faction, scope, asReminder });
+    const userPrompt = buildUserPrompt({ ruleName, ruleText, faction, scope, asReminder, aiExplanation, userResponse });
 
     // Call OpenAI with structured output using Zod schema
     const completion = await openai.chat.completions.parse({

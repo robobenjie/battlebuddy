@@ -587,34 +587,32 @@ export default function CombatCalculatorPage({
     const appliedAttackerRules = evaluateAllRules(attackerRules, attackerContext);
     const appliedDefenderRules = evaluateAllRules(defenderRules, defenderContext);
 
-    // Merge applied rules from both contexts
+    // Merge applied rules from both contexts for effect calculation
     const appliedRules = [...appliedAttackerRules, ...appliedDefenderRules];
 
-    // Also include rules that have userInput (conditional rules that will activate with user input)
-    const allRules = [...attackerRules, ...defenderRules];
-    const conditionalRules = allRules.filter(rule => {
+    // For display, only show ATTACKER rules (not opponent's rules)
+    // Include choice rules that are waiting for user input
+    const conditionalAttackerRules = attackerRules.filter(rule => {
       // Skip if already applied
-      if (appliedRules.some(r => r.id === rule.id)) return false;
+      if (appliedAttackerRules.some(r => r.id === rule.id)) return false;
 
-      // Include if the rule has a userInput field
-      // For choice rules, check if the rule's conditions would be met
+      // Include choice rules if their when condition is met
       if (rule.kind === 'choice') {
-        const isAttackerRule = attackerRules.some(r => r.id === rule.id);
-        const context = isAttackerRule ? attackerContext : defenderContext;
-        // Check if rule's when condition is met
-        return evaluateWhen(rule.when, context);
+        return evaluateWhen(rule.when, attackerContext);
       }
 
       return false;
     });
 
-    // Combine applied rules with conditional rules for display
-    const displayRules = [...appliedRules, ...conditionalRules];
+    // Combine applied attacker rules with conditional attacker rules for display
+    // NOTE: We only show the attacker's rules in the UI, not the defender's rules
+    const displayRules = [...appliedAttackerRules, ...conditionalAttackerRules];
 
     // Debug: log applied rules
     console.log('✅ Applied Attacker Rules:', appliedAttackerRules.map(r => r.id));
     console.log('✅ Applied Defender Rules:', appliedDefenderRules.map(r => r.id));
-    console.log('🔀 Conditional Rules (with user input):', conditionalRules.map(r => r.id));
+    console.log('🔀 Conditional Attacker Rules (with user input):', conditionalAttackerRules.map(r => r.id));
+    console.log('📺 Display Rules (shown in UI):', displayRules.map(r => r.id));
     console.log('📊 Attacker context modifiers:', attackerContext.modifiers.getAllModifiers());
     console.log('📊 Defender context modifiers:', defenderContext.modifiers.getAllModifiers());
 
@@ -645,15 +643,16 @@ export default function CombatCalculatorPage({
     const dMod = attackerDMod + defenderDMod;
 
     // Extract save modifiers from defender context
-    // INV and FNP are keywords, not stats
-    const invulnKeywords = defenderContext.modifiers.getModifiers('keyword:Invulnerable Save');
-    const invMod = invulnKeywords.length > 0
-      ? Math.min(...invulnKeywords.map(m => m.value))
+    // Get defensive stat modifiers from defender context
+    // INV and FNP use 'set' operation, so we need to check if they were set
+    const invModifiers = defenderContext.modifiers.getModifiers('INV');
+    const invMod = invModifiers.length > 0
+      ? invModifiers.find(m => m.operation === 'set')?.value
       : undefined;
 
-    const fnpKeywords = defenderContext.modifiers.getModifiers('keyword:Feel No Pain');
-    const fnpMod = fnpKeywords.length > 0
-      ? Math.min(...fnpKeywords.map(m => m.value))
+    const fnpModifiers = defenderContext.modifiers.getModifiers('FNP');
+    const fnpMod = fnpModifiers.length > 0
+      ? fnpModifiers.find(m => m.operation === 'set')?.value
       : undefined;
 
     const svMod = defenderContext.modifiers.get('SV') || 0;

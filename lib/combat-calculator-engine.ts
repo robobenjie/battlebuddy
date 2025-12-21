@@ -318,14 +318,15 @@ export function calculateCombatModifiers(params: {
   const svMod = defenderContext.modifiers.get('SV') || 0;
 
   // Extract save modifiers from defender context
-  const invulnKeywords = defenderContext.modifiers.getModifiers('keyword:Invulnerable Save');
-  const invMod = invulnKeywords.length > 0
-    ? Math.min(...invulnKeywords.map(m => m.value))
+  // INV and FNP use 'set' operation in the new schema
+  const invModifiers = defenderContext.modifiers.getModifiers('INV');
+  const invMod = invModifiers.length > 0
+    ? invModifiers.find(m => m.operation === 'set')?.value
     : undefined;
 
-  const fnpKeywords = defenderContext.modifiers.getModifiers('keyword:Feel No Pain');
-  const fnpMod = fnpKeywords.length > 0
-    ? Math.min(...fnpKeywords.map(m => m.value))
+  const fnpModifiers = defenderContext.modifiers.getModifiers('FNP');
+  const fnpMod = fnpModifiers.length > 0
+    ? fnpModifiers.find(m => m.operation === 'set')?.value
     : undefined;
 
   const targetModifiers = {

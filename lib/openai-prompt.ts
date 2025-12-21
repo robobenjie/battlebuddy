@@ -252,11 +252,24 @@ export function buildUserPrompt(params: {
   faction?: string;
   scope?: string;
   asReminder?: boolean;
+  aiExplanation?: string;
+  userResponse?: string;
 }): string {
-  const { ruleName, ruleText, faction, scope, asReminder } = params;
+  const { ruleName, ruleText, faction, scope, asReminder, aiExplanation, userResponse } = params;
 
   const reminderSuggestion = asReminder
     ? '\n\nNOTE: The user has specified that this rule is acceptable to implement as a reminder-only rule (kind: "reminder"). Please implement it as a reminder that triggers at the appropriate phase, even if it does not directly affect combat calculations.'
+    : '';
+
+  const retryContext = aiExplanation && userResponse
+    ? `\n\nPREVIOUS ATTEMPT CONTEXT:
+You previously responded:
+"${aiExplanation}"
+
+The user has provided the following instructions:
+"${userResponse}"
+
+Please reconsider your implementation based on the user's guidance.`
     : '';
 
   return `
@@ -271,5 +284,5 @@ Please convert this into a structured rule following the schema.
 Rules are mostly used to remind players of the rules at the appropriate time (e.g. an ability that triggers after they move).
 The app also support automatic rolling of combat, so rules that affect combat calculations should be implemented modifying attributes and keywords for combat (and movement speed).
 
-If this rule cannot be implemented as a reminder in a particular phase or can affect combat calculations in a way that is not expressible by the schema, respond with a message explaining why it cannot be implemented in the combat rules engine.${reminderSuggestion}`;
+If this rule cannot be implemented as a reminder in a particular phase or can affect combat calculations in a way that is not expressible by the schema, respond with a message explaining why it cannot be implemented in the combat rules engine.${reminderSuggestion}${retryContext}`;
 }
