@@ -10,6 +10,9 @@ import RulePopup from '../ui/RulePopup';
 import ReactiveAbilitiesSection from '../ui/ReactiveAbilitiesSection';
 import { getUnitReminders, deduplicateRemindersByName, getReactiveUnits } from '../../lib/rules-engine/reminder-utils';
 import { formatUnitForCard } from '../../lib/unit-utils';
+import ArmyChoiceSelector from '../ui/ArmyChoiceSelector';
+import EnemyUnitSelector from '../ui/EnemyUnitSelector';
+import { Rule, ChoiceRuleType } from '../../lib/rules-engine/types';
 
 interface CommandPhaseProps {
   gameId: string;
@@ -48,6 +51,7 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
     currentUserArmy?.id ? {
       armies: {
         states: {},
+        armyRules: {}, // Query army-level rules
         $: {
           where: {
             id: currentUserArmy.id
@@ -180,6 +184,93 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
     ]);
   };
 
+  // Get army-level rules for choices and targeting
+  const armyRulesData = armyWithStates?.armyRules || [];
+  const armyRules: Rule[] = armyRulesData
+    .map((ruleData: any) => {
+      try {
+        return JSON.parse(ruleData.ruleObject) as Rule;
+      } catch (e) {
+        console.error('Failed to parse army rule:', e);
+        return null;
+      }
+    })
+    .filter((r: Rule | null): r is Rule => r !== null);
+
+  // Filter for command phase choice rules that need action
+  const commandChoiceRules = armyRules.filter((rule): rule is ChoiceRuleType => {
+    if (rule.kind !== 'choice') return false;
+    if (rule.scope !== 'army') return false;
+    if (!rule.trigger) return false;
+    if (rule.trigger.phase !== 'command' && !Array.isArray(rule.trigger.phase)) return false;
+    if (Array.isArray(rule.trigger.phase) && !rule.trigger.phase.includes('command')) return false;
+
+    // Check if already selected
+    const existingState = armyStates.find((s: any) => s.state === rule.choice.id);
+
+    // Once-per-battle: only show on turn 1 if not already selected
+    if (rule.trigger.limit === 'once-per-battle') {
+      return game.currentTurn === 1 && !existingState;
+    }
+
+    // Otherwise (none limit): always show if not selected this turn
+    return !existingState || existingState.activatedTurn < game.currentTurn;
+  });
+
+  // Filter for targeting rules that need action (like Oath of Moment)
+  const targetingRules = armyRules.filter(rule => {
+    if (rule.kind !== 'passive') return false;
+    if (rule.scope !== 'army') return false;
+    if (!rule.when || rule.when.t !== 'isTargetedUnit') return false;
+    if (!rule.trigger) return false;
+    if (rule.trigger.phase !== 'command' && !Array.isArray(rule.trigger.phase)) return false;
+    if (Array.isArray(rule.trigger.phase) && !rule.trigger.phase.includes('command')) return false;
+
+    // Check if target already set this turn
+    const existingTarget = armyStates.find((s: any) =>
+      s.state === rule.id && s.targetUnitId
+    );
+
+    // Show if no target set, or if it was set in a previous turn and should be renewed
+    return !existingTarget || existingTarget.activatedTurn < game.currentTurn;
+  });
+
+  // Handle choice selection
+  const handleChoiceSelection = async (ruleId: string, choiceId: string, optionValue: string) => {
+    if (!currentUserArmy?.id) return;
+
+    await db.transact([
+      db.tx.armyStates[id()].update({
+        state: choiceId,
+        choiceValue: optionValue,
+        activatedTurn: game.currentTurn,
+        // Choices with game lifetime don't expire
+        // Choices with phase lifetime expire at next command phase
+        expiresPhase: undefined, // Will add phase-based expiration in future iteration
+      }).link({ army: currentUserArmy.id })
+    ]);
+  };
+
+  // Handle enemy unit targeting
+  const handleTargetSelection = async (ruleId: string, targetUnitId: string) => {
+    if (!currentUserArmy?.id) return;
+
+    await db.transact([
+      db.tx.armyStates[id()].update({
+        state: ruleId,
+        targetUnitId: targetUnitId,
+        activatedTurn: game.currentTurn,
+        expiresPhase: 'command', // Most targeting abilities expire at next command phase
+      }).link({ army: currentUserArmy.id })
+    ]);
+  };
+
+  // Get enemy units for targeting
+  const enemyUnits = allGameArmies
+    .filter((a: any) => a.id !== army.id)
+    .flatMap((a: any) => a.units || [])
+    .filter((unit: any) => !destroyedUnitIds.has(unit.id));
+
   return (
     <div className="space-y-6">
       <div className="bg-gray-800 rounded-lg p-4">
@@ -214,6 +305,42 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
           </div>
         </div>
       )}
+
+      {/* Army-Wide Choice Rules (Hyper Adaptations, etc.) */}
+      {isCurrentPlayer && commandChoiceRules.map(rule => {
+        const existingState = armyStates.find((s: any) => s.state === rule.choice.id);
+        const currentSelection = existingState?.choiceValue;
+
+        return (
+          <ArmyChoiceSelector
+            key={rule.id}
+            rule={rule}
+            currentSelection={currentSelection}
+            onSelect={(optionValue) => handleChoiceSelection(rule.id, rule.choice.id, optionValue)}
+            disabled={!!currentSelection} // Disable once selected (for once-per-battle)
+          />
+        );
+      })}
+
+      {/* Enemy Unit Targeting (Oath of Moment, etc.) */}
+      {isCurrentPlayer && targetingRules.map(rule => {
+        const existingTarget = armyStates.find((s: any) =>
+          s.state === rule.id && s.targetUnitId
+        );
+        const currentTargetId = existingTarget?.targetUnitId;
+
+        return (
+          <EnemyUnitSelector
+            key={rule.id}
+            ruleId={rule.id}
+            ruleName={rule.name}
+            ruleDescription={rule.description}
+            enemyUnits={enemyUnits}
+            currentTargetId={currentTargetId}
+            onSelect={(unitId) => handleTargetSelection(rule.id, unitId)}
+          />
+        );
+      })}
 
       {/* Player Score Tracking */}
       <div className="space-y-4">

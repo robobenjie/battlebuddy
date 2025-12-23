@@ -64,6 +64,14 @@ export function evaluateWhen(when: WhenType, context: CombatContext): boolean {
       }
       return !!context.attacker.isLeader || !!context.attacker.leaderId;
 
+    // Is targeted unit - checks if the defender is the targeted unit (for Oath of Moment, etc.)
+    case 'isTargetedUnit': {
+      const defenderUnitId = context.defender.unitId;
+      return context.armyStates.some(armyState =>
+        armyState.targetUnitId === defenderUnitId
+      );
+    }
+
     // Typed ability checks
     case 'weaponHasAbility':
       // TODO: Implement weapon ability checking
@@ -316,7 +324,22 @@ export function evaluateRule(rule: Rule, context: CombatContext): boolean {
 
   // Handle choice rules
   if (rule.kind === 'choice') {
-    const selectedValue = context.userInputs[rule.choice.id];
+    let selectedValue: string | undefined;
+
+    // For army-scoped choices, check army states first
+    if (rule.scope === 'army') {
+      // Look for army state with matching choice ID
+      const armyState = context.armyStates.find(state =>
+        state.state === rule.choice.id && state.choiceValue
+      );
+      selectedValue = armyState?.choiceValue;
+    }
+
+    // Fall back to user inputs (for unit/model-scoped choices or combat calculator)
+    if (selectedValue === undefined || selectedValue === null) {
+      selectedValue = context.userInputs[rule.choice.id];
+    }
+
     if (selectedValue !== undefined && selectedValue !== null) {
       const selectedOption = rule.choice.options.find(opt => opt.v === selectedValue);
       if (selectedOption) {

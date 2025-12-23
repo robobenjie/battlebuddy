@@ -28,7 +28,7 @@ export interface Modifier {
 }
 
 /**
- * Army state tracking (for activated abilities like Waaagh!)
+ * Army state tracking (for activated abilities like Waaagh!, Oath of Moment, army-wide choices)
  */
 export interface ArmyState {
   id: string;
@@ -36,4 +36,6 @@ export interface ArmyState {
   state: string;
   activatedTurn: number;
   expiresPhase?: string;
+  targetUnitId?: string;  // For targeting abilities like Oath of Moment
+  choiceValue?: string;   // For storing selected choice option (e.g., 'swarming-instincts')
 }

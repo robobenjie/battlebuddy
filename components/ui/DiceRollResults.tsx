@@ -30,6 +30,7 @@ interface DiceRollResultsProps {
     hit?: string[];
     wound?: string[];
     keywords?: Array<{ keyword: string; source: string }>;
+    damageReroll?: string[];
   };
 }
 
@@ -460,6 +461,15 @@ export default function DiceRollResults({
                     </span>
                   )}
                 </p>
+
+                {/* Damage reroll reminder */}
+                {modifierSources?.damageReroll && modifierSources.damageReroll.length > 0 && (
+                  <div className="mt-2 p-2 bg-yellow-900/30 border border-yellow-600 rounded">
+                    <p className="text-yellow-300 text-sm font-semibold">
+                      ⚠️ Reroll Damage: {modifierSources.damageReroll.join(', ')}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {!fnpPhase && (

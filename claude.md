@@ -4,13 +4,20 @@
 - Never put rules-jon in a test: tests should reference rules in lib/rules-engine/test-rules.json
 - Never try to support two different data formats. Never maintain backwards compatability. There should be one representation for things used in code, data and tests.
 
+# To push schema updates:
+npx instant-cli@latest push schema --yes
+
 # Rules Schema guidelines:
 design doc linves in rules-schema-guidelines.md
 
 
 # How to test Rules Engine:
 ## IMPORTANT: all rules for unit tests should be in lib/rules-engine/test-rules.json
-When creating a new unit test, never put the rule in the unit test: instead find a rule in test-rules.json or add one if needed. That way all our rules in all tests can be validated and the schema can be migrated together. We want to avoid old versions of rules masking bugs by keeping unit tests passing when we update rules formats.
+When creating a new unit test, never put the rule in the unit test: instead find a rule in test-rules.json or add one if needed. That way all our rules in all tests can be validated and the schema can be migrated together. We want to avoid old versions of rules masking bugs by keeping unit tests passing when we update rules formats. Do not make new rules example:true. We will do that only if we find that class of rule hard for the AI to implement.
+
+To use in a test:
+import { getTestRule } from '../lib/rules-engine/test-rules';
+const devastatingStrikesRule = getTestRule('devastating-strikes');
 
 
 # InstantDB Performance Best Practices

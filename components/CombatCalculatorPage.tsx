@@ -136,6 +136,7 @@ export default function CombatCalculatorPage({
     S?: string[];
     AP?: string[];
     D?: string[];
+    damageReroll?: string[];
   }>({});
 
   // Helper to apply weapon modifiers (consolidates logic for display and dice rolling)
@@ -367,7 +368,7 @@ export default function CombatCalculatorPage({
       setActiveRules([]);
       setHitModifier(0);
       setWoundModifier(0);
-      setModifierSources({ hit: [], wound: [], keywords: [] });
+      setModifierSources({ hit: [], wound: [], keywords: [], damageReroll: [] });
       return;
     }
 
@@ -705,6 +706,24 @@ export default function CombatCalculatorPage({
       }
     }
 
+    // Extract reroll sources from both attacker and defender contexts
+    const damageRerollSources: string[] = [];
+    for (const [stat, mods] of attackerMods.entries()) {
+      if (stat.startsWith('reroll:damage')) {
+        for (const mod of mods) {
+          damageRerollSources.push(mod.source);
+        }
+      }
+    }
+    const defenderMods = defenderContext.modifiers.getAllModifiers();
+    for (const [stat, mods] of defenderMods.entries()) {
+      if (stat.startsWith('reroll:damage')) {
+        for (const mod of mods) {
+          damageRerollSources.push(mod.source);
+        }
+      }
+    }
+
     // Save for display
     setActiveRules(displayRules);
     setHitModifier(hitMod);
@@ -717,7 +736,8 @@ export default function CombatCalculatorPage({
       A: aSources,
       S: sSources,
       AP: apSources,
-      D: dSources
+      D: dSources,
+      damageReroll: damageRerollSources
     });
   }, [selectedWeaponId, selectedTarget?.id, unit?.id, game?.id, weaponType]); // Use IDs to avoid object reference changes
 

@@ -128,13 +128,15 @@ const _schema = i.schema({
       activation: i.json().optional(), // RuleActivation object
     }),
 
-    // Army states tracking (e.g., Waaagh!, Oath of Moment target, etc.)
+    // Army states tracking (e.g., Waaagh!, Oath of Moment target, army-wide choices)
     // Each army has its own states, so multiple Ork armies can have separate Waaghs
     // Note: armyId is handled by the armyStateArmy link, not as a field
     armyStates: i.entity({
-      state: i.string(), // 'waaagh-active', 'oath-target-xxx', etc.
+      state: i.string(), // 'waaagh-active', 'oath-target', 'hyper-adaptation-selected', etc.
       activatedTurn: i.number(),
       expiresPhase: i.string().optional(),
+      targetUnitId: i.string().optional(), // For targeting abilities like Oath of Moment
+      choiceValue: i.string().optional(),  // For storing selected choice option (e.g., 'swarming-instincts')
     }),
 
   },

@@ -82,6 +82,7 @@ export const Atom = z.union([
   z.object({ t: z.literal("unitStatus"), has: z.array(z.string()).min(1) }).strict(),
   z.object({ t: z.literal("armyState"), is: z.array(z.string()).min(1) }).strict(),
   z.object({ t: z.literal("isLeading") }).strict(),
+  z.object({ t: z.literal("isTargetedUnit") }).strict(),  // Check if defender is the targeted unit (for Oath of Moment)
 
   // Optional: ability-based conditions (typed)
   z.object({ t: z.literal("weaponHasAbility"), ability: WeaponAbility }).strict(),
@@ -132,7 +133,7 @@ export const Fx = z.union([
   z.object({ t: z.literal("setFNP"), n: z.number().int().min(2).max(7) }).strict(),
 
   // Rerolls
-  z.object({ t: z.literal("reroll"), phase: z.enum(["hit", "wound"]), kind: z.enum(["ones", "failed"]) }).strict(),
+  z.object({ t: z.literal("reroll"), phase: z.enum(["hit", "wound", "damage"]), kind: z.enum(["ones", "failed", "all"]) }).strict(),
 ]);
 
 /** ---------------------------
@@ -158,6 +159,7 @@ export const Lifetime = z.union([
   z.object({ t: z.literal("roll") }).strict(),
   z.object({ t: z.literal("turn") }).strict(),
   z.object({ t: z.literal("game") }).strict(),
+  z.object({ t: z.literal("phase"), phase: Phase }).strict(),  // Lasts until next occurrence of specified phase
 ]);
 
 export const Choice = z.object({

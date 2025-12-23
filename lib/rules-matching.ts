@@ -162,20 +162,59 @@ export function extractRulesFromSourceData(sourceData: string): ExtractedRules {
     });
   }
 
+  // Extract army-level abilities from force selections (e.g., Hyper Adaptations)
+  // These are configuration selections at the force level with ability profiles
+  if (force.selections) {
+    force.selections.forEach(selection => {
+      // Check for abilities in configuration selections
+      if (selection.categories?.some(c => c.name === 'Configuration') && selection.profiles) {
+        selection.profiles.forEach(profile => {
+          if (profile.typeName === 'Abilities' && !profile.hidden && !isStandardKeyword(profile.name)) {
+            const description = profile.characteristics.find(c => c.name === 'Description')?.$text || '';
+            result.armyRules.push({
+              name: profile.name,
+              rawText: description,
+              battlescribeId: profile.id,
+              scope: 'army'
+            });
+          }
+        });
+      }
+    });
+  }
+
   // Extract unit, model, and weapon rules
   function processSelection(selection: NewRecruitSelection, parentName?: string) {
     // Detachment-level rules (from selections with group === "Detachment")
-    if (selection.group === 'Detachment' && selection.rules) {
-      selection.rules.forEach(rule => {
-        if (!rule.hidden && !isStandardKeyword(rule.name)) {
-          result.armyRules.push({
-            name: rule.name,
-            rawText: rule.description,
-            battlescribeId: rule.id,
-            scope: 'army'
-          });
-        }
-      });
+    if (selection.group === 'Detachment') {
+      // Check rules array
+      if (selection.rules) {
+        selection.rules.forEach(rule => {
+          if (!rule.hidden && !isStandardKeyword(rule.name)) {
+            result.armyRules.push({
+              name: rule.name,
+              rawText: rule.description,
+              battlescribeId: rule.id,
+              scope: 'army'
+            });
+          }
+        });
+      }
+
+      // Check ability profiles (e.g., Hyper Adaptions)
+      if (selection.profiles) {
+        selection.profiles.forEach(profile => {
+          if (profile.typeName === 'Abilities' && !profile.hidden && !isStandardKeyword(profile.name)) {
+            const description = profile.characteristics.find(c => c.name === 'Description')?.$text || '';
+            result.armyRules.push({
+              name: profile.name,
+              rawText: description,
+              battlescribeId: profile.id,
+              scope: 'army'
+            });
+          }
+        });
+      }
     }
 
     // Unit-level rules (from rules array and ability profiles)

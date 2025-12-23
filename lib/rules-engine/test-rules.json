@@ -165,6 +165,42 @@
       }
     },
     {
+      "name": "devastating-strikes",
+      "isExample": false,
+      "rule": {
+        "id": "devastating-strikes",
+        "name": "Devastating Strikes",
+        "description": "Each time this model makes a melee attack, you can re-roll the Damage roll.",
+        "faction": "Orks",
+        "scope": "model",
+        "trigger": {
+          "t": "automatic",
+          "phase": "fight",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "weaponType",
+          "any": [
+            "melee"
+          ]
+        },
+        "kind": "passive",
+        "then": [
+          {
+            "t": "do",
+            "fx": [
+              {
+                "t": "reroll",
+                "phase": "damage",
+                "kind": "all"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "dakka-dakka-dakka",
       "isExample": false,
       "exampleReason": "Simple automatic keyword addition. Shows the most basic pattern: check weapon type condition, add keyword. No user input needed.",
@@ -1156,6 +1192,140 @@
           "t": "true"
         },
         "kind": "reminder"
+      }
+    },
+    {
+      "name": "hyper-adaptations-swarming",
+      "isExample": true,
+      "exampleReason": "Army-wide command phase choice that lasts entire game. Demonstrates army scope, game lifetime, and adding weapon abilities based on target category.",
+      "rule": {
+        "id": "hyper-adaptations",
+        "name": "Hyper Adaptations",
+        "description": "At the start of the first battle round, select one of the following Hyper-adaptations to be active for Tyranids units from your army until the end of the battle.",
+        "faction": "Tyranids",
+        "scope": "army",
+        "trigger": {
+          "t": "manual",
+          "phase": "command",
+          "turn": "own",
+          "limit": "once-per-battle"
+        },
+        "when": {
+          "t": "true"
+        },
+        "kind": "choice",
+        "choice": {
+          "id": "hyper-adaptations",
+          "prompt": "Select a Hyper-adaptation for your army",
+          "lifetime": {
+            "t": "game"
+          },
+          "options": [
+            {
+              "v": "swarming-instincts",
+              "label": "Swarming Instincts",
+              "then": [
+                {
+                  "t": "if",
+                  "when": {
+                    "t": "targetCategory",
+                    "any": ["Infantry", "Swarm"]
+                  },
+                  "then": [
+                    {
+                      "t": "do",
+                      "fx": [
+                        {
+                          "t": "addWeaponAbility",
+                          "ability": {
+                            "t": "sustainedHits",
+                            "x": 1
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "v": "hyper-aggression",
+              "label": "Hyper-Aggression",
+              "then": [
+                {
+                  "t": "if",
+                  "when": {
+                    "t": "targetCategory",
+                    "any": ["Monster", "Vehicle"]
+                  },
+                  "then": [
+                    {
+                      "t": "do",
+                      "fx": [
+                        {
+                          "t": "addWeaponAbility",
+                          "ability": {
+                            "t": "flag",
+                            "id": "lethalHits"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "v": "hive-predators",
+              "label": "Hive Predators (precision is not implemented in the engine: track manually)",
+              "then": [
+                {
+                  "t": "do",
+                  "fx": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "name": "oath-of-moment",
+      "isExample": false,
+      "exampleReason": "Army-wide ability that targets a specific enemy unit and lasts until next command phase. Demonstrates isTargetedUnit condition and phase-based lifetime.",
+      "rule": {
+        "id": "oath-of-moment",
+        "name": "Oath of Moment",
+        "description": "At the start of your Command phase, select one unit from your opponent's army. Until the start of your next Command phase, that enemy unit is your Oath of Moment target. Each time a model with this ability makes an attack that targets your Oath of Moment target, you can re-roll the Hit roll and add 1 to the Wound roll.",
+        "faction": "Adeptus Astartes",
+        "scope": "army",
+        "trigger": {
+          "t": "automatic",
+          "phase": "any",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "isTargetedUnit"
+        },
+        "kind": "passive",
+        "then": [
+          {
+            "t": "do",
+            "fx": [
+              {
+                "t": "reroll",
+                "phase": "hit",
+                "kind": "failed"
+              },
+              {
+                "t": "modWound",
+                "add": 1
+              }
+            ]
+          }
+        ]
       }
     }
   ]
