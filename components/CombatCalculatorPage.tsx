@@ -1135,16 +1135,30 @@ export default function CombatCalculatorPage({
     setCombatResult(updatedResult);
     setShowSavePhase(true);
 
-    // Publish phase advancement to other players
-    if (gameId && publishPhaseAdvance && currentPlayer) {
-      const phaseEvent: CombatPhaseEvent = {
+    // Publish updated combat result with saves to other players
+    if (gameId && publishDiceRoll && currentPlayer && selectedTarget && unit && targetStats) {
+      const diceRollEvent: DiceRollEvent = {
         playerId: currentPlayer.id,
         playerName: currentPlayer.name,
-        phase: 'show-saves',
         timestamp: Date.now(),
+        attackerUnitId: unit.id,
+        attackerUnitName: unit.name,
+        defenderUnitId: selectedTarget.id,
+        defenderUnitName: selectedTarget.name,
+        weaponId: selectedWeapon.id,
+        weaponName: weaponStats.name,
+        targetStats: {
+          T: targetStats.T,
+          SV: targetStats.SV,
+          INV: targetStats.INV,
+          FNP: targetStats.FNP,
+          modelCount: targetStats.modelCount,
+        },
+        combatResult: updatedResult,
+        phase: 'saves',
       };
-      console.log('📡 Publishing phase advance event:', phaseEvent);
-      publishPhaseAdvance(phaseEvent);
+      console.log('📡 [CombatCalc] Publishing save results:', diceRollEvent);
+      publishDiceRoll(diceRollEvent);
     }
   };
 
