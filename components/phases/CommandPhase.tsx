@@ -186,13 +186,17 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
 
   // Get army-level rules for choices and targeting
   const armyRulesData = armyWithStates?.armyRules || [];
+
   const armyRules: Rule[] = armyRulesData
-    .map((ruleData: any) => {
+    .flatMap((ruleData: any) => {
       try {
-        return JSON.parse(ruleData.ruleObject) as Rule;
+        const parsed = JSON.parse(ruleData.ruleObject);
+        // Handle both single rule objects and arrays of rules
+        const rules = Array.isArray(parsed) ? parsed : [parsed];
+        return rules;
       } catch (e) {
         console.error('Failed to parse army rule:', e);
-        return null;
+        return [];
       }
     })
     .filter((r: Rule | null): r is Rule => r !== null);

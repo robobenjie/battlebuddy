@@ -138,6 +138,7 @@ export default function CombatCalculatorPage({
     D?: string[];
     damageReroll?: string[];
   }>({});
+  const [currentArmyStates, setCurrentArmyStates] = useState<ArmyState[]>([]);
 
   // Helper to apply weapon modifiers (consolidates logic for display and dice rolling)
   const applyWeaponModifiers = (baseWeapon: any, modifiers: { A?: number; S?: number; AP?: number; D?: number }): WeaponStats => {
@@ -617,6 +618,10 @@ export default function CombatCalculatorPage({
     console.log('📊 Attacker context modifiers:', attackerContext.modifiers.getAllModifiers());
     console.log('📊 Defender context modifiers:', defenderContext.modifiers.getAllModifiers());
 
+    // Extract keywords (weapon abilities) from attacker context
+    const keywords = getAddedKeywords(attackerContext);
+    console.log('🎯 Extracted keywords:', keywords);
+
     // Extract modifiers from attacker context (offensive abilities)
     const attackerHitMod = attackerContext.modifiers.get('hit') || 0;
     const attackerWoundMod = attackerContext.modifiers.get('wound') || 0;
@@ -724,15 +729,23 @@ export default function CombatCalculatorPage({
       }
     }
 
+    // Update keyword sources to include weapon abilities
+    const updatedKeywordSources = keywords.map(kw => ({
+      keyword: kw,
+      source: 'rule' // Simplified for now
+    }));
+
     // Save for display
     setActiveRules(displayRules);
     setHitModifier(hitMod);
     setWoundModifier(woundMod);
+    setAddedKeywords(keywords); // Set the keywords for display
     setWeaponStatModifiers({ A: aMod, S: sMod, AP: apMod, D: dMod });
+    setCurrentArmyStates(attackerArmyStates); // Store army states for digital dice menu
     setModifierSources({
       hit: hitSources,
       wound: woundSources,
-      keywords: keywordSources,
+      keywords: updatedKeywordSources,
       A: aSources,
       S: sSources,
       AP: apSources,
@@ -953,43 +966,11 @@ export default function CombatCalculatorPage({
       source: 'rule' // Simplified for now
     }));
 
-    // Apply modifiers to weapon stats for execution
-    // Check for "Extra Attacks" keyword - these weapons cannot have attacks modified
-    const hasExtraAttacks = weaponStats.keywords?.some((kw: string) =>
-      kw.toLowerCase() === 'extra attacks'
-    );
-
-    // Use the same logic as combat-calculator-engine for handling dice notation
-    let modifiedA = weaponStats.A;
-    // Only apply A modifier if weapon doesn't have "Extra Attacks" keyword
-    if (aMod !== 0 && !hasExtraAttacks) {
-      // Simple implementation: if it's a number, add the modifier
-      const numA = parseInt(weaponStats.A);
-      if (!isNaN(numA)) {
-        modifiedA = String(numA + aMod);
-      } else {
-        // For dice notation like "D6+3", we'd need parser - for now just keep original
-        modifiedA = weaponStats.A;
-      }
-    }
-
-    let modifiedD = weaponStats.D;
-    if (dMod !== 0) {
-      const numD = parseInt(weaponStats.D);
-      if (!isNaN(numD)) {
-        modifiedD = String(numD + dMod);
-      } else {
-        modifiedD = weaponStats.D;
-      }
-    }
-
+    // Don't apply modifiers here - executeCombatSequence will handle them
+    // Just merge in the added keywords so they're available for keyword-based logic
     const modifiedWeaponStats: WeaponStats = {
       ...weaponStats,
-      keywords: [...weaponStats.keywords, ...keywords],
-      A: modifiedA,
-      S: weaponStats.S + sMod,
-      AP: weaponStats.AP + apMod,
-      D: modifiedD
+      keywords: [...weaponStats.keywords, ...keywords]
     };
 
     // Save for display
@@ -1309,6 +1290,7 @@ export default function CombatCalculatorPage({
           unitHasCharged={unitHasCharged}
           unitHasMovedOrAdvanced={unitHasMovedOrAdvanced}
           activeRules={activeRules as any}
+          armyStates={currentArmyStates}
           onRollAttacks={handleRollAttacks}
           onClose={() => setShowDigitalDiceMenu(false)}
         />

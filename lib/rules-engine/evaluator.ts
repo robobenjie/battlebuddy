@@ -32,11 +32,16 @@ export function evaluateWhen(when: WhenType, context: CombatContext): boolean {
 
     // Target category
     case 'targetCategory':
-      return when.any.some((cat: string) =>
+      console.log('    🎯 Checking targetCategory');
+      console.log('      Looking for:', when.any);
+      console.log('      Defender categories:', context.defender.categories);
+      const result = when.any.some((cat: string) =>
         context.defender.categories.some((defCat: string) =>
           defCat.toLowerCase() === cat.toLowerCase()
         )
       );
+      console.log('      Match result:', result);
+      return result;
 
     // Unit status
     case 'unitStatus':
@@ -287,10 +292,16 @@ export function evaluateBlock(block: BlockType, context: CombatContext, ruleId: 
 
     case 'if':
       // Check condition, then recursively evaluate nested blocks
-      if (evaluateWhen(block.when, context)) {
+      console.log('  🔍 Evaluating IF block, condition:', block.when);
+      const conditionResult = evaluateWhen(block.when, context);
+      console.log('  🔍 Condition result:', conditionResult);
+      if (conditionResult) {
+        console.log('  ✅ Condition TRUE, evaluating', block.then.length, 'nested blocks');
         for (const nestedBlock of block.then) {
           evaluateBlock(nestedBlock, context, ruleId);
         }
+      } else {
+        console.log('  ❌ Condition FALSE, skipping nested blocks');
       }
       break;
 
@@ -324,6 +335,12 @@ export function evaluateRule(rule: Rule, context: CombatContext): boolean {
 
   // Handle choice rules
   if (rule.kind === 'choice') {
+    console.log('🔍 [Choice Rule]', rule.name);
+    console.log('  choice.id:', rule.choice.id);
+    console.log('  scope:', rule.scope);
+    console.log('  armyStates count:', context.armyStates.length);
+    console.log('  armyStates:', context.armyStates.map(s => ({ state: s.state, choiceValue: s.choiceValue })));
+
     let selectedValue: string | undefined;
 
     // For army-scoped choices, check army states first
@@ -332,23 +349,31 @@ export function evaluateRule(rule: Rule, context: CombatContext): boolean {
       const armyState = context.armyStates.find(state =>
         state.state === rule.choice.id && state.choiceValue
       );
+      console.log('  Found in armyStates:', armyState);
       selectedValue = armyState?.choiceValue;
     }
 
     // Fall back to user inputs (for unit/model-scoped choices or combat calculator)
     if (selectedValue === undefined || selectedValue === null) {
+      console.log('  No value in armyStates, checking userInputs...');
+      console.log('  userInputs:', context.userInputs);
       selectedValue = context.userInputs[rule.choice.id];
     }
 
+    console.log('  Final selectedValue:', selectedValue);
+
     if (selectedValue !== undefined && selectedValue !== null) {
       const selectedOption = rule.choice.options.find(opt => opt.v === selectedValue);
+      console.log('  Matched option:', selectedOption?.label || 'NOT FOUND');
       if (selectedOption) {
+        console.log('  Evaluating', selectedOption.then.length, 'blocks...');
         for (const block of selectedOption.then) {
           evaluateBlock(block, context, rule.id);
         }
         return true;
       }
     }
+    console.log('  ❌ Choice rule returning false');
     return false;
   }
 
@@ -377,9 +402,12 @@ export function evaluateAllRules(rules: Rule[], context: CombatContext): Rule[] 
  * but this function translates them back to keyword strings for testing.
  */
 export function getAddedKeywords(context: CombatContext): string[] {
+  console.log('🔍 [getAddedKeywords] Starting...');
   const keywords: string[] = [];
   const allMods = context.modifiers.getAllModifiers();
+  console.log('  All modifiers:', Array.from(allMods.entries()).map(([stat, mods]) => ({ stat, count: mods.length })));
   const abilityDetails = (context as any)._abilityDetails || {};
+  console.log('  Ability details keys:', Object.keys(abilityDetails));
 
   for (const [stat, mods] of allMods.entries()) {
     // Old keyword format (for backward compatibility)
@@ -387,23 +415,30 @@ export function getAddedKeywords(context: CombatContext): string[] {
       for (const mod of mods) {
         const keyword = stat.replace('keyword:', '');
         const keywordString = mod.value > 0 ? `${keyword} ${mod.value}` : keyword;
+        console.log('  Adding old keyword:', keywordString);
         keywords.push(keywordString);
       }
     }
 
     // New weapon ability format
     if (stat.startsWith('weaponAbility:')) {
+      console.log('  Processing weaponAbility:', stat);
       for (const mod of mods) {
+        console.log('    Modifier value:', mod.value);
         if (mod.value > 0) {
-          const abilityDetails = (context as any)._abilityDetails?.[stat];
-          if (abilityDetails) {
-            keywords.push(formatAbility(abilityDetails));
+          const abilityDetailsForStat = (context as any)._abilityDetails?.[stat];
+          console.log('    Ability details for', stat, ':', abilityDetailsForStat);
+          if (abilityDetailsForStat) {
+            const formatted = formatAbility(abilityDetailsForStat);
+            console.log('    Formatted ability:', formatted);
+            keywords.push(formatted);
           } else {
             const ability = stat.replace('weaponAbility:', '');
             const displayName = ability
               .replace(/([A-Z])/g, ' $1')
               .trim()
               .replace(/^./, (str: string) => str.toUpperCase());
+            console.log('    Fallback display name:', displayName);
             keywords.push(displayName);
           }
         }
@@ -414,9 +449,9 @@ export function getAddedKeywords(context: CombatContext): string[] {
     if (stat.startsWith('unitAbility:')) {
       for (const mod of mods) {
         if (mod.value > 0) {
-          const abilityDetails = (context as any)._abilityDetails?.[stat];
-          if (abilityDetails) {
-            keywords.push(formatAbility(abilityDetails));
+          const abilityDetailsForStat = (context as any)._abilityDetails?.[stat];
+          if (abilityDetailsForStat) {
+            keywords.push(formatAbility(abilityDetailsForStat));
           } else {
             const ability = stat.replace('unitAbility:', '');
             const displayName = ability
@@ -430,6 +465,7 @@ export function getAddedKeywords(context: CombatContext): string[] {
     }
   }
 
+  console.log('🔍 [getAddedKeywords] Returning:', keywords);
   return keywords;
 }
 

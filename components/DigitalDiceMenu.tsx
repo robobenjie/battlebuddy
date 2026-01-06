@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { WeaponStats, TargetStats, CombatOptions, parseKeywords } from '../lib/combat-calculator-engine';
-import { Rule } from '../lib/rules-engine/types';
+import { Rule, ArmyState } from '../lib/rules-engine/types';
 
 interface DigitalDiceMenuProps {
   weapon: WeaponStats;
@@ -13,6 +13,7 @@ interface DigitalDiceMenuProps {
   unitHasCharged: boolean;
   unitHasMovedOrAdvanced: boolean;
   activeRules?: Rule[]; // Rules with conditional inputs
+  armyStates?: ArmyState[]; // Army states to check for existing selections
   onRollAttacks: (options: CombatOptions) => void;
   onClose: () => void;
 }
@@ -24,6 +25,7 @@ export default function DigitalDiceMenu({
   unitHasCharged,
   unitHasMovedOrAdvanced,
   activeRules = [],
+  armyStates = [],
   onRollAttacks,
   onClose
 }: DigitalDiceMenuProps) {
@@ -53,7 +55,22 @@ export default function DigitalDiceMenu({
   });
 
   // Get rules that require user input (choice rules)
-  const rulesWithInput = activeRules.filter(rule => rule.kind === 'choice' && rule.choice);
+  // Skip choice rules that already have selections in armyStates
+  const rulesWithInput = activeRules.filter(rule => {
+    if (rule.kind !== 'choice' || !rule.choice) return false;
+
+    // For army-scoped choices, check if already selected in armyStates
+    if (rule.scope === 'army') {
+      const hasSelection = armyStates.some(state =>
+        state.state === rule.choice.id && state.choiceValue
+      );
+      // Skip this rule if it already has a selection
+      return !hasSelection;
+    }
+
+    // For non-army scoped choices, always show
+    return true;
+  });
 
   // Update blast bonus when target model count changes
   useEffect(() => {

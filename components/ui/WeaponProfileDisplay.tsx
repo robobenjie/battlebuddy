@@ -53,6 +53,7 @@ interface WeaponProfileDisplayProps {
   modifierSources?: {
     hit?: string[];
     wound?: string[];
+    keywords?: Array<{ keyword: string; source: string }>;
     A?: string[];
     S?: string[];
     AP?: string[];
@@ -358,7 +359,7 @@ export default function WeaponProfileDisplay({
       </table>
 
       {/* Keywords display */}
-      {weapon.keywords.length > 0 && (
+      {(weapon.keywords.length > 0 || (modifierSources?.keywords && modifierSources.keywords.length > 0)) && (
         <div className="mt-3 pt-3 border-t border-gray-700">
           <div className="flex flex-wrap gap-1">
             {weapon.keywords.map((keyword, index) => (
@@ -367,6 +368,16 @@ export default function WeaponProfileDisplay({
                 className="inline-block bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded"
               >
                 {keyword}
+              </span>
+            ))}
+            {/* Added keywords from rules */}
+            {modifierSources?.keywords?.map((kw, index) => (
+              <span
+                key={`added-${index}`}
+                className="inline-block bg-purple-700 text-purple-100 text-xs px-2 py-1 rounded font-semibold"
+                title={`Added by: ${kw.source}`}
+              >
+                {kw.keyword}
               </span>
             ))}
           </div>
