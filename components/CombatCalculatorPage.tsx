@@ -12,6 +12,7 @@ import DiceRollResults from './ui/DiceRollResults';
 import { executeCombatSequence, executeSavePhase, executeFNPPhase, CombatResult, CombatOptions, WeaponStats, TargetStats, calculateCombatModifiers } from '../lib/combat-calculator-engine';
 import { Rule, ArmyState, buildCombatContext, evaluateAllRules, getAddedKeywords, getAllUnitRules, evaluateWhen } from '../lib/rules-engine';
 import { UNIT_FULL_QUERY, UNIT_BASIC_QUERY } from '../lib/query-fragments';
+import { DiceRollEvent, CombatPhaseEvent } from '../lib/rooms-types';
 
 interface CombatCalculatorPageProps {
   gameId?: string;
@@ -110,6 +111,8 @@ export default function CombatCalculatorPage({
   const [showDigitalDiceMenu, setShowDigitalDiceMenu] = useState(false);
   const [combatResult, setCombatResult] = useState<CombatResult | null>(null);
   const [showSavePhase, setShowSavePhase] = useState(false);
+  const [rollInitiatorId, setRollInitiatorId] = useState<string>('');
+  const [rollInitiatorName, setRollInitiatorName] = useState<string>('');
 
   // State for active rules display
   const [activeRules, setActiveRules] = useState<Rule[]>([]);
@@ -139,6 +142,71 @@ export default function CombatCalculatorPage({
     damageReroll?: string[];
   }>({});
   const [currentArmyStates, setCurrentArmyStates] = useState<ArmyState[]>([]);
+
+  // Room setup for real-time collaboration
+  // Always initialize room (use dummy ID if no gameId to satisfy React hooks rules)
+  const room = db.room('game', gameId || 'no-game');
+
+  // Track presence in the game room (hook must be called unconditionally)
+  const { peers, publishPresence } = db.rooms.usePresence(room, {
+    initialData: {
+      playerId: currentPlayer?.id || '',
+      playerName: currentPlayer?.name || 'Unknown Player',
+      status: 'active' as const,
+      currentView: 'combat-calculator',
+      lastAction: Date.now(),
+    },
+  });
+
+  // Publish topic for dice roll results (hook must be called unconditionally)
+  const publishDiceRoll = db.rooms.usePublishTopic(room, 'diceRollResult');
+
+  // Publish topic for combat phase advancement (hook must be called unconditionally)
+  const publishPhaseAdvance = db.rooms.usePublishTopic(room, 'combatPhaseAdvance');
+
+  // Subscribe to dice roll results from other players (hook must be called unconditionally)
+  db.rooms.useTopicEffect(room, 'diceRollResult', (event, peer) => {
+    // Only process if we have a valid gameId and event is from another player
+    if (!gameId || event.playerId === currentPlayer?.id) return;
+
+    console.log(`🎲 [CombatCalc] Received dice roll from ${event.playerName}, phase: ${event.phase}`, event);
+    // Set the combat result to show in the UI
+    setCombatResult(event.combatResult as CombatResult);
+    // When receiving 'attacks' phase, saves haven't been rolled yet (showSavePhase = false)
+    // When receiving 'saves' or 'fnp' phase, saves have been rolled (showSavePhase = true)
+    setShowSavePhase(event.phase === 'saves' || event.phase === 'fnp');
+    setShowDigitalDiceMenu(false);
+    setRollInitiatorId(event.playerId);
+    setRollInitiatorName(event.playerName);
+  });
+
+  // Subscribe to combat phase advancement from other players (hook must be called unconditionally)
+  db.rooms.useTopicEffect(room, 'combatPhaseAdvance', (event, peer) => {
+    // Only process if we have a valid gameId and event is from another player
+    if (!gameId || event.playerId === currentPlayer?.id) return;
+
+    console.log(`⏭️ Received phase advance from ${event.playerName}:`, event.phase);
+    // Handle phase advancement
+    if (event.phase === 'show-saves' && combatResult) {
+      setShowSavePhase(true);
+    } else if (event.phase === 'show-fnp' && combatResult) {
+      setShowSavePhase(false);
+      // FNP phase would be handled similarly
+    } else if (event.phase === 'complete') {
+      setCombatResult(null);
+      setShowSavePhase(false);
+    }
+  });
+
+  // Update presence when view changes
+  useEffect(() => {
+    if (gameId && publishPresence && currentPlayer) {
+      publishPresence({
+        currentView: 'combat-calculator',
+        lastAction: Date.now(),
+      });
+    }
+  }, [gameId, selectedTargetId, selectedWeaponId, publishPresence, currentPlayer]);
 
   // Helper to apply weapon modifiers (consolidates logic for display and dice rolling)
   const applyWeaponModifiers = (baseWeapon: any, modifiers: { A?: number; S?: number; AP?: number; D?: number }): WeaponStats => {
@@ -1013,6 +1081,34 @@ export default function CombatCalculatorPage({
     setCombatResult(result);
     setShowSavePhase(false);
     setShowDigitalDiceMenu(false);
+    setRollInitiatorId(currentPlayer?.id || '');
+    setRollInitiatorName(currentPlayer?.name || '');
+
+    // Publish dice roll result to other players in the room
+    if (gameId && publishDiceRoll && currentPlayer && selectedTarget && unit && targetStats) {
+      const diceRollEvent: DiceRollEvent = {
+        playerId: currentPlayer.id,
+        playerName: currentPlayer.name,
+        timestamp: Date.now(),
+        attackerUnitId: unit.id,
+        attackerUnitName: unit.name,
+        defenderUnitId: selectedTarget.id,
+        defenderUnitName: selectedTarget.name,
+        weaponId: selectedWeapon.id,
+        weaponName: weaponStats.name,
+        targetStats: {
+          T: targetStats.T,
+          SV: targetStats.SV,
+          INV: targetStats.INV,
+          FNP: targetStats.FNP,
+          modelCount: targetStats.modelCount,
+        },
+        combatResult: result,
+        phase: 'attacks',
+      };
+      console.log('📡 Publishing dice roll event:', diceRollEvent);
+      publishDiceRoll(diceRollEvent);
+    }
   };
 
   const handleRollSaves = () => {
@@ -1040,11 +1136,35 @@ export default function CombatCalculatorPage({
 
     setCombatResult(updatedResult);
     setShowSavePhase(true);
+
+    // Publish phase advancement to other players
+    if (gameId && publishPhaseAdvance && currentPlayer) {
+      const phaseEvent: CombatPhaseEvent = {
+        playerId: currentPlayer.id,
+        playerName: currentPlayer.name,
+        phase: 'show-saves',
+        timestamp: Date.now(),
+      };
+      console.log('📡 Publishing phase advance event:', phaseEvent);
+      publishPhaseAdvance(phaseEvent);
+    }
   };
 
   const handleCloseDiceResults = () => {
     setCombatResult(null);
     setShowSavePhase(false);
+
+    // Publish completion event to other players
+    if (gameId && publishPhaseAdvance && currentPlayer) {
+      const phaseEvent: CombatPhaseEvent = {
+        playerId: currentPlayer.id,
+        playerName: currentPlayer.name,
+        phase: 'complete',
+        timestamp: Date.now(),
+      };
+      console.log('📡 Publishing completion event:', phaseEvent);
+      publishPhaseAdvance(phaseEvent);
+    }
   };
 
   const handleDone = async () => {
@@ -1143,9 +1263,26 @@ export default function CombatCalculatorPage({
 
   const unitDataForCard = formatUnitForCard(unit);
 
+  // Get active peer count (players viewing within last minute)
+  const activePeers = Object.values(peers).filter(
+    (peer: any) => Date.now() - (peer.lastAction || 0) < 60000
+  );
+
   return (
     <div className="text-white">
       <div className="max-w-2xl mx-auto">
+        {/* Presence Indicator */}
+        {activePeers.length > 0 && (
+          <div className="bg-purple-900/30 border border-purple-500/50 rounded-lg p-3 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-sm text-purple-200">
+                {activePeers.map((p: any) => p.playerName).join(', ')} {activePeers.length === 1 ? 'is' : 'are'} viewing
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Main Card */}
         <div className="bg-gray-800 rounded-lg p-6">
           {/* Weapon Selection - only show if more than one weapon */}
@@ -1324,6 +1461,9 @@ export default function CombatCalculatorPage({
                 woundModifier={woundModifier}
                 addedKeywords={addedKeywords}
                 modifierSources={modifierSources}
+                initiatorPlayerId={rollInitiatorId}
+                initiatorPlayerName={rollInitiatorName}
+                currentPlayerId={currentPlayer?.id}
               />
             </div>
 

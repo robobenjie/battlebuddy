@@ -32,6 +32,10 @@ interface DiceRollResultsProps {
     keywords?: Array<{ keyword: string; source: string }>;
     damageReroll?: string[];
   };
+  // Room collaboration props
+  initiatorPlayerId?: string;
+  initiatorPlayerName?: string;
+  currentPlayerId?: string;
 }
 
 export default function DiceRollResults({
@@ -44,7 +48,10 @@ export default function DiceRollResults({
   hitModifier = 0,
   woundModifier = 0,
   addedKeywords = [],
-  modifierSources
+  modifierSources,
+  initiatorPlayerId,
+  initiatorPlayerName,
+  currentPlayerId
 }: DiceRollResultsProps) {
   const { attackPhase, woundPhase, savePhase, fnpPhase, keywords, summary, options, modifiedWeapon } = combatResult;
 
@@ -81,8 +88,22 @@ export default function DiceRollResults({
   const damagePerWound = parseInt(effectiveWeapon.D, 10) + meltaBonus;
   const directTotalDamage = shouldShowDirectDamage ? summary.totalWounds * damagePerWound : 0;
 
+  // Determine if this was rolled by the current player or someone else
+  const isOwnRoll = !initiatorPlayerId || initiatorPlayerId === currentPlayerId;
+
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4">
+      {/* Initiator Badge */}
+      {initiatorPlayerId && initiatorPlayerName && (
+        <div className={`rounded-lg p-3 mb-4 ${isOwnRoll ? 'bg-blue-900/30 border border-blue-500/50' : 'bg-green-900/30 border border-green-500/50'}`}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">
+              {isOwnRoll ? '🎲 You rolled' : `🎲 ${initiatorPlayerName} rolled`}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Attacks Rolled Card (if variable attacks) */}
       {hasVariableAttacks && attackPhase.attackCountRolls && attackPhase.attackCountRolls.length > 0 && (
         <div className="bg-gray-800 rounded-lg overflow-hidden">

@@ -219,6 +219,44 @@ const _schema = i.schema({
       reverse: { on: "units", has: "many", label: "bodyguardUnits" },
     },
   },
+
+  // Real-time rooms for ephemeral state and events
+  rooms: {
+    game: {
+      presence: i.entity({
+        playerId: i.string(),
+        playerName: i.string(),
+        status: i.string(), // 'active', 'away'
+        currentView: i.string().optional(), // 'combat-calculator', 'army-list', etc.
+        lastAction: i.number(), // timestamp of last action
+      }),
+      topics: {
+        diceRollResult: i.entity({
+          playerId: i.string(),
+          playerName: i.string(),
+          timestamp: i.number(),
+          // Combat context
+          attackerUnitId: i.string(),
+          attackerUnitName: i.string(),
+          defenderUnitId: i.string(),
+          defenderUnitName: i.string(),
+          weaponId: i.string(),
+          weaponName: i.string(),
+          // Target stats for displaying save information
+          targetStats: i.json(), // { T, SV, INV?, FNP?, modelCount }
+          // Results (stored as JSON)
+          combatResult: i.any(), // Full CombatResult object
+          phase: i.string(), // 'attacks', 'saves', 'fnp'
+        }),
+        combatPhaseAdvance: i.entity({
+          playerId: i.string(),
+          playerName: i.string(),
+          phase: i.string(), // 'show-saves', 'show-fnp', 'complete'
+          timestamp: i.number(),
+        }),
+      },
+    },
+  },
 });
 
 // This helps TypeScript display nicer intellisense

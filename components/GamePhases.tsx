@@ -14,6 +14,9 @@ import HamburgerMenu from './HamburgerMenu';
 import Sidebar from './Sidebar';
 import ArmyViewPanel from './ArmyViewPanel';
 import { Stratagem } from '../lib/stratagems';
+import DiceRollResults from './ui/DiceRollResults';
+import { CombatResult, WeaponStats, TargetStats, executeSavePhase } from '../lib/combat-calculator-engine';
+import { DiceRollEvent, CombatPhaseEvent } from '../lib/rooms-types';
 
 interface GamePhasesProps {
   gameId: string;
@@ -52,6 +55,136 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isArmyPanelOpen, setIsArmyPanelOpen] = useState(false);
   const router = useRouter();
+
+  // State for shared dice roll results
+  const [sharedCombatResult, setSharedCombatResult] = useState<CombatResult | null>(null);
+  const [sharedWeapon, setSharedWeapon] = useState<WeaponStats | null>(null);
+  const [sharedTarget, setSharedTarget] = useState<TargetStats | null>(null);
+  const [showSharedResults, setShowSharedResults] = useState(false);
+  const [rollInitiatorId, setRollInitiatorId] = useState<string>('');
+  const [rollInitiatorName, setRollInitiatorName] = useState<string>('');
+  const [showSavePhase, setShowSavePhase] = useState(false);
+
+  // Room subscription for real-time dice roll sharing
+  const room = db.room('game', gameId);
+
+  // Get publish functions for room topics
+  const publishPhaseAdvance = db.rooms.usePublishTopic(room, 'combatPhaseAdvance');
+  const publishDiceRoll = db.rooms.usePublishTopic(room, 'diceRollResult');
+
+  // Subscribe to dice roll results from other players
+  db.rooms.useTopicEffect(room, 'diceRollResult', (event, peer) => {
+    // Only process events from other players
+    if (event.playerId === currentUser?.id) return;
+
+    console.log(`🎲 [GamePhases] Received dice roll from ${event.playerName}:`, event);
+
+    const combatResult = event.combatResult as CombatResult;
+
+    // Use the modifiedWeapon from combatResult (has all the actual stats used)
+    const weapon: WeaponStats = combatResult.modifiedWeapon || {
+      name: event.weaponName,
+      range: 0,
+      A: '1',
+      WS: 0,
+      S: 0,
+      AP: 0,
+      D: '1',
+      keywords: []
+    };
+
+    // Use target stats from the event
+    const target: TargetStats = {
+      T: event.targetStats.T,
+      SV: event.targetStats.SV,
+      INV: event.targetStats.INV,
+      FNP: event.targetStats.FNP,
+      modelCount: event.targetStats.modelCount,
+      categories: []
+    };
+
+    setSharedCombatResult(combatResult);
+    setSharedWeapon(weapon);
+    setSharedTarget(target);
+    setRollInitiatorId(event.playerId);
+    setRollInitiatorName(event.playerName);
+    // When receiving 'attacks' phase, saves haven't been rolled yet (showSavePhase = false)
+    // When receiving 'saves' or 'fnp' phase, saves have been rolled (showSavePhase = true)
+    setShowSavePhase(event.phase === 'saves' || event.phase === 'fnp');
+    setShowSharedResults(true);
+  });
+
+  // Subscribe to combat phase advancement
+  db.rooms.useTopicEffect(room, 'combatPhaseAdvance', (event, peer) => {
+    if (event.playerId === currentUser?.id) return;
+
+    console.log(`⏭️ [GamePhases] Received phase advance from ${event.playerName}:`, event.phase);
+
+    if (event.phase === 'show-saves' && sharedCombatResult) {
+      setShowSavePhase(true);
+    } else if (event.phase === 'complete') {
+      setShowSharedResults(false);
+      setSharedCombatResult(null);
+    }
+  });
+
+  // Handler for rolling saves on shared combat results
+  const handleRollSaves = () => {
+    if (!sharedCombatResult || !sharedWeapon || !sharedTarget) {
+      console.log('❌ [GamePhases] Cannot roll saves - missing data:', {
+        hasCombatResult: !!sharedCombatResult,
+        hasWeapon: !!sharedWeapon,
+        hasTarget: !!sharedTarget
+      });
+      return;
+    }
+
+    console.log('🎲 [GamePhases] Rolling saves...', { sharedCombatResult, sharedWeapon, sharedTarget });
+
+    // Execute save phase
+    const updatedResult = executeSavePhase(sharedCombatResult, sharedWeapon, sharedTarget);
+
+    // Update local state
+    setSharedCombatResult(updatedResult);
+    setShowSavePhase(true);
+
+    console.log('📡 [GamePhases] Preparing to publish save results...', {
+      hasGameId: !!gameId,
+      hasPublishDiceRoll: !!publishDiceRoll,
+      hasCurrentUser: !!currentUser?.id,
+      hasRollInitiatorId: !!rollInitiatorId,
+      rollInitiatorId,
+      rollInitiatorName
+    });
+
+    // Publish updated combat result with saves to other players
+    if (gameId && publishDiceRoll && currentUser?.id) {
+      const diceRollEvent: DiceRollEvent = {
+        playerId: currentUser.id, // Use current user who rolled saves, not original attacker
+        playerName: currentUser.email || 'Player',
+        timestamp: Date.now(),
+        attackerUnitId: '', // Not critical for save phase
+        attackerUnitName: '',
+        defenderUnitId: '',
+        defenderUnitName: '',
+        weaponId: '',
+        weaponName: sharedWeapon.name,
+        targetStats: {
+          T: sharedTarget.T,
+          SV: sharedTarget.SV,
+          INV: sharedTarget.INV,
+          FNP: sharedTarget.FNP,
+          modelCount: sharedTarget.modelCount,
+        },
+        combatResult: updatedResult,
+        phase: 'saves',
+      };
+      console.log('📡 [GamePhases] Publishing save results:', diceRollEvent);
+      publishDiceRoll(diceRollEvent);
+    } else {
+      console.log('❌ [GamePhases] Cannot publish - condition failed');
+    }
+  };
 
   // Swipe gesture handling
   const touchStartX = useRef(0);
@@ -393,6 +526,46 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
         activePlayerId={game.activePlayerId}
         currentUserId={currentUserPlayer?.id}
       />
+
+      {/* Shared Dice Roll Results Modal */}
+      {showSharedResults && sharedCombatResult && sharedWeapon && sharedTarget && (() => {
+        console.log('🎬 [GamePhases] Rendering shared results modal', {
+          showSavePhase,
+          hasCombatResult: !!sharedCombatResult,
+          hasWeapon: !!sharedWeapon,
+          hasTarget: !!sharedTarget,
+          totalWounds: sharedCombatResult?.summary?.totalWounds,
+          hasSavePhase: !!sharedCombatResult?.savePhase
+        });
+        return true;
+      })() && (
+        <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800">
+            <h2 className="text-xl font-bold text-white">Combat Results</h2>
+            <button
+              onClick={() => setShowSharedResults(false)}
+              className="text-gray-400 hover:text-white text-3xl font-bold leading-none"
+            >
+              ×
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto">
+            <DiceRollResults
+              combatResult={sharedCombatResult}
+              weapon={sharedWeapon}
+              target={sharedTarget}
+              showSavePhase={showSavePhase}
+              onRollSaves={() => {
+                console.log('🔘 [GamePhases] Roll Saves button clicked in modal');
+                handleRollSaves();
+              }}
+              initiatorPlayerId={rollInitiatorId}
+              initiatorPlayerName={rollInitiatorName}
+              currentPlayerId={currentUser?.id}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="bg-gray-800 border-b border-gray-700 px-6 py-4 pt-20">
