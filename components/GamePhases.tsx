@@ -122,10 +122,8 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
 
     if (event.phase === 'show-saves' && sharedCombatResult) {
       setShowSavePhase(true);
-    } else if (event.phase === 'complete') {
-      setShowSharedResults(false);
-      setSharedCombatResult(null);
     }
+    // Note: 'complete' phase removed - each player closes their own modal independently
   });
 
   // Handler for rolling saves on shared combat results

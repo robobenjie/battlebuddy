@@ -192,10 +192,8 @@ export default function CombatCalculatorPage({
     } else if (event.phase === 'show-fnp' && combatResult) {
       setShowSavePhase(false);
       // FNP phase would be handled similarly
-    } else if (event.phase === 'complete') {
-      setCombatResult(null);
-      setShowSavePhase(false);
     }
+    // Note: 'complete' phase removed - each player closes their own view independently
   });
 
   // Update presence when view changes
@@ -1154,17 +1152,7 @@ export default function CombatCalculatorPage({
     setCombatResult(null);
     setShowSavePhase(false);
 
-    // Publish completion event to other players
-    if (gameId && publishPhaseAdvance && currentPlayer) {
-      const phaseEvent: CombatPhaseEvent = {
-        playerId: currentPlayer.id,
-        playerName: currentPlayer.name,
-        phase: 'complete',
-        timestamp: Date.now(),
-      };
-      console.log('📡 Publishing completion event:', phaseEvent);
-      publishPhaseAdvance(phaseEvent);
-    }
+    // Don't publish completion event - each player can close their own view independently
   };
 
   const handleDone = async () => {
