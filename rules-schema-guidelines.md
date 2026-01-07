@@ -108,6 +108,45 @@ implementable: false means: rules are absent (rules: null) and message explains 
 
 message should be short, user-readable, and point out missing constructs or ambiguous inputs.
 
+How Rules Are Evaluated (Critical Concept)
+
+IMPORTANT: Rules are evaluated PER-ATTACK, not once per game.
+
+When a unit attacks:
+1. The rules engine evaluates each rule's when condition against the current attack context
+2. If when evaluates to TRUE, the effects (then) are applied to THIS ATTACK ONLY
+3. If when evaluates to FALSE, the effects are NOT applied
+
+Example: Psychic Hood grants FNP 4+ vs Psychic attacks
+
+{
+  "when": {
+    "t": "all",
+    "xs": [
+      {"t": "isLeading"},
+      {"t": "attackHasAbility", "ability": {"t": "flag", "id": "psychic"}}
+    ]
+  },
+  "then": [{"t": "do", "fx": [{"t": "setFNP", "n": 4}]}]
+}
+
+This is evaluated for EVERY attack:
+- Attack with psychic keyword: when = TRUE → FNP 4+ applied
+- Attack without psychic keyword: when = FALSE → FNP 4+ NOT applied
+
+The setFNP effect is NOT global - it only applies when the when condition is satisfied.
+
+Effects Are Conditional, Not Permanent
+
+DO NOT think of setFNP, setInvuln, modHit, etc. as "setting a permanent state"
+They are modifiers applied ONLY IF the when condition is true for this specific attack
+
+This means you CAN implement:
+- FNP only vs psychic attacks (use attackHasAbility)
+- +1 to hit only vs VEHICLE targets (use targetCategory)
+- Reroll wounds only when charged (use unitStatus)
+- Different effects based on weapon type (use weaponType)
+
 Core Schema Decisions
 1) Conditions become a Boolean Expression AST (when)
 
@@ -123,15 +162,17 @@ Solution: when is a recursive expression tree:
 
 {t:"not", x: ...} for NOT
 
-leaf nodes are “atoms” like {t:"weaponType", any:["melee"]}
+leaf nodes are "atoms" like {t:"weaponType", any:["melee"]}
 
 Why this is good
 
 Arbitrary nesting supports complex logic without duplicated rules.
 
-{t:"true"} makes unconditional rules visually obvious (no subtle “empty AND” semantics).
+{t:"true"} makes unconditional rules visually obvious (no subtle "empty AND" semantics).
 
 Atoms are a discriminated union, so we avoid a giant params bag.
+
+The when condition is evaluated per-attack, so effects can be contextual (e.g., FNP only vs psychic).
 
 2) Effects are tagged unions (Fx) — no params bags
 
@@ -204,7 +245,7 @@ InvulnerableSave vs invulnerable_save vs INV etc.
 
 Solution: model keywords/abilities as typed enums + typed parameterized abilities:
 
-Weapon abilities: lethalHits, hazardous, sustainedHits(x), rapidFire(x), etc.
+Weapon abilities: lethalHits, hazardous, psychic, sustainedHits(x), rapidFire(x), etc.
 
 Unit abilities: deepStrike, scouts(distance), feelNoPain(threshold), etc.
 
@@ -212,11 +253,70 @@ Important rule
 
 If the ability has a number, model it as a parameterized ability or a dedicated property effect.
 
-Example: use setInvuln(n) rather than “addKeywordN invulnerableSave=5”.
+Example: use setInvuln(n) rather than "addKeywordN invulnerableSave=5".
+
+Available Condition Atoms
+
+The when clause supports these condition types:
+
+Offensive (checking your own attack):
+- weaponType: {t:"weaponType", any:["melee"|"ranged"]}
+- weaponHasAbility: {t:"weaponHasAbility", ability:WeaponAbility} (check your weapon)
+
+Defensive (checking incoming attacks):
+- attackHasAbility: {t:"attackHasAbility", ability:WeaponAbility} (check enemy weapon)
+- attackHasKeyword: {t:"attackHasKeyword", any:["string"]} (free-text fallback)
+
+Target checking:
+- targetCategory: {t:"targetCategory", any:["VEHICLE", "INFANTRY", etc.]}
+
+Unit state:
+- unitStatus: {t:"unitStatus", has:["charged"|"moved"|"stationary"]}
+- isLeading: {t:"isLeading"} (for leader abilities)
+
+Game state:
+- armyState: {t:"armyState", is:["waaagh-active", etc.]}
+- isTargetedUnit: {t:"isTargetedUnit"} (for Oath of Moment)
+
+Boolean:
+- {t:"true"} / {t:"false"}
+- {t:"all", xs:[...]} / {t:"any", xs:[...]} / {t:"not", x:...}
+
+Defensive Abilities Checking Incoming Attacks
+
+IMPORTANT: You CAN implement conditional defensive abilities.
+
+For defensive abilities that grant bonuses against specific attack types (e.g., "FNP 4+ vs Psychic Attacks"):
+
+Use attackHasAbility with typed canonical abilities:
+
+{t:"attackHasAbility", ability:{t:"flag", id:"psychic"}}
+
+This checks if the incoming weapon has the "psychic" keyword. The FNP is ONLY applied when this condition is TRUE.
+
+Example: Psychic Hood rule grants FNP 4+ when defending against psychic attacks:
+
+{
+  "when": {
+    "t": "all",
+    "xs": [
+      {"t": "isLeading"},
+      {"t": "attackHasAbility", "ability": {"t": "flag", "id": "psychic"}}
+    ]
+  },
+  "then": [{"t": "do", "fx": [{"t": "setFNP", "n": 4}]}]
+}
+
+This is implementable: true because:
+- attackHasAbility checks the incoming attack's weapon
+- setFNP only applies when the when condition is satisfied
+- The effect is scoped to psychic attacks only
+
+Available weapon ability flags: assault, blast, devastatingWounds, hazardous, heavy, ignoresCover, indirectFire, lethalHits, pistol, psychic, torrent, twinLinked.
 
 Fallback behavior
 
-If an input refers to an ability not in the enum set and we haven’t implemented it yet:
+If an input refers to an ability not in the enum set and we haven't implemented it yet:
 
 set implementable:false
 
@@ -227,6 +327,26 @@ explain what ability/effect is missing in message
 This prevents the model from inventing new identifiers.
 
 Practical Authoring Rules for the LLM
+
+Common Implementability Mistakes
+
+MISTAKE: "Cannot implement FNP only vs psychic attacks because setFNP would apply to all attacks"
+CORRECT: setFNP is conditional - it ONLY applies when the when clause is TRUE
+
+Example of what IS implementable:
+"FNP 4+ vs Psychic attacks" ✅
+{when: {t:"attackHasAbility", ability:{t:"flag", id:"psychic"}}, fx:[{t:"setFNP", n:4}]}
+
+"Reroll wounds vs VEHICLE targets" ✅
+{when: {t:"targetCategory", any:["VEHICLE"]}, fx:[{t:"reroll", phase:"wound", kind:"failed"}]}
+
+"+1 to hit with melee weapons when charged" ✅
+{when: {t:"all", xs:[{t:"weaponType", any:["melee"]}, {t:"unitStatus", has:["charged"]}]}, fx:[{t:"modHit", add:1}]}
+
+Example of what is NOT implementable:
+"Cannot use ability if within 6\" of terrain" ❌ (no distance/terrain checking)
+"Gain CP on a 5+" ❌ (no CP modification effect)
+"Allocate wounds to specific model" ❌ (no wound allocation control)
 
 When generating rules:
 
@@ -246,14 +366,14 @@ No rule duplication to implement OR
 Use when: {t:"any", xs:[...]}
 (or nested all/any/not) instead.
 
-If you can’t represent it, fail cleanly
+If you can't represent it, fail cleanly
 Return:
 
 implementable:false
 
 rules:null
 
-message:"Missing effect type for …"
+message:"Missing effect type for …" (be specific about what condition or effect is missing)
 
 Non-goals (for now)
 
@@ -273,6 +393,12 @@ moving conditional logic into structured blocks,
 
 typing abilities to eliminate naming drift,
 
-preserving a clean failure mode (implementable/message) so the model doesn’t hallucinate unsupported constructs.
+evaluating rules per-attack (enabling conditional defensive abilities),
+
+supporting incoming attack property checks (attackHasAbility),
+
+preserving a clean failure mode (implementable/message) so the model doesn't hallucinate unsupported constructs.
+
+CRITICAL: Effects (setFNP, modHit, etc.) are NOT global. They apply ONLY when the when condition is TRUE for a specific attack. This enables conditional defensive abilities like "FNP 4+ vs psychic attacks."
 
 If the JSON validates, it should be mechanically implementable with high confidence.

@@ -53,6 +53,7 @@ export const WeaponAbilityFlag = z.enum([
   "indirectFire",
   "lethalHits",
   "pistol",
+  "psychic",
   "torrent",
   "twinLinked",
 ]);
@@ -83,6 +84,10 @@ export const Atom = z.union([
   z.object({ t: z.literal("armyState"), is: z.array(z.string()).min(1) }).strict(),
   z.object({ t: z.literal("isLeading") }).strict(),
   z.object({ t: z.literal("isTargetedUnit") }).strict(),  // Check if defender is the targeted unit (for Oath of Moment)
+
+  // Attack keyword/ability checking (for defensive abilities checking incoming attack properties)
+  z.object({ t: z.literal("attackHasKeyword"), any: z.array(z.string()).min(1) }).strict(), // Free-text fallback
+  z.object({ t: z.literal("attackHasAbility"), ability: WeaponAbility }).strict(), // Typed canonical abilities
 
   // Optional: ability-based conditions (typed)
   z.object({ t: z.literal("weaponHasAbility"), ability: WeaponAbility }).strict(),

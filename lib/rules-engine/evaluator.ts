@@ -52,6 +52,29 @@ export function evaluateWhen(when: WhenType, context: CombatContext): boolean {
         return false;
       });
 
+    // Attack keyword checking (for defensive abilities checking incoming attack properties)
+    case 'attackHasKeyword':
+      return when.any.some((keyword: string) =>
+        context.weapon.keywords?.some((weaponKeyword: string) =>
+          weaponKeyword.toLowerCase() === keyword.toLowerCase()
+        )
+      );
+
+    // Attack ability checking - typed version (for canonical weapon abilities like psychic)
+    case 'attackHasAbility': {
+      const ability = when.ability;
+      // For flag abilities, check if the keyword exists
+      if (ability.t === 'flag') {
+        const abilityName = ability.id;
+        return context.weapon.keywords?.some((weaponKeyword: string) =>
+          weaponKeyword.toLowerCase() === abilityName.toLowerCase()
+        );
+      }
+      // For parameterized abilities (anti, rapidFire, sustainedHits), would need more complex matching
+      // TODO: Implement if needed
+      return false;
+    }
+
     // Army state
     case 'armyState':
       return when.is.some((requiredState: string) =>

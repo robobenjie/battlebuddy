@@ -1327,6 +1327,51 @@
           }
         ]
       }
+    },
+    {
+      "name": "psychic-hood",
+      "isExample": false,
+      "exampleReason": "Defensive ability that grants FNP against psychic attacks. Tests attackHasAbility condition with typed canonical abilities.",
+      "rule": {
+        "id": "psychic-hood",
+        "name": "Psychic Hood",
+        "description": "While this model is leading a unit, models in that unit have the Feel No Pain 4+ ability against Psychic Attacks.",
+        "faction": "Adeptus Astartes",
+        "scope": "unit",
+        "trigger": {
+          "t": "automatic",
+          "phase": "any",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "all",
+          "xs": [
+            {
+              "t": "isLeading"
+            },
+            {
+              "t": "attackHasAbility",
+              "ability": {
+                "t": "flag",
+                "id": "psychic"
+              }
+            }
+          ]
+        },
+        "kind": "passive",
+        "then": [
+          {
+            "t": "do",
+            "fx": [
+              {
+                "t": "setFNP",
+                "n": 4
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }
