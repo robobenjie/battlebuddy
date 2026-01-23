@@ -101,6 +101,10 @@ export default function CombatCalculatorPage({
       .filter((unit: any) => !destroyedUnitIds.has(unit.id)), // Filter out destroyed units
     destroyedUnitIds
   );
+  const oathTargetId = game?.armies
+    ?.find((army: any) => army.id === currentArmyId)
+    ?.states?.find((state: any) => state.state === 'oath-of-moment')
+    ?.targetUnitId;
 
   // State for selected target and weapon
   const [selectedTargetId, setSelectedTargetId] = useState<string>('');
@@ -1011,6 +1015,8 @@ export default function CombatCalculatorPage({
     const woundMod = modifiers.woundModifier; // Already includes defender penalties
     const keywords = modifiers.addedKeywords;
     const appliedRules = modifiers.appliedRules;
+    const rerollHitKind = modifiers.rerollHitKind;
+    const rerollWoundKind = modifiers.rerollWoundKind;
 
     // Extract weapon and target modifiers
     const aMod = modifiers.weaponModifiers.A;
@@ -1072,7 +1078,9 @@ export default function CombatCalculatorPage({
         woundModifier: woundMod,
         weaponModifiers: { A: aMod, S: sMod, AP: apMod, D: dMod },
         addedKeywords: keywords,
-        appliedRules: appliedRules
+        appliedRules: appliedRules,
+        rerollHitKind,
+        rerollWoundKind
       }
     });
 
@@ -1348,7 +1356,9 @@ export default function CombatCalculatorPage({
               <option value="">Choose a target...</option>
               {enemyUnits.map((enemyUnit: any) => (
                 <option key={enemyUnit.id} value={enemyUnit.id}>
-                  {getUnitDisplayName(enemyUnit)}
+                  {enemyUnit.id === oathTargetId
+                    ? `⌖ ${getUnitDisplayName(enemyUnit)}`
+                    : getUnitDisplayName(enemyUnit)}
                 </option>
               ))}
             </select>

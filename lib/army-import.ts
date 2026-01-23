@@ -9,6 +9,107 @@ import { id } from '@instantdb/react';
 import { db } from './db';
 import { extractRulesFromSourceData, matchRuleToImplementation, getAllUnitRuleImplementations, ImportedRule } from './rules-matching';
 
+const OATH_OF_MOMENT_RULE_NAME = 'oathofmoment';
+const OATH_OF_MOMENT_BONUS_RULE_ID = 'oath-of-moment-codex-bonus';
+const EXCLUDED_OATH_CHAPTER_KEYWORDS = new Set([
+  'black templars',
+  'blood angels',
+  'dark angels',
+  'deathwatch',
+  'space wolves',
+]);
+
+function normalizeRuleName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function normalizeArmyKeyword(keyword: string): string {
+  return keyword
+    .toLowerCase()
+    .replace(/^faction:\s*/i, '')
+    .trim();
+}
+
+function hasExcludedOathChapterKeywords(units: UnitData[]): boolean {
+  for (const unit of units) {
+    for (const category of unit.categories || []) {
+      const normalized = normalizeArmyKeyword(category);
+      if (EXCLUDED_OATH_CHAPTER_KEYWORDS.has(normalized)) {
+        return true;
+      }
+      for (const excluded of EXCLUDED_OATH_CHAPTER_KEYWORDS) {
+        if (normalized.includes(excluded)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function buildOathOfMomentBaseRule(faction: string) {
+  return {
+    id: 'oath-of-moment',
+    name: 'Oath of Moment',
+    description: 'At the start of your Command phase, select one unit from your opponent\'s army. Until the start of your next Command phase, that enemy unit is your Oath of Moment target. Each time a model with this ability makes an attack that targets your Oath of Moment target, you can re-roll the Hit roll.',
+    faction,
+    scope: 'army',
+    trigger: {
+      t: 'automatic',
+      phase: 'command',
+      turn: 'own',
+      limit: 'none'
+    },
+    when: {
+      t: 'isTargetedUnit'
+    },
+    kind: 'passive',
+    then: [
+      {
+        t: 'do',
+        fx: [
+          {
+            t: 'reroll',
+            phase: 'hit',
+            kind: 'failed'
+          }
+        ]
+      }
+    ]
+  };
+}
+
+function buildOathOfMomentBonusRule(faction: string) {
+  return {
+    id: OATH_OF_MOMENT_BONUS_RULE_ID,
+    name: 'Oath of Moment',
+    description: 'Codex: Space Marines Oath of Moment bonus. Each time a model with this ability makes an attack that targets your Oath of Moment target, add 1 to the Wound roll.',
+    faction,
+    scope: 'army',
+    trigger: {
+      t: 'automatic',
+      phase: 'any',
+      turn: 'both',
+      limit: 'none'
+    },
+    when: {
+      t: 'isTargetedUnit'
+    },
+    kind: 'passive',
+    then: [
+      {
+        t: 'do',
+        fx: [
+          {
+            t: 'modWound',
+            add: 1
+          }
+        ]
+      }
+    ]
+  };
+}
+
 export interface ArmyMetadata {
   id: string;
   name: string;
@@ -1550,6 +1651,9 @@ export async function extractAndLinkRules(params: {
   const unimplementedRules: string[] = [];
   const ruleIdMap = new Map<string, string>(); // battlescribeId -> ruleId
 
+  const isAdeptusAstartes = faction?.toLowerCase().includes('adeptus astartes');
+  const oathBonusEligible = isAdeptusAstartes && !hasExcludedOathChapterKeywords(units);
+
   // Query all existing rules for deduplication
   const queryStart = performance.now();
   const { data: existingRulesData } = await client.queryOnce({
@@ -1563,10 +1667,51 @@ export async function extractAndLinkRules(params: {
     const processingStart = performance.now();
     let linkingTime = 0;
     let ruleCreationTime = 0;
+    let oathHandled = false;
 
     // Process army-level rules
     const armyRuleIds: string[] = [];
     for (const importedRule of extractedRules.armyRules) {
+      if (normalizeRuleName(importedRule.name) === OATH_OF_MOMENT_RULE_NAME) {
+        if (oathHandled) {
+          continue;
+        }
+        oathHandled = true;
+
+        const baseRuleObject = JSON.stringify(buildOathOfMomentBaseRule(faction));
+        const baseRuleId = await findOrCreateRule(
+          importedRule,
+          faction,
+          existingRules,
+          client,
+          { ruleObjectOverride: baseRuleObject }
+        );
+        createdRuleIds.push(baseRuleId);
+        ruleIdMap.set(importedRule.battlescribeId, baseRuleId);
+        armyRuleIds.push(baseRuleId);
+
+        if (oathBonusEligible) {
+          const bonusRule: ImportedRule = {
+            name: 'Oath of Moment',
+            rawText: 'Codex: Space Marines Oath of Moment bonus. Each time a model with this ability makes an attack that targets your Oath of Moment target, add 1 to the Wound roll.',
+            battlescribeId: OATH_OF_MOMENT_BONUS_RULE_ID,
+            scope: 'army'
+          };
+          const bonusRuleObject = JSON.stringify(buildOathOfMomentBonusRule(faction));
+          const bonusRuleId = await findOrCreateRule(
+            bonusRule,
+            faction,
+            existingRules,
+            client,
+            { ruleObjectOverride: bonusRuleObject }
+          );
+          createdRuleIds.push(bonusRuleId);
+          ruleIdMap.set(bonusRule.battlescribeId, bonusRuleId);
+          armyRuleIds.push(bonusRuleId);
+        }
+        continue;
+      }
+
       const createStart = performance.now();
       const ruleId = await findOrCreateRule(importedRule, faction, existingRules, client);
       ruleCreationTime += (performance.now() - createStart);
@@ -1695,13 +1840,24 @@ async function findOrCreateRule(
   importedRule: ImportedRule,
   faction: string,
   existingRules: any[],
-  dbClient: typeof db = db
+  dbClient: typeof db = db,
+  options?: {
+    ruleObjectOverride?: string;
+  }
 ): Promise<string> {
   // First, try to find by battlescribeId
   const byBattlescribeId = existingRules.find(
     r => r.battlescribeId === importedRule.battlescribeId
   );
   if (byBattlescribeId) {
+    if (options?.ruleObjectOverride && byBattlescribeId.ruleObject !== options.ruleObjectOverride) {
+      await dbClient.transact([
+        dbClient.tx.rules[byBattlescribeId.id].update({
+          ruleObject: options.ruleObjectOverride
+        })
+      ]);
+      byBattlescribeId.ruleObject = options.ruleObjectOverride;
+    }
     console.log(`🔗 Reusing rule by battlescribeId: ${importedRule.name}`);
     return byBattlescribeId.id;
   }
@@ -1711,6 +1867,14 @@ async function findOrCreateRule(
     r => r.name === importedRule.name && r.rawText === importedRule.rawText
   );
   if (byContent) {
+    if (options?.ruleObjectOverride && byContent.ruleObject !== options.ruleObjectOverride) {
+      await dbClient.transact([
+        dbClient.tx.rules[byContent.id].update({
+          ruleObject: options.ruleObjectOverride
+        })
+      ]);
+      byContent.ruleObject = options.ruleObjectOverride;
+    }
     console.log(`🔗 Reusing rule by content match: ${importedRule.name}`);
     return byContent.id;
   }
@@ -1720,7 +1884,7 @@ async function findOrCreateRule(
 
   // Try to match against rules-engine implementation
   const matchedRule = matchRuleToImplementation(importedRule, faction);
-  const ruleObject = matchedRule ? JSON.stringify(matchedRule) : undefined;
+  const ruleObject = options?.ruleObjectOverride ?? (matchedRule ? JSON.stringify(matchedRule) : undefined);
 
   if (!ruleObject) {
     console.log(`⚠️  Rule not implemented: ${importedRule.name}`);

@@ -136,6 +136,7 @@ export function rollAttacks(
     sustainedHitsValue?: number;
     lethalHits?: boolean;
     torrent?: boolean;
+    rerollHits?: 'ones' | 'failed' | 'all';
     attackCountRolls?: { value: number; sides: number }[];
   } = {}
 ): AttackResult {
@@ -171,6 +172,31 @@ export function rollAttacks(
   const criticalHits: number[] = [];
   const lethalHits: number[] = [];
 
+  // Apply rerolls before evaluating hits
+  if (modifiers.rerollHits) {
+    const indicesToReroll: number[] = [];
+    attackRolls.forEach((roll, index) => {
+      if (modifiers.rerollHits === 'all') {
+        indicesToReroll.push(index);
+      } else if (modifiers.rerollHits === 'ones' && roll.value === 1) {
+        indicesToReroll.push(index);
+      } else if (modifiers.rerollHits === 'failed' && roll.value < hitThreshold) {
+        indicesToReroll.push(index);
+      }
+    });
+
+    indicesToReroll.forEach(index => {
+      const originalValue = attackRolls[index].value;
+      const rerollValue = rollDie();
+      attackRolls[index] = {
+        value: rerollValue,
+        isReroll: true,
+        originalValue
+      };
+    });
+  }
+
+  // Evaluate hits after rerolls
   attackRolls.forEach((roll, index) => {
     if (roll.value >= hitThreshold) {
       hits.push(index);
@@ -244,6 +270,7 @@ export function rollWounds(
   modifiers: {
     twinLinked?: boolean;
     antiXThreshold?: number; // For Anti-X critical wounds
+    rerollWounds?: 'ones' | 'failed' | 'all';
   } = {}
 ): WoundResult {
   const lethalWounds = [...lethalHitIndices]; // These auto-wound
@@ -275,11 +302,17 @@ export function rollWounds(
     }
   });
 
-  // Twin-Linked: reroll failed wounds
-  if (modifiers.twinLinked) {
+  const rerollKind = modifiers.rerollWounds || (modifiers.twinLinked ? 'failed' : undefined);
+
+  // Reroll wounds (twin-linked or explicit reroll effects)
+  if (rerollKind) {
     const failedIndices: number[] = [];
     woundRolls.forEach((roll, index) => {
-      if (roll.value < woundThreshold) {
+      if (
+        rerollKind === 'all' ||
+        (rerollKind === 'ones' && roll.value === 1) ||
+        (rerollKind === 'failed' && roll.value < woundThreshold)
+      ) {
         failedIndices.push(index);
       }
     });

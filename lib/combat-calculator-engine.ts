@@ -261,6 +261,8 @@ export function calculateCombatModifiers(params: {
   targetModifiers: { T: number; SV: number; INV?: number; FNP?: number };
   addedKeywords: string[];
   appliedRules: Rule[];
+  rerollHitKind?: 'ones' | 'failed' | 'all';
+  rerollWoundKind?: 'ones' | 'failed' | 'all';
 } {
   // Build separate contexts for attacker and defender
   const attackerContext = buildCombatContext({
@@ -305,6 +307,19 @@ export function calculateCombatModifiers(params: {
   // Combine wound modifiers (attacker bonuses + defender penalties)
   const woundModifier = attackerWoundModifier + defenderWoundModifier;
 
+  const resolveRerollKind = (phase: 'hit' | 'wound') => {
+    const all = attackerContext.modifiers.getModifiers(`reroll:${phase}:all`);
+    if (all.length > 0) return 'all' as const;
+    const failed = attackerContext.modifiers.getModifiers(`reroll:${phase}:failed`);
+    if (failed.length > 0) return 'failed' as const;
+    const ones = attackerContext.modifiers.getModifiers(`reroll:${phase}:ones`);
+    if (ones.length > 0) return 'ones' as const;
+    return undefined;
+  };
+
+  const rerollHitKind = resolveRerollKind('hit');
+  const rerollWoundKind = resolveRerollKind('wound');
+
   // Extract weapon characteristic modifiers (from attacker)
   const weaponModifiers = {
     A: attackerContext.modifiers.get('A') || 0,
@@ -345,7 +360,9 @@ export function calculateCombatModifiers(params: {
     weaponModifiers,
     targetModifiers,
     addedKeywords,
-    appliedRules
+    appliedRules,
+    rerollHitKind,
+    rerollWoundKind
   };
 }
 
@@ -369,6 +386,8 @@ export function executeCombatSequence(
       weaponModifiers: { A: number; S: number; AP: number; D: number };
       addedKeywords: string[];
       appliedRules: Rule[];
+      rerollHitKind?: 'ones' | 'failed' | 'all';
+      rerollWoundKind?: 'ones' | 'failed' | 'all';
     };
   }
 ): CombatResult {
@@ -381,6 +400,8 @@ export function executeCombatSequence(
   let dMod = 0;
   let addedKeywords: string[] = [];
   let appliedRules: Rule[] = [];
+  let rerollHitKind: 'ones' | 'failed' | 'all' | undefined;
+  let rerollWoundKind: 'ones' | 'failed' | 'all' | undefined;
 
   if (params?.preCalculatedModifiers) {
     // Use pre-calculated modifiers (already merged from attacker and defender)
@@ -392,6 +413,8 @@ export function executeCombatSequence(
     dMod = params.preCalculatedModifiers.weaponModifiers.D;
     addedKeywords = params.preCalculatedModifiers.addedKeywords;
     appliedRules = params.preCalculatedModifiers.appliedRules;
+    rerollHitKind = params.preCalculatedModifiers.rerollHitKind;
+    rerollWoundKind = params.preCalculatedModifiers.rerollWoundKind;
   } else if (params?.rules && params?.attacker && params?.game) {
     // Legacy path: calculate modifiers from rules (only supports attacker rules)
     const context = buildCombatContext({
@@ -416,6 +439,17 @@ export function executeCombatSequence(
     apMod = context.modifiers.get('AP') || 0;
     dMod = context.modifiers.get('D') || 0;
     addedKeywords = getAddedKeywords(context);
+    const resolveRerollKind = (phase: 'hit' | 'wound') => {
+      const all = context.modifiers.getModifiers(`reroll:${phase}:all`);
+      if (all.length > 0) return 'all' as const;
+      const failed = context.modifiers.getModifiers(`reroll:${phase}:failed`);
+      if (failed.length > 0) return 'failed' as const;
+      const ones = context.modifiers.getModifiers(`reroll:${phase}:ones`);
+      if (ones.length > 0) return 'ones' as const;
+      return undefined;
+    };
+    rerollHitKind = resolveRerollKind('hit');
+    rerollWoundKind = resolveRerollKind('wound');
   }
 
   // Apply weapon modifiers (works for both legacy and new paths)
@@ -518,6 +552,7 @@ export function executeCombatSequence(
     sustainedHitsValue: keywords.sustainedHitsValue || undefined,
     lethalHits: keywords.lethalHits,
     torrent: keywords.torrent,
+    rerollHits: rerollHitKind,
     attackCountRolls: attacksResult.rolls
   });
 
@@ -539,6 +574,7 @@ export function executeCombatSequence(
     adjustedWoundThreshold,
     {
       twinLinked: keywords.twinLinked,
+      rerollWounds: rerollWoundKind,
       antiXThreshold: keywords.antiXThreshold || undefined
     }
   );
