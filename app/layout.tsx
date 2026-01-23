@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Skranji } from "next/font/google";
 import "./globals.css";
+import Eruda from "../components/Eruda";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,6 +35,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${skranji.variable} antialiased bg-gray-900 text-white`}
         suppressHydrationWarning
       >
+        <Eruda />
         {children}
       </body>
     </html>

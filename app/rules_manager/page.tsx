@@ -90,6 +90,7 @@ export default function RulesManagerPage() {
     setRuleObjectText(rule.ruleObject || '');
     setError(null);
     setAiMessage(null);
+    setUserInstructions('');
   };
 
   const handleAiImplement = async (rule: Rule, asReminder: boolean = false, aiExplanation?: string, userResponse?: string) => {
@@ -172,6 +173,7 @@ export default function RulesManagerPage() {
     setRuleObjectText('');
     setError(null);
     setAiMessage(null);
+    setUserInstructions('');
   };
 
   const handleDownloadAll = () => {
@@ -380,6 +382,19 @@ export default function RulesManagerPage() {
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Additional Instructions (Optional):
+                  </label>
+                  <textarea
+                    value={userInstructions}
+                    onChange={(e) => setUserInstructions(e.target.value)}
+                    placeholder="Provide additional context for the AI (e.g., 'Treat this as a reminder-only rule in the fight phase')"
+                    className="w-full bg-gray-900 text-white border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-purple-500 resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Rule Objects (JSON Array):
                   </label>
                   <div className="text-xs text-gray-400 mb-2">
@@ -420,17 +435,32 @@ export default function RulesManagerPage() {
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <button
-                    onClick={() => handleAiImplement(editingRule)}
-                    disabled={isImplementing || !editingRule.rawText}
-                    className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition-colors flex items-center gap-2"
-                    title={!editingRule.rawText ? 'No rule text available' : 'Use AI to re-implement this rule'}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    {isImplementing ? 'Generating...' : 'AI Re-implement'}
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleAiImplement(editingRule)}
+                      disabled={isImplementing || !editingRule.rawText}
+                      className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition-colors flex items-center gap-2"
+                      title={!editingRule.rawText ? 'No rule text available' : 'Use AI to re-implement this rule'}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      {isImplementing ? 'Generating...' : 'AI Re-implement'}
+                    </button>
+                    <button
+                      onClick={() => handleAiImplement(
+                        editingRule,
+                        false,
+                        undefined,
+                        userInstructions.trim() || undefined
+                      )}
+                      disabled={isImplementing || !editingRule.rawText}
+                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition-colors"
+                      title={!editingRule.rawText ? 'No rule text available' : 'Re-implement with your instructions'}
+                    >
+                      {isImplementing ? 'Generating...' : 'Redo with Instructions'}
+                    </button>
+                  </div>
                   <div className="flex gap-3">
                     <button
                       onClick={handleCancel}

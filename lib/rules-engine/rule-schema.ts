@@ -81,6 +81,7 @@ export const Atom = z.union([
   z.object({ t: z.literal("weaponType"), any: z.array(z.enum(["ranged", "melee"])).min(1) }).strict(),
   z.object({ t: z.literal("targetCategory"), any: z.array(z.string()).min(1) }).strict(),
   z.object({ t: z.literal("weaponName"), is: z.string().min(1) }).strict(),
+  z.object({ t: z.literal("unitName"), is: z.string().min(1) }).strict(),
   z.object({ t: z.literal("unitStatus"), has: z.array(z.string()).min(1) }).strict(),
   z.object({ t: z.literal("armyState"), is: z.array(z.string()).min(1) }).strict(),
   z.object({ t: z.literal("isLeading") }).strict(),

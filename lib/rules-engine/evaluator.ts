@@ -49,6 +49,13 @@ export function evaluateWhen(when: WhenType, context: CombatContext): boolean {
       return weaponName.toLowerCase() === when.is.toLowerCase();
     }
 
+    case 'unitName': {
+      const unitName = context.combatRole === 'defender'
+        ? context.defender.name
+        : context.attacker.name;
+      return unitName.toLowerCase() === when.is.toLowerCase();
+    }
+
     // Unit status
     case 'unitStatus':
       return when.has.some((status: string) => {

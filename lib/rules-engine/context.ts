@@ -11,6 +11,7 @@ export interface CombatContext extends CombatOptions {
   attacker: {
     unitId: string;
     armyId: string;
+    name: string;
     categories: string[];
     leaderId?: string;      // If unit is being led
     isLeader?: boolean;     // If this unit is itself a leader (CHARACTER)
@@ -19,6 +20,7 @@ export interface CombatContext extends CombatOptions {
   defender: {
     unitId: string;
     armyId: string;
+    name: string;
     categories: string[];
     modelCount: number;
     T: number;
@@ -113,6 +115,7 @@ export function buildCombatContext(params: {
     attacker: {
       unitId: attacker.id,
       armyId: attacker.armyId,
+      name: attacker.name || '',
       categories: attacker.categories || [],
       leaderId: getLeaderId(attacker),
       // Use passed-in isLeader if available, otherwise check if unit is a CHARACTER
@@ -126,6 +129,7 @@ export function buildCombatContext(params: {
     defender: {
       unitId: defender.id,
       armyId: defender.armyId,
+      name: defender.name || '',
       categories: defender.categories || [],
       modelCount: defender.models?.length || 0,
       T: defender.models?.[0]?.T || 0,
