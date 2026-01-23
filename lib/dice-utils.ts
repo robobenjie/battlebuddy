@@ -142,7 +142,7 @@ export function rollAttacks(
 ): AttackResult {
   // Torrent: all attacks auto-hit
   if (modifiers.torrent) {
-    const attackRolls = Array.from({ length: attackCount }, () => ({ value: 6 }));
+    const attackRolls: DiceRoll[] = Array.from({ length: attackCount }, () => ({ value: 6 }));
     const hits = Array.from({ length: attackCount }, (_, i) => i);
     const criticalHits = Array.from({ length: attackCount }, (_, i) => i);
     const lethalHits = modifiers.lethalHits ? Array.from({ length: attackCount }, (_, i) => i) : [];
@@ -166,7 +166,7 @@ export function rollAttacks(
     };
   }
 
-  const attackRolls = rollDice(attackCount).map(value => ({ value }));
+  const attackRolls: DiceRoll[] = rollDice(attackCount).map(value => ({ value }));
 
   const hits: number[] = [];
   const criticalHits: number[] = [];

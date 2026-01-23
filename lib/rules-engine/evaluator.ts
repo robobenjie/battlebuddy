@@ -43,6 +43,12 @@ export function evaluateWhen(when: WhenType, context: CombatContext): boolean {
       console.log('      Match result:', result);
       return result;
 
+    // Weapon name
+    case 'weaponName': {
+      const weaponName = context.weapon?.name || '';
+      return weaponName.toLowerCase() === when.is.toLowerCase();
+    }
+
     // Unit status
     case 'unitStatus':
       return when.has.some((status: string) => {

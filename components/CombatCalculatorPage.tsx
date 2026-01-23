@@ -228,6 +228,24 @@ export default function CombatCalculatorPage({
       }
     }
 
+    const applyDamageModifier = (baseDamage: string, mod: number) => {
+      if (!mod) return baseDamage;
+      const flatMatch = baseDamage.match(/^\d+$/);
+      if (flatMatch) {
+        return (parseInt(baseDamage, 10) + mod).toString();
+      }
+
+      const dieMatch = baseDamage.match(/^D([36])(?:\+(\d+))?$/i);
+      if (dieMatch) {
+        const sides = dieMatch[1];
+        const existing = dieMatch[2] ? parseInt(dieMatch[2], 10) : 0;
+        const next = existing + mod;
+        return next > 0 ? `D${sides}+${next}` : `D${sides}`;
+      }
+
+      return `${baseDamage}+${mod}`;
+    };
+
     return {
       name: baseWeapon.name,
       range: baseWeapon.range,
@@ -235,7 +253,7 @@ export default function CombatCalculatorPage({
       WS: baseWeapon.WS,
       S: baseWeapon.S + (modifiers.S || 0),
       AP: baseWeapon.AP + (modifiers.AP || 0),
-      D: baseWeapon.D, // TODO: handle D modifiers
+      D: applyDamageModifier(baseWeapon.D, modifiers.D || 0),
       keywords: baseWeapon.keywords || []
     };
   };
@@ -415,17 +433,34 @@ export default function CombatCalculatorPage({
     keywords: selectedTarget.keywords || []
   } : undefined;
 
+  const currentTurnKey = game?.currentTurn && propCurrentPlayer?.id
+    ? `${game.currentTurn}-${propCurrentPlayer.id}`
+    : null;
+
+  const statusHasCurrentTurn = (status: any) => {
+    if (!status?.turns) return false;
+    if (currentTurnKey && status.turns.includes(currentTurnKey)) return true;
+    if (game?.currentTurn !== undefined && status.turns.includes(game.currentTurn)) return true;
+    if (game?.currentTurn !== undefined && status.turns.includes(String(game.currentTurn))) return true;
+    return false;
+  };
+
+  const unitHasStatus = (unitToCheck: any, name: string) =>
+    unitToCheck?.statuses?.some((status: any) =>
+      status.name === name && statusHasCurrentTurn(status)
+    ) || false;
+
   // Check if the attacking unit charged this turn (for lance keyword)
-  const unitHasCharged = unit?.statuses?.some((status: any) =>
-    status.name === 'charged' &&
-    status.turns && status.turns.includes(game?.currentTurn)
-  ) || false;
+  const unitHasCharged = unitHasStatus(unit, 'charged');
 
   // Check if unit has moved or advanced this turn (for heavy weapon bonus)
-  const unitHasMovedOrAdvanced = unit?.statuses?.some((status: any) =>
-    (status.name === 'moved' || status.name === 'advanced') &&
-    status.turns && status.turns.includes(game?.currentTurn)
-  ) || false;
+  const unitHasMovedOrAdvanced = unitHasStatus(unit, 'moved') || unitHasStatus(unit, 'advanced');
+
+  // Check if the target unit charged this turn (for defender rules that care)
+  const targetHasCharged = unitHasStatus(selectedTarget, 'charged');
+
+  // Check if target unit has moved or advanced this turn
+  const targetHasMovedOrAdvanced = unitHasStatus(selectedTarget, 'moved') || unitHasStatus(selectedTarget, 'advanced');
 
   // Count total weapons with the same name
   const totalWeaponCount = selectedWeapon
@@ -626,14 +661,22 @@ export default function CombatCalculatorPage({
       options: {
         modelsFiring: 1,
         withinHalfRange: false,
-        unitRemainedStationary: false,
-        unitHasCharged: false,
+        unitRemainedStationary: !unitHasMovedOrAdvanced,
+        unitHasCharged,
         blastBonusAttacks: 0
       },
       rules: attackerRules,
       armyStates: attackerArmyStates // Use attacker's army states
     });
     console.log('🔍 Attacker context created with armyStates:', attackerContext.armyStates, 'length:', attackerContext.armyStates.length);
+    console.log('🔍 Attacker context details:', {
+      unitHasCharged: attackerContext.unitHasCharged,
+      unitRemainedStationary: attackerContext.unitRemainedStationary,
+      weaponName: attackerContext.weapon?.name,
+      combatPhase: attackerContext.combatPhase,
+      attackerCategories: attackerContext.attacker?.categories,
+      defenderCategories: attackerContext.defender?.categories
+    });
 
     console.log('🔍 Building defender context with armyStates:', defenderArmyStates, 'length:', defenderArmyStates.length);
     const defenderContext = buildCombatContext({
@@ -646,8 +689,8 @@ export default function CombatCalculatorPage({
       options: {
         modelsFiring: 1,
         withinHalfRange: false,
-        unitRemainedStationary: false,
-        unitHasCharged: false,
+        unitRemainedStationary: !targetHasMovedOrAdvanced,
+        unitHasCharged: targetHasCharged,
         blastBonusAttacks: 0
       },
       rules: defenderRules,

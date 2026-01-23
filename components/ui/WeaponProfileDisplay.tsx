@@ -142,6 +142,24 @@ export default function WeaponProfileDisplay({
 
   // Use provided modifiedWeapon or calculate it (for backwards compatibility)
   const modifiedWeapon = propModifiedWeapon || (() => {
+    const applyDamageModifier = (baseDamage: string, mod: number) => {
+      if (!mod) return baseDamage;
+      const flatMatch = baseDamage.match(/^\d+$/);
+      if (flatMatch) {
+        return (parseInt(baseDamage, 10) + mod).toString();
+      }
+
+      const dieMatch = baseDamage.match(/^D([36])(?:\+(\d+))?$/i);
+      if (dieMatch) {
+        const sides = dieMatch[1];
+        const existing = dieMatch[2] ? parseInt(dieMatch[2], 10) : 0;
+        const next = existing + mod;
+        return next > 0 ? `D${sides}+${next}` : `D${sides}`;
+      }
+
+      return `${baseDamage}+${mod}`;
+    };
+
     // Check for "Extra Attacks" keyword
     const hasExtraAttacks = weapon.keywords?.some((kw: string) =>
       kw.toLowerCase() === 'extra attacks'
@@ -162,7 +180,7 @@ export default function WeaponProfileDisplay({
       A: modifiedA,
       S: weapon.S + (weaponStatModifiers.S || 0),
       AP: weapon.AP + (weaponStatModifiers.AP || 0),
-      D: weapon.D
+      D: applyDamageModifier(weapon.D, weaponStatModifiers.D || 0)
     };
   })();
 
@@ -326,13 +344,18 @@ export default function WeaponProfileDisplay({
     };
   };
 
+  const damageModifier =
+    weaponStatModifiers.D && modifierSources?.D && modifierSources.D.length > 0
+      ? `${weapon.D} → ${modifiedWeapon.D} (${formatModifierSources(modifierSources.D, activeRules)})`
+      : '';
+
   const rows = [
     ...(!hideRange ? [{ stat: 'Range', value: `${weapon.range}"`, modifier: '' }] : []),
     getAttacksRow(),
     getHitsRow(),
     getWoundsRow(),
     getSaveRow(),
-    { stat: 'Damage', value: weapon.D, modifier: '' }
+    { stat: 'Damage', value: modifiedWeapon.D, modifier: damageModifier }
   ];
 
   return (

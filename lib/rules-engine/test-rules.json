@@ -1372,6 +1372,58 @@
           }
         ]
       }
+    },
+    {
+      "name": "thunderous-charge",
+      "isExample": false,
+      "exampleReason": "Weapon-name specific melee modifier gated by charged status.",
+      "rule": {
+        "id": "thunderous-charge",
+        "name": "Thunderous Charge",
+        "description": "Each time a model in this unit makes a melee attack with its Wolf Guard weapon, if it made a Charge move this turn, add 1 to the Damage characteristic of that attack.",
+        "faction": "Adeptus Astartes",
+        "scope": "unit",
+        "trigger": {
+          "t": "automatic",
+          "phase": "fight",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "all",
+          "xs": [
+            {
+              "t": "weaponType",
+              "any": [
+                "melee"
+              ]
+            },
+            {
+              "t": "weaponName",
+              "is": "Wolf Guard weapon"
+            },
+            {
+              "t": "unitStatus",
+              "has": [
+                "charged"
+              ]
+            }
+          ]
+        },
+        "kind": "passive",
+        "then": [
+          {
+            "t": "do",
+            "fx": [
+              {
+                "t": "modWeaponStat",
+                "stat": "D",
+                "add": 1
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }
