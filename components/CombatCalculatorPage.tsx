@@ -9,8 +9,19 @@ import ActiveRulesDisplay from './ui/ActiveRulesDisplay';
 import { formatUnitForCard, sortUnitsByPriority, getUnitDisplayName } from '../lib/unit-utils';
 import DigitalDiceMenu from './DigitalDiceMenu';
 import DiceRollResults from './ui/DiceRollResults';
-import { executeCombatSequence, executeSavePhase, executeFNPPhase, CombatResult, CombatOptions, WeaponStats, TargetStats, calculateCombatModifiers } from '../lib/combat-calculator-engine';
-import { Rule, ArmyState, buildCombatContext, evaluateAllRules, getAddedKeywords, getAllUnitRules, evaluateWhen } from '../lib/rules-engine';
+import {
+  executeCombatSequence,
+  executeSavePhase,
+  executeFNPPhase,
+  CombatResult,
+  CombatOptions,
+  WeaponStats,
+  TargetStats,
+  buildCombatState,
+  applyTargetModifiers,
+  CombatState
+} from '../lib/combat-calculator-engine';
+import { Rule, ArmyState, getAllUnitRules, evaluateWhen } from '../lib/rules-engine';
 import { UNIT_FULL_QUERY, UNIT_BASIC_QUERY } from '../lib/query-fragments';
 import { DiceRollEvent, CombatPhaseEvent } from '../lib/rooms-types';
 
@@ -146,6 +157,8 @@ export default function CombatCalculatorPage({
     damageReroll?: string[];
   }>({});
   const [currentArmyStates, setCurrentArmyStates] = useState<ArmyState[]>([]);
+  const [combatState, setCombatState] = useState<CombatState | null>(null);
+  const [rollCombatState, setRollCombatState] = useState<CombatState | null>(null);
 
   // Room setup for real-time collaboration
   // Always initialize room (use dummy ID if no gameId to satisfy React hooks rules)
@@ -210,71 +223,10 @@ export default function CombatCalculatorPage({
     }
   }, [gameId, selectedTargetId, selectedWeaponId, publishPresence, currentPlayer]);
 
-  // Helper to apply weapon modifiers (consolidates logic for display and dice rolling)
-  const applyWeaponModifiers = (baseWeapon: any, modifiers: { A?: number; S?: number; AP?: number; D?: number }): WeaponStats => {
-    // Check for "Extra Attacks" keyword - these weapons cannot have attacks modified
-    const hasExtraAttacks = baseWeapon.keywords?.some((kw: string) =>
-      kw.toLowerCase() === 'extra attacks'
-    );
-
-    let modifiedA = baseWeapon.A;
-    // Only apply A modifier if weapon doesn't have "Extra Attacks" keyword
-    if (modifiers.A && !hasExtraAttacks) {
-      const numMatch = baseWeapon.A.match(/^\d+$/);
-      if (numMatch) {
-        modifiedA = (parseInt(baseWeapon.A, 10) + modifiers.A).toString();
-      } else {
-        modifiedA = `${baseWeapon.A}+${modifiers.A}`;
-      }
-    }
-
-    const applyDamageModifier = (baseDamage: string, mod: number) => {
-      if (!mod) return baseDamage;
-      const flatMatch = baseDamage.match(/^\d+$/);
-      if (flatMatch) {
-        return (parseInt(baseDamage, 10) + mod).toString();
-      }
-
-      const dieMatch = baseDamage.match(/^D([36])(?:\+(\d+))?$/i);
-      if (dieMatch) {
-        const sides = dieMatch[1];
-        const existing = dieMatch[2] ? parseInt(dieMatch[2], 10) : 0;
-        const next = existing + mod;
-        return next > 0 ? `D${sides}+${next}` : `D${sides}`;
-      }
-
-      return `${baseDamage}+${mod}`;
-    };
-
-    return {
-      name: baseWeapon.name,
-      range: baseWeapon.range,
-      A: modifiedA,
-      WS: baseWeapon.WS,
-      S: baseWeapon.S + (modifiers.S || 0),
-      AP: baseWeapon.AP + (modifiers.AP || 0),
-      D: applyDamageModifier(baseWeapon.D, modifiers.D || 0),
-      keywords: baseWeapon.keywords || []
-    };
-  };
-
   // Ref for target select to auto-focus
   const targetSelectRef = useRef<HTMLSelectElement>(null);
 
   // Auto-focus the target dropdown when component mounts
-  // Helper to apply target stat modifiers (for display and combat calculation)
-  const applyTargetModifiers = (baseTarget: TargetStats | null | undefined, modifiers: { T?: number; SV?: number; INV?: number; FNP?: number }): TargetStats | null => {
-    if (!baseTarget) return null;
-
-    return {
-      ...baseTarget,
-      T: baseTarget.T + (modifiers.T || 0),
-      SV: baseTarget.SV + (modifiers.SV || 0),
-      INV: modifiers.INV !== undefined ? modifiers.INV : baseTarget.INV,
-      FNP: modifiers.FNP !== undefined ? modifiers.FNP : baseTarget.FNP
-    };
-  };
-
   useEffect(() => {
     if (targetSelectRef.current) {
       targetSelectRef.current.focus();
@@ -475,6 +427,7 @@ export default function CombatCalculatorPage({
       setHitModifier(0);
       setWoundModifier(0);
       setModifierSources({ hit: [], wound: [], keywords: [], damageReroll: [] });
+      setCombatState(null);
       return;
     }
 
@@ -647,17 +600,12 @@ export default function CombatCalculatorPage({
       weaponType
     });
 
-    // Build separate contexts for attacker and defender rules with their respective army states
-    console.log('🔍 Building attacker context with armyStates:', attackerArmyStates, 'length:', attackerArmyStates.length);
-    const isLeaderValue = !!(unit?.bodyguardUnits && unit.bodyguardUnits.length > 0);
-    console.log('🔍 Setting isLeader for unit:', unit?.name, 'bodyguardUnits.length:', unit?.bodyguardUnits?.length, 'isLeader:', isLeaderValue);
-    const attackerContext = buildCombatContext({
-      attacker: { ...unit, armyId: currentArmyId, isLeader: isLeaderValue },
+    const combatStateResult = buildCombatState({
+      attacker: { ...unit, armyId: currentArmyId, isLeader: !!(unit?.bodyguardUnits && unit.bodyguardUnits.length > 0) },
       defender: selectedTarget || effectiveTargetStats,
       weapon: weaponStats,
       game: game,
       combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
-      combatRole: 'attacker',
       options: {
         modelsFiring: 1,
         withinHalfRange: false,
@@ -665,45 +613,18 @@ export default function CombatCalculatorPage({
         unitHasCharged,
         blastBonusAttacks: 0
       },
-      rules: attackerRules,
-      armyStates: attackerArmyStates // Use attacker's army states
-    });
-    console.log('🔍 Attacker context created with armyStates:', attackerContext.armyStates, 'length:', attackerContext.armyStates.length);
-    console.log('🔍 Attacker context details:', {
-      unitHasCharged: attackerContext.unitHasCharged,
-      unitRemainedStationary: attackerContext.unitRemainedStationary,
-      weaponName: attackerContext.weapon?.name,
-      combatPhase: attackerContext.combatPhase,
-      attackerCategories: attackerContext.attacker?.categories,
-      defenderCategories: attackerContext.defender?.categories
+      attackerRules,
+      defenderRules,
+      attackerArmyStates,
+      defenderArmyStates,
+      target: effectiveTargetStats
     });
 
-    console.log('🔍 Building defender context with armyStates:', defenderArmyStates, 'length:', defenderArmyStates.length);
-    const defenderContext = buildCombatContext({
-      attacker: { ...unit, armyId: currentArmyId, isLeader: !!(unit?.bodyguardUnits && unit.bodyguardUnits.length > 0) },
-      defender: selectedTarget ? { ...selectedTarget, isLeader: !!(selectedTarget?.bodyguardUnits && selectedTarget.bodyguardUnits.length > 0) } : effectiveTargetStats,
-      weapon: weaponStats,
-      game: game,
-      combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
-      combatRole: 'defender',
-      options: {
-        modelsFiring: 1,
-        withinHalfRange: false,
-        unitRemainedStationary: !targetHasMovedOrAdvanced,
-        unitHasCharged: targetHasCharged,
-        blastBonusAttacks: 0
-      },
-      rules: defenderRules,
-      armyStates: defenderArmyStates // Use defender's army states
-    });
-    console.log('🔍 Defender context created with armyStates:', defenderContext.armyStates, 'length:', defenderContext.armyStates.length);
-
-    // Evaluate rules separately for attacker and defender
-    const appliedAttackerRules = evaluateAllRules(attackerRules, attackerContext);
-    const appliedDefenderRules = evaluateAllRules(defenderRules, defenderContext);
-
-    // Merge applied rules from both contexts for effect calculation
-    const appliedRules = [...appliedAttackerRules, ...appliedDefenderRules];
+    const attackerContext = combatStateResult.modifiers.attackerContext;
+    const defenderContext = combatStateResult.modifiers.defenderContext;
+    const appliedAttackerRules = combatStateResult.modifiers.appliedAttackerRules;
+    const appliedDefenderRules = combatStateResult.modifiers.appliedDefenderRules;
+    const appliedRules = combatStateResult.modifiers.appliedRules;
 
     // For display, only show ATTACKER rules (not opponent's rules)
     // Include choice rules that are waiting for user input
@@ -732,58 +653,17 @@ export default function CombatCalculatorPage({
     console.log('📊 Defender context modifiers:', defenderContext.modifiers.getAllModifiers());
 
     // Extract keywords (weapon abilities) from attacker context
-    const keywords = getAddedKeywords(attackerContext);
+    const keywords = combatStateResult.modifiers.addedKeywords;
     console.log('🎯 Extracted keywords:', keywords);
 
-    // Extract modifiers from attacker context (offensive abilities)
-    const attackerHitMod = attackerContext.modifiers.get('hit') || 0;
-    const attackerWoundMod = attackerContext.modifiers.get('wound') || 0;
-    const attackerAMod = attackerContext.modifiers.get('A') || 0;
-    const attackerSMod = attackerContext.modifiers.get('S') || 0;
-    const attackerApMod = attackerContext.modifiers.get('AP') || 0;
-    const attackerDMod = attackerContext.modifiers.get('D') || 0;
+    const hitMod = combatStateResult.modifiers.hitModifier;
+    const woundMod = combatStateResult.modifiers.woundModifier;
+    const aMod = combatStateResult.modifiers.weaponModifiers.A;
+    const sMod = combatStateResult.modifiers.weaponModifiers.S;
+    const apMod = combatStateResult.modifiers.weaponModifiers.AP;
+    const dMod = combatStateResult.modifiers.weaponModifiers.D;
 
-    // Extract defensive modifiers from defender context (defensive abilities)
-    // (e.g., Super Runts: "subtract 1 from wound roll" when defending)
-    const defenderHitMod = defenderContext.modifiers.get('hit') || 0;
-    const defenderWoundMod = defenderContext.modifiers.get('wound') || 0;
-    const defenderAMod = defenderContext.modifiers.get('A') || 0;
-    const defenderSMod = defenderContext.modifiers.get('S') || 0;
-    const defenderApMod = defenderContext.modifiers.get('AP') || 0;
-    const defenderDMod = defenderContext.modifiers.get('D') || 0;
-
-    // Combine modifiers from both contexts
-    // Defensive abilities can penalize the attacker's rolls/stats
-    const hitMod = attackerHitMod + defenderHitMod;
-    const woundMod = attackerWoundMod + defenderWoundMod;
-    const aMod = attackerAMod + defenderAMod;
-    const sMod = attackerSMod + defenderSMod;
-    const apMod = attackerApMod + defenderApMod;
-    const dMod = attackerDMod + defenderDMod;
-
-    // Extract save modifiers from defender context
-    // Get defensive stat modifiers from defender context
-    // INV and FNP use 'set' operation, so we need to check if they were set
-    const invModifiers = defenderContext.modifiers.getModifiers('INV');
-    const invMod = invModifiers.length > 0
-      ? invModifiers.find(m => m.operation === 'set')?.value
-      : undefined;
-
-    const fnpModifiers = defenderContext.modifiers.getModifiers('FNP');
-    const fnpMod = fnpModifiers.length > 0
-      ? fnpModifiers.find(m => m.operation === 'set')?.value
-      : undefined;
-
-    const svMod = defenderContext.modifiers.get('SV') || 0;
-    const tMod = defenderContext.modifiers.get('T') || 0;
-
-    // Save target stat modifiers to state for display
-    setTargetStatModifiers({
-      T: tMod,
-      SV: svMod,
-      INV: invMod,
-      FNP: fnpMod
-    });
+    setTargetStatModifiers(combatStateResult.modifiers.targetModifiers);
 
     // Extract modifier sources from both attacker and defender contexts
     const hitSources = [
@@ -852,9 +732,9 @@ export default function CombatCalculatorPage({
     setActiveRules(displayRules);
     setHitModifier(hitMod);
     setWoundModifier(woundMod);
-    setAddedKeywords(keywords); // Set the keywords for display
+    setAddedKeywords(keywords);
     setWeaponStatModifiers({ A: aMod, S: sMod, AP: apMod, D: dMod });
-    setCurrentArmyStates(attackerArmyStates); // Store army states for digital dice menu
+    setCurrentArmyStates(attackerArmyStates);
     setModifierSources({
       hit: hitSources,
       wound: woundSources,
@@ -865,6 +745,7 @@ export default function CombatCalculatorPage({
       D: dSources,
       damageReroll: damageRerollSources
     });
+    setCombatState(combatStateResult);
   }, [selectedWeaponId, selectedTarget?.id, unit?.id, game?.id, weaponType]); // Use IDs to avoid object reference changes
 
   const handleBack = () => {
@@ -1039,8 +920,7 @@ export default function CombatCalculatorPage({
       weaponType
     });
 
-    // Use centralized modifier calculation function
-    const modifiers = calculateCombatModifiers({
+    const combatStateResult = buildCombatState({
       attacker: { ...unit, armyId: currentArmyId },
       defender: selectedTarget || targetStats,
       weapon: weaponStats,
@@ -1050,27 +930,26 @@ export default function CombatCalculatorPage({
       attackerRules,
       defenderRules,
       attackerArmyStates,
-      defenderArmyStates
+      defenderArmyStates,
+      target: targetStats
     });
 
-    // Extract modifiers from result
-    const hitMod = modifiers.hitModifier;
-    const woundMod = modifiers.woundModifier; // Already includes defender penalties
-    const keywords = modifiers.addedKeywords;
-    const appliedRules = modifiers.appliedRules;
-    const rerollHitKind = modifiers.rerollHitKind;
-    const rerollWoundKind = modifiers.rerollWoundKind;
+    const hitMod = combatStateResult.modifiers.hitModifier;
+    const woundMod = combatStateResult.modifiers.woundModifier;
+    const keywords = combatStateResult.modifiers.addedKeywords;
+    const appliedRules = combatStateResult.modifiers.appliedRules;
+    const rerollHitKind = combatStateResult.modifiers.rerollHitKind;
+    const rerollWoundKind = combatStateResult.modifiers.rerollWoundKind;
 
-    // Extract weapon and target modifiers
-    const aMod = modifiers.weaponModifiers.A;
-    const sMod = modifiers.weaponModifiers.S;
-    const apMod = modifiers.weaponModifiers.AP;
-    const dMod = modifiers.weaponModifiers.D;
+    const aMod = combatStateResult.modifiers.weaponModifiers.A;
+    const sMod = combatStateResult.modifiers.weaponModifiers.S;
+    const apMod = combatStateResult.modifiers.weaponModifiers.AP;
+    const dMod = combatStateResult.modifiers.weaponModifiers.D;
 
-    const tMod = modifiers.targetModifiers.T;
-    const svMod = modifiers.targetModifiers.SV;
-    const invMod = modifiers.targetModifiers.INV;
-    const fnpMod = modifiers.targetModifiers.FNP;
+    const tMod = combatStateResult.modifiers.targetModifiers.T;
+    const svMod = combatStateResult.modifiers.targetModifiers.SV;
+    const invMod = combatStateResult.modifiers.targetModifiers.INV;
+    const fnpMod = combatStateResult.modifiers.targetModifiers.FNP;
 
     // TODO: Extract modifier sources from appliedRules if needed for UI display
     // For now, just use rule IDs as sources (detailed source tracking would require walking the new schema's then/fx blocks)
@@ -1083,10 +962,7 @@ export default function CombatCalculatorPage({
 
     // Don't apply modifiers here - executeCombatSequence will handle them
     // Just merge in the added keywords so they're available for keyword-based logic
-    const modifiedWeaponStats: WeaponStats = {
-      ...weaponStats,
-      keywords: [...weaponStats.keywords, ...keywords]
-    };
+    const modifiedWeaponStats: WeaponStats = combatStateResult.effectiveWeapon;
 
     // Save for display
     setActiveRules(appliedRules);
@@ -1128,6 +1004,7 @@ export default function CombatCalculatorPage({
     });
 
     setCombatResult(result);
+    setRollCombatState(combatStateResult);
     setShowSavePhase(false);
     setShowDigitalDiceMenu(false);
     setRollInitiatorId(currentPlayer?.id || '');
@@ -1412,8 +1289,8 @@ export default function CombatCalculatorPage({
             <div className="mb-6">
               <WeaponProfileDisplay
                 weapon={selectedWeapon as any}
-                modifiedWeapon={applyWeaponModifiers(selectedWeapon, weaponStatModifiers)}
-                target={applyTargetModifiers(targetStats, targetStatModifiers) || undefined}
+                modifiedWeapon={combatState?.effectiveWeapon}
+                target={combatState?.effectiveTarget || (targetStats ? applyTargetModifiers(targetStats, targetStatModifiers) : undefined)}
                 unitName={unit?.name}
                 hideRange={weaponType === 'melee'}
                 unitHasCharged={unitHasCharged}
@@ -1422,6 +1299,8 @@ export default function CombatCalculatorPage({
                 weaponStatModifiers={weaponStatModifiers}
                 activeRules={activeRules as any}
                 modifierSources={modifierSources}
+                hitThresholdOverride={combatState?.hitThreshold}
+                woundThresholdOverride={combatState?.woundThreshold}
               />
             </div>
           )}
@@ -1476,8 +1355,8 @@ export default function CombatCalculatorPage({
       {/* Digital Dice Menu Modal */}
       {showDigitalDiceMenu && selectedWeapon && targetStats && (
         <DigitalDiceMenu
-          weapon={applyWeaponModifiers(selectedWeapon, weaponStatModifiers)}
-          target={applyTargetModifiers(targetStats, targetStatModifiers)!}
+          weapon={combatState?.effectiveWeapon || (selectedWeapon as any)}
+          target={combatState?.effectiveTarget || applyTargetModifiers(targetStats, targetStatModifiers)!}
           totalWeaponCount={totalWeaponCount}
           unitHasCharged={unitHasCharged}
           unitHasMovedOrAdvanced={unitHasMovedOrAdvanced}
@@ -1507,8 +1386,8 @@ export default function CombatCalculatorPage({
             <div className="flex-1 overflow-hidden">
               <DiceRollResults
                 combatResult={combatResult}
-                weapon={applyWeaponModifiers(selectedWeapon, weaponStatModifiers)}
-                target={applyTargetModifiers(targetStats, targetStatModifiers)!}
+                weapon={rollCombatState?.effectiveWeapon || (selectedWeapon as any)}
+                target={rollCombatState?.effectiveTarget || applyTargetModifiers(targetStats, targetStatModifiers)!}
                 onRollSaves={handleRollSaves}
                 showSavePhase={showSavePhase}
                 activeRules={activeRules as any}
@@ -1516,6 +1395,8 @@ export default function CombatCalculatorPage({
                 woundModifier={woundModifier}
                 addedKeywords={addedKeywords}
                 modifierSources={modifierSources}
+                hitThresholdOverride={rollCombatState?.hitThreshold}
+                woundThresholdOverride={rollCombatState?.woundThreshold}
                 initiatorPlayerId={rollInitiatorId}
                 initiatorPlayerName={rollInitiatorName}
                 currentPlayerId={currentPlayer?.id}

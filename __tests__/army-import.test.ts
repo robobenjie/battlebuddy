@@ -17,6 +17,7 @@ import {
   type WeaponData
 } from '../lib/army-import';
 import testData from '../test_data/assault_weapon_test.json';
+import spaceWolvesData from '../test_data/space_wolves.json';
 
 // Mock transactions storage
 const mockTransactions: any[] = [];
@@ -243,6 +244,118 @@ describe('Army Import - Model Count Preservation', () => {
       army2Models.forEach(transaction => {
         expect(transaction.data.hasOwnProperty('count')).toBe(false);
       });
+    });
+
+    it('should leave movement undefined when M is missing from the profile', () => {
+      const jsonData: NewRecruitRoster = {
+        roster: {
+          name: 'Missing M Test',
+          forces: [
+            {
+              selections: [
+                {
+                  name: 'Test Unit',
+                  categories: [{ name: 'Infantry', id: 'cat-infantry' }],
+                  selections: [
+                    {
+                      type: 'model',
+                      name: 'Test Model',
+                      number: 1,
+                      profiles: [
+                        {
+                          typeName: 'Unit',
+                          name: 'Test Model',
+                          characteristics: [
+                            { name: 'T', $text: '4' },
+                            { name: 'SV', $text: '3+' },
+                            { name: 'W', $text: '2' },
+                            { name: 'LD', $text: '6+' },
+                            { name: 'OC', $text: '1' }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      };
+
+      const armyMetadata = extractArmyMetadata(jsonData, userId1);
+      const units = extractUnits(jsonData, armyMetadata.id, userId1);
+      const models = extractModels(units[0]);
+
+      expect(models[0].M).toBeUndefined();
+    });
+  });
+
+  describe('Movement Import', () => {
+    it('should import correct movement for Space Wolves units (Njal Stormcaller = 7)', () => {
+      const jsonData = spaceWolvesData as NewRecruitRoster;
+      const armyMetadata = extractArmyMetadata(jsonData, userId1);
+      const units = extractUnits(jsonData, armyMetadata.id, userId1);
+
+      const njalUnit = units.find(unit => unit.name === 'Njal Stormcaller');
+      expect(njalUnit).toBeTruthy();
+
+      const models = extractModels(njalUnit!);
+      expect(models.length).toBeGreaterThan(0);
+      expect(models[0].M).toBe(7);
+    });
+
+    it('should not mis-import movement values for unit profiles in space_wolves.json', () => {
+      const jsonData = spaceWolvesData as NewRecruitRoster;
+      const armyMetadata = extractArmyMetadata(jsonData, userId1);
+      const units = extractUnits(jsonData, armyMetadata.id, userId1);
+
+      const unitSelections = jsonData.roster.forces?.[0]?.selections || [];
+      const unitProfileExpectations: Array<{ name: string; expectedM: number }> = [];
+
+      for (const selection of unitSelections) {
+        if (!selection?.profiles) continue;
+        for (const profile of selection.profiles) {
+          if (profile.typeName !== 'Unit') continue;
+          const mChar = profile.characteristics?.find((char: any) => char.name === 'M');
+          if (!mChar) continue;
+          const rawValue = mChar.$text || mChar.value || '';
+          const expectedM = parseInt(String(rawValue).replace(/[^\d]/g, ''), 10);
+          if (Number.isFinite(expectedM)) {
+            unitProfileExpectations.push({ name: profile.name, expectedM });
+          }
+        }
+      }
+
+      const normalizeName = (value: string) => {
+        if (value.endsWith('s')) return value.slice(0, -1);
+        return value;
+      };
+
+      // Only check units we actually imported and can map by name
+      for (const { name, expectedM } of unitProfileExpectations) {
+        const unit = units.find(u => u.name === name) || units.find(u => extractModels(u).some(m => m.name === name || m.name.startsWith(name)));
+        if (!unit) continue;
+        const models = extractModels(unit);
+        const singularName = normalizeName(name);
+        const baseName = name.split(' ')[0];
+        let importedM = models.find(m =>
+          m.name === name ||
+          m.name.startsWith(name) ||
+          m.name === singularName ||
+          m.name.startsWith(singularName)
+        )?.M;
+        if (importedM === undefined && baseName) {
+          importedM = models.find(m => m.name.startsWith(baseName))?.M;
+        }
+        if (importedM === undefined) {
+          const uniqueM = Array.from(new Set(models.map(m => m.M)));
+          if (uniqueM.length === 1) {
+            importedM = uniqueM[0];
+          }
+        }
+        expect(importedM, `unit ${name} M`).toBe(expectedM);
+      }
     });
   });
 });

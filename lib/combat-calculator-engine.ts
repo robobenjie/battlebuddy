@@ -90,6 +90,17 @@ export interface CombatResult {
   options: CombatOptions;
 }
 
+export interface CombatState {
+  modifiers: ReturnType<typeof calculateCombatModifiers>;
+  effectiveWeapon: WeaponStats;
+  effectiveTarget: TargetStats;
+  keywords: KeywordModifiers;
+  hitThreshold: number;
+  woundThreshold: number;
+  saveThreshold: number;
+  usingInvulnerable: boolean;
+}
+
 /**
  * Parse weapon keywords to extract modifiers
  */
@@ -204,6 +215,105 @@ export function parseUnitKeywords(keywords: string[]): { invuln: number | null; 
   return { invuln, fnp };
 }
 
+export function applyWeaponModifiers(
+  weapon: WeaponStats,
+  modifiers: { A?: number; S?: number; AP?: number; D?: number },
+  addedKeywords: string[] = []
+): WeaponStats {
+  const hasExtraAttacks = weapon.keywords?.some((kw: string) =>
+    kw.toLowerCase() === 'extra attacks'
+  );
+
+  let modifiedA = weapon.A;
+  const aMod = modifiers.A || 0;
+  if (aMod !== 0 && !hasExtraAttacks) {
+    const parsed = parseAttackCount(weapon.A);
+    if (parsed.dice > 0) {
+      const newMod = parsed.modifier + aMod;
+      if (newMod > 0) {
+        modifiedA = `D${parsed.dice}+${newMod}`;
+      } else if (newMod < 0) {
+        modifiedA = `D${parsed.dice}${newMod}`;
+      } else {
+        modifiedA = `D${parsed.dice}`;
+      }
+    } else {
+      const newFixed = parsed.fixed + parsed.modifier + aMod;
+      modifiedA = newFixed.toString();
+    }
+  }
+
+  let modifiedD = weapon.D;
+  const dMod = modifiers.D || 0;
+  if (dMod !== 0) {
+    const parsed = parseAttackCount(weapon.D);
+    if (parsed.dice > 0) {
+      const newMod = parsed.modifier + dMod;
+      if (newMod > 0) {
+        modifiedD = `D${parsed.dice}+${newMod}`;
+      } else if (newMod < 0) {
+        modifiedD = `D${parsed.dice}${newMod}`;
+      } else {
+        modifiedD = `D${parsed.dice}`;
+      }
+    } else {
+      const newFixed = parsed.fixed + parsed.modifier + dMod;
+      modifiedD = Math.max(1, newFixed).toString();
+    }
+  }
+
+  return {
+    ...weapon,
+    A: modifiedA,
+    S: weapon.S + (modifiers.S || 0),
+    AP: weapon.AP + (modifiers.AP || 0),
+    D: modifiedD,
+    keywords: [...weapon.keywords, ...addedKeywords]
+  };
+}
+
+export function applyTargetModifiers(
+  target: TargetStats,
+  modifiers: { T?: number; SV?: number; INV?: number; FNP?: number }
+): TargetStats {
+  return {
+    ...target,
+    T: target.T + (modifiers.T || 0),
+    SV: target.SV + (modifiers.SV || 0),
+    INV: modifiers.INV !== undefined ? modifiers.INV : target.INV,
+    FNP: modifiers.FNP !== undefined ? modifiers.FNP : target.FNP
+  };
+}
+
+export function getHitThreshold(
+  weapon: WeaponStats,
+  options: CombatOptions,
+  hitModifier: number,
+  keywords: KeywordModifiers
+): number {
+  let hitThreshold = weapon.WS || -99; // Use -99 to make missing WS obvious
+
+  if (keywords.heavy && options.unitRemainedStationary) {
+    hitThreshold = Math.max(2, hitThreshold - 1);
+  }
+
+  return Math.max(2, Math.min(6, hitThreshold - hitModifier));
+}
+
+export function getWoundThreshold(
+  weapon: WeaponStats,
+  target: TargetStats,
+  options: CombatOptions,
+  woundModifier: number,
+  keywords: KeywordModifiers
+): number {
+  const baseWoundThreshold = calculateWoundThreshold(weapon.S, target.T, {
+    lance: keywords.lance && options.unitHasCharged
+  });
+
+  return Math.max(2, Math.min(6, baseWoundThreshold - woundModifier));
+}
+
 /**
  * Explain modifiers applied to a combat context
  * Returns human-readable explanations for each modifier
@@ -261,6 +371,10 @@ export function calculateCombatModifiers(params: {
   targetModifiers: { T: number; SV: number; INV?: number; FNP?: number };
   addedKeywords: string[];
   appliedRules: Rule[];
+  appliedAttackerRules: Rule[];
+  appliedDefenderRules: Rule[];
+  attackerContext: CombatContext;
+  defenderContext: CombatContext;
   rerollHitKind?: 'ones' | 'failed' | 'all';
   rerollWoundKind?: 'ones' | 'failed' | 'all';
 } {
@@ -361,8 +475,84 @@ export function calculateCombatModifiers(params: {
     targetModifiers,
     addedKeywords,
     appliedRules,
+    appliedAttackerRules,
+    appliedDefenderRules,
+    attackerContext,
+    defenderContext,
     rerollHitKind,
     rerollWoundKind
+  };
+}
+
+export function buildCombatState(params: {
+  attacker: any;
+  defender: any;
+  weapon: WeaponStats;
+  game: any;
+  combatPhase: 'shooting' | 'melee';
+  options: CombatOptions;
+  attackerRules: Rule[];
+  defenderRules: Rule[];
+  attackerArmyStates: ArmyState[];
+  defenderArmyStates: ArmyState[];
+  target: TargetStats;
+}): CombatState {
+  const modifiers = calculateCombatModifiers({
+    attacker: params.attacker,
+    defender: params.defender,
+    weapon: params.weapon,
+    game: params.game,
+    combatPhase: params.combatPhase,
+    options: params.options,
+    attackerRules: params.attackerRules,
+    defenderRules: params.defenderRules,
+    attackerArmyStates: params.attackerArmyStates,
+    defenderArmyStates: params.defenderArmyStates
+  });
+
+  const effectiveWeapon = applyWeaponModifiers(
+    params.weapon,
+    modifiers.weaponModifiers,
+    modifiers.addedKeywords
+  );
+
+  const effectiveTarget = applyTargetModifiers(
+    params.target,
+    modifiers.targetModifiers
+  );
+
+  const keywords = parseKeywords(effectiveWeapon.keywords, effectiveTarget.categories || []);
+
+  const hitThreshold = getHitThreshold(
+    effectiveWeapon,
+    params.options,
+    modifiers.hitModifier,
+    keywords
+  );
+
+  const woundThreshold = getWoundThreshold(
+    effectiveWeapon,
+    effectiveTarget,
+    params.options,
+    modifiers.woundModifier,
+    keywords
+  );
+
+  const saveCalc = calculateSaveThreshold(
+    effectiveTarget.SV,
+    effectiveWeapon.AP,
+    effectiveTarget.INV
+  );
+
+  return {
+    modifiers,
+    effectiveWeapon,
+    effectiveTarget,
+    keywords,
+    hitThreshold,
+    woundThreshold,
+    saveThreshold: saveCalc.threshold,
+    usingInvulnerable: saveCalc.usingInvulnerable
   };
 }
 
@@ -452,66 +642,13 @@ export function executeCombatSequence(
     rerollWoundKind = resolveRerollKind('wound');
   }
 
-  // Apply weapon modifiers (works for both legacy and new paths)
-  // Merge added keywords with weapon keywords
-  weapon = {
-    ...weapon,
-    keywords: [...weapon.keywords, ...addedKeywords]
-  };
-
-  // Check for "Extra Attacks" keyword - these weapons cannot have attacks modified
-  const hasExtraAttacks = weapon.keywords?.some((kw: string) =>
-    kw.toLowerCase() === 'extra attacks'
+  const effectiveWeapon = applyWeaponModifiers(
+    weapon,
+    { A: aMod, S: sMod, AP: apMod, D: dMod },
+    addedKeywords
   );
 
-  // Modify attacks properly (handle string parsing)
-  let modifiedA = weapon.A;
-  // Only apply A modifier if weapon doesn't have "Extra Attacks" keyword
-  if (aMod !== 0 && !hasExtraAttacks) {
-    const parsed = parseAttackCount(weapon.A);
-    if (parsed.dice > 0) {
-      // Dice notation: add to modifier (e.g., "d6" → "d6+5")
-      const newMod = parsed.modifier + aMod;
-      if (newMod > 0) {
-        modifiedA = `D${parsed.dice}+${newMod}`;
-      } else {
-        modifiedA = `D${parsed.dice}`;
-      }
-    } else {
-      // Fixed attacks: add to fixed value (e.g., "5" → "10")
-      const newFixed = parsed.fixed + parsed.modifier + aMod;
-      modifiedA = newFixed.toString();
-    }
-  }
-
-  // Modify damage properly (handle string parsing)
-  let modifiedD = weapon.D;
-  if (dMod !== 0) {
-    const parsed = parseAttackCount(weapon.D); // Reuse attack parser - same format
-    if (parsed.dice > 0) {
-      // Dice notation: add to modifier (e.g., "d6" → "d6+2")
-      const newMod = parsed.modifier + dMod;
-      if (newMod > 0) {
-        modifiedD = `D${parsed.dice}+${newMod}`;
-      } else if (newMod < 0) {
-        modifiedD = `D${parsed.dice}${newMod}`;
-      } else {
-        modifiedD = `D${parsed.dice}`;
-      }
-    } else {
-      // Fixed damage: add to fixed value (e.g., "3" → "5")
-      const newFixed = parsed.fixed + parsed.modifier + dMod;
-      modifiedD = Math.max(1, newFixed).toString();
-    }
-  }
-
-  weapon = {
-    ...weapon,
-    A: modifiedA,
-    S: weapon.S + sMod,
-    AP: weapon.AP + apMod,
-    D: modifiedD
-  };
+  weapon = effectiveWeapon;
 
   console.log('⚔️ Applied weapon modifiers:', { A: aMod, S: sMod, AP: apMod, D: dMod });
   console.log('📈 Modified weapon stats:', { A: weapon.A, S: weapon.S, AP: weapon.AP, D: weapon.D });
@@ -536,16 +673,7 @@ export function executeCombatSequence(
   );
   const totalAttacks = attacksResult.total;
 
-  // Calculate hit threshold
-  let hitThreshold = weapon.WS || -99; // Use -99 to make missing WS obvious
-
-  // Heavy: +1 to hit if remained stationary
-  if (keywords.heavy && options.unitRemainedStationary) {
-    hitThreshold = Math.max(2, hitThreshold - 1);
-  }
-
-  // Apply hit modifiers (works for both legacy and new paths)
-  hitThreshold = Math.max(2, Math.min(6, hitThreshold - hitMod));
+  const hitThreshold = getHitThreshold(weapon, options, hitMod, keywords);
 
   // Roll attacks
   const attackPhase = rollAttacks(totalAttacks, hitThreshold, {
@@ -558,14 +686,13 @@ export function executeCombatSequence(
 
   // ===== WOUND PHASE =====
 
-  // Calculate wound threshold
-  const woundThreshold = calculateWoundThreshold(weapon.S, target.T, {
-    lance: keywords.lance && options.unitHasCharged
-  });
-
-  // Apply wound modifiers (works for both legacy and new paths)
-  // NOTE: woundMod now includes both attacker bonuses AND defender penalties (merged in calculateCombatModifiers)
-  let adjustedWoundThreshold = Math.max(2, Math.min(6, woundThreshold - woundMod));
+  const adjustedWoundThreshold = getWoundThreshold(
+    weapon,
+    target,
+    options,
+    woundMod,
+    keywords
+  );
 
   // Roll wounds
   const woundPhase = rollWounds(

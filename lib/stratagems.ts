@@ -239,6 +239,146 @@ export const ORKS_SPEED_FREEKS_STRATAGEMS: Stratagem[] = [
   },
 ];
 
+// Space Wolves Stratagems
+export const SPACE_WOLVES_STRATAGEMS: Stratagem[] = [
+  {
+    id: 'envelop-and-ensnare',
+    name: 'Envelop and Ensnare',
+    cost: 1,
+    phase: 'fight',
+    when: 'Your Fight phase, when a SPACE WOLVES unit (excluding MONSTERS or VEHICLES) has not been selected to fight',
+    effect: 'That unit can make 6" Pile-in and Consolidation moves. Each model does not have to end closer to the closest enemy model, but must end closer to the closest enemy unit.',
+    faction: 'Space Wolves',
+    detachment: 'Saga of the Hunter',
+    turn: 'your-turn',
+  },
+  {
+    id: 'territorial-advantage',
+    name: 'Territorial Advantage',
+    cost: 1,
+    phase: 'fight',
+    when: 'Your Fight phase, just after an enemy unit is destroyed by an ADEPTUS ASTARTES unit from your army',
+    effect: 'Pick one objective marker that unit is within range of. That objective marker remains under your control until your opponent controls it.',
+    faction: 'Space Wolves',
+    detachment: 'Saga of the Hunter',
+    turn: 'your-turn',
+  },
+  {
+    id: 'overwhelming-onslaught',
+    name: 'Overwhelming Onslaught',
+    cost: 1,
+    phase: 'fight',
+    when: "Your opponent's Fight phase, just after an enemy unit has selected its targets",
+    effect: 'Select either two ADEPTUS ASTARTES units or one SPACE WOLVES BEASTS unit within Engagement Range of that enemy unit. Until the end of the phase, subtract 1 from Hit rolls made by that enemy unit.',
+    faction: 'Space Wolves',
+    detachment: 'Saga of the Hunter',
+    turn: 'opponent-turn',
+  },
+  {
+    id: 'chosen-prey',
+    name: 'Chosen Prey',
+    cost: 1,
+    phase: 'move',
+    when: 'Your Movement phase, just after a SPACE WOLVES unit from your army Falls Back',
+    effect: 'That unit can shoot and declare a charge this turn.',
+    faction: 'Space Wolves',
+    detachment: 'Saga of the Hunter',
+    turn: 'your-turn',
+  },
+  {
+    id: 'bounding-advance',
+    name: 'Bounding Advance',
+    cost: 1,
+    phase: 'any',
+    when: 'Your Movement phase or Charge phase, select one SPACE WOLVES INFANTRY or BEASTS unit that has not moved or declared a charge this phase',
+    effect: 'Until the end of the phase, models in that unit can move through non-TITANIC models when making a Normal, Advance, Fall Back, or Charge move.',
+    faction: 'Space Wolves',
+    detachment: 'Saga of the Hunter',
+    turn: 'your-turn',
+  },
+  {
+    id: 'marked-for-destruction',
+    name: 'Marked for Destruction',
+    cost: 1,
+    phase: 'shoot',
+    when: 'Your Shooting phase, select two ADEPTUS ASTARTES units (excluding BEASTS) that have not been selected to shoot',
+    effect: 'Select one enemy unit visible to both. Until the end of the phase, models in your units can only target that enemy unit, and re-roll Wound rolls of 1 against it.',
+    faction: 'Space Wolves',
+    detachment: 'Saga of the Hunter',
+    turn: 'your-turn',
+  },
+];
+
+// Adeptus Astartes - Gladius Task Force Stratagems
+export const SPACE_MARINES_GLADIUS_STRATAGEMS: Stratagem[] = [
+  {
+    id: 'armour-of-contempt',
+    name: 'Armour of Contempt',
+    cost: 1,
+    phase: 'any',
+    when: "Your opponent's Shooting phase or Fight phase, just after an enemy unit has selected its targets",
+    effect: 'Until the attacking unit has finished making its attacks, worsen the Armour Penetration characteristic of those attacks by 1.',
+    faction: 'Adeptus Astartes',
+    detachment: 'Gladius Task Force',
+    turn: 'opponent-turn',
+  },
+  {
+    id: 'only-in-death-does-duty-end',
+    name: 'Only in Death Does Duty End',
+    cost: 2,
+    phase: 'fight',
+    when: 'Fight phase, just after an enemy unit has selected its targets',
+    effect: 'Until the end of the phase, each time a model in your unit is destroyed, if that model has not fought this phase, do not remove it from play. The destroyed model can fight after the attacking unit has finished making its attacks, and is then removed.',
+    faction: 'Adeptus Astartes',
+    detachment: 'Gladius Task Force',
+    turn: 'opponent-turn',
+  },
+  {
+    id: 'honour-the-chapter',
+    name: 'Honour the Chapter',
+    cost: 1,
+    phase: 'fight',
+    when: 'Fight phase',
+    effect: 'Until the end of the phase, melee weapons equipped by models in your unit have the [LANCE] ability. If your unit is under the effects of the Assault Doctrine, improve the Armour Penetration characteristic of such weapons by 1 as well.',
+    faction: 'Adeptus Astartes',
+    detachment: 'Gladius Task Force',
+    turn: 'your-turn',
+  },
+  {
+    id: 'adaptive-strategy',
+    name: 'Adaptive Strategy',
+    cost: 1,
+    phase: 'command',
+    when: 'Your Command phase',
+    effect: 'Select the Devastator Doctrine, Tactical Doctrine or Assault Doctrine. Until the start of your next Command phase, that Combat Doctrine is active for that unit instead of any other Combat Doctrine that is active for your army, even if you have already selected that doctrine this battle.',
+    faction: 'Adeptus Astartes',
+    detachment: 'Gladius Task Force',
+    turn: 'your-turn',
+  },
+  {
+    id: 'storm-of-fire',
+    name: 'Storm of Fire',
+    cost: 1,
+    phase: 'shoot',
+    when: 'Your Shooting phase',
+    effect: 'Until the end of the phase, ranged weapons equipped by models in your unit have the [IGNORES COVER] ability. If your unit is under the effects of the Devastator Doctrine, improve the Armour Penetration characteristic of such weapons by 1 as well.',
+    faction: 'Adeptus Astartes',
+    detachment: 'Gladius Task Force',
+    turn: 'your-turn',
+  },
+  {
+    id: 'squad-tactics',
+    name: 'Squad Tactics',
+    cost: 1,
+    phase: 'move',
+    when: "Your opponent's Movement phase, just after an enemy unit ends a Normal, Advance or Fall Back move",
+    effect: 'Your unit can make a Normal move of up to D6", or a Normal move of up to 6" instead if it is under the effects of the Tactical Doctrine. You cannot select a unit within Engagement Range of any enemy units.',
+    faction: 'Adeptus Astartes',
+    detachment: 'Gladius Task Force',
+    turn: 'opponent-turn',
+  },
+];
+
 // Helper function to get all stratagems for a faction/detachment
 export function getAvailableStratagems(faction?: string, detachment?: string): Stratagem[] {
   const stratagems = [...CORE_STRATAGEMS];
@@ -248,6 +388,18 @@ export function getAvailableStratagems(faction?: string, detachment?: string): S
       stratagems.push(...ORKS_GREEN_TIDE_STRATAGEMS);
     } else if (detachment === 'Speed Freeks' || detachment === 'Kult of Speed') {
       stratagems.push(...ORKS_SPEED_FREEKS_STRATAGEMS);
+    }
+  }
+
+  if (faction?.toLowerCase().includes('space wolves')) {
+    if (detachment === 'Saga of the Hunter') {
+      stratagems.push(...SPACE_WOLVES_STRATAGEMS);
+    }
+  }
+
+  if (faction?.toLowerCase().includes('adeptus astartes')) {
+    if (detachment === 'Gladius Task Force') {
+      stratagems.push(...SPACE_MARINES_GLADIUS_STRATAGEMS);
     }
   }
 

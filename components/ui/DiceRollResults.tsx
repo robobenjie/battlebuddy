@@ -32,6 +32,8 @@ interface DiceRollResultsProps {
     keywords?: Array<{ keyword: string; source: string }>;
     damageReroll?: string[];
   };
+  hitThresholdOverride?: number;
+  woundThresholdOverride?: number;
   // Room collaboration props
   initiatorPlayerId?: string;
   initiatorPlayerName?: string;
@@ -49,6 +51,8 @@ export default function DiceRollResults({
   woundModifier = 0,
   addedKeywords = [],
   modifierSources,
+  hitThresholdOverride,
+  woundThresholdOverride,
   initiatorPlayerId,
   initiatorPlayerName,
   currentPlayerId
@@ -198,7 +202,7 @@ export default function DiceRollResults({
                 <span className="text-gray-400">Hit on:</span>{' '}
                 {/* Show EFFECTIVE hit value (after applying modifiers) */}
                 <span className="text-white">
-                  {getEffectiveHitValue(effectiveWeapon.WS, hitModifier).display}
+                  {hitThresholdOverride ? `${hitThresholdOverride}+` : getEffectiveHitValue(effectiveWeapon.WS, hitModifier).display}
                 </span>
                 {(() => {
                   const sources = formatModifierSources(modifierSources?.hit || [], activeRules);
@@ -306,13 +310,15 @@ export default function DiceRollResults({
               <p>
                 <span className="text-gray-400">Wound on:</span>{' '}
                 <span className="text-white">
-                  {getEffectiveWoundValue(
-                    effectiveWeapon.S,
-                    target.T,
-                    woundModifier,
-                    keywords.lance || false,
-                    options.unitHasCharged || false
-                  ).display}
+                  {woundThresholdOverride
+                    ? `${woundThresholdOverride}+`
+                    : getEffectiveWoundValue(
+                      effectiveWeapon.S,
+                      target.T,
+                      woundModifier,
+                      keywords.lance || false,
+                      options.unitHasCharged || false
+                    ).display}
                 </span>
                 {(() => {
                   const sources = formatModifierSources(modifierSources?.wound || [], activeRules);

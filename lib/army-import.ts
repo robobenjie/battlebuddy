@@ -145,7 +145,7 @@ export interface ModelData {
   id: string;
   name: string;
   unitId: string;
-  M: number; // movement in inches
+  M: number | undefined; // movement in inches
   T: number; // toughness
   SV: number; // save value
   W: number; // wounds
@@ -467,7 +467,7 @@ export function extractModels(unit: UnitData): ModelData[] {
 function getUnitStatlines(unit: UnitData): Array<{
   modelName: string;
   count: number;
-  M: number;
+  M: number | undefined;
   T: number;
   SV: number;
   INV?: number;
@@ -477,7 +477,7 @@ function getUnitStatlines(unit: UnitData): Array<{
 }> {
   const statlineMap = new Map<string, {
     count: number;
-    M: number;
+    M: number | undefined;
     T: number;
     SV: number;
     INV?: number;
@@ -491,18 +491,64 @@ function getUnitStatlines(unit: UnitData): Array<{
     extractStatlinesFromSelections(unit.sourceData.selections, statlineMap);
   }
 
-  // If no statlines found in selections, fallback to unit abilities
-  if (statlineMap.size === 0 && unit.sourceData?.profiles) {
-    // Look for an ability that might represent the unit's profile/statline
-    const unitProfileAbility = unit.sourceData.profiles.find((profile: any) => profile.typeName === 'Unit');
-    if (unitProfileAbility) {
-      const characteristics = unitProfileAbility.characteristics || [];
-      const stats = parseCharacteristicsToStats(characteristics);
-      
-      statlineMap.set(unit.name, {
-        count: 1,
-        ...stats
-      });
+  // Use unit profile stats as a fallback source for missing values
+  if (unit.sourceData?.profiles) {
+    const unitProfiles = unit.sourceData.profiles.filter((profile: any) => profile.typeName === 'Unit');
+    if (unitProfiles.length > 0) {
+      const normalizeName = (value: string) => value.endsWith('s') ? value.slice(0, -1) : value;
+
+      for (const unitProfile of unitProfiles) {
+        const characteristics = unitProfile.characteristics || [];
+        const stats = parseCharacteristicsToStats(characteristics);
+        const profileName = unitProfile.name;
+        const singularName = normalizeName(profileName);
+
+        let targetKey: string | undefined;
+        if (statlineMap.has(profileName)) {
+          targetKey = profileName;
+        } else if (statlineMap.has(singularName)) {
+          targetKey = singularName;
+        } else {
+          // Try prefix match for model names that include loadouts
+          targetKey = Array.from(statlineMap.keys()).find(key =>
+            key === profileName ||
+            key === singularName ||
+            key.startsWith(profileName) ||
+            key.startsWith(singularName)
+          );
+        }
+        if (!targetKey) {
+          const baseName = profileName.split(' ')[0];
+          if (baseName) {
+            targetKey = Array.from(statlineMap.keys()).find(key =>
+              key.startsWith(baseName)
+            );
+          }
+        }
+
+        if (targetKey) {
+          const entry = statlineMap.get(targetKey)!;
+          if (entry.M === undefined) {
+            entry.M = stats.M;
+          }
+        } else if ((profileName === unit.name || unit.name.includes(profileName) || profileName.includes(unit.name)) && stats.M !== undefined) {
+          // Use the unit profile as a fallback for all model entries
+          for (const entry of statlineMap.values()) {
+            if (entry.M === undefined) {
+              entry.M = stats.M;
+            }
+          }
+        }
+      }
+
+      if (statlineMap.size === 0) {
+        const characteristics = unitProfiles[0].characteristics || [];
+        const stats = parseCharacteristicsToStats(characteristics);
+        statlineMap.set(unit.name, {
+          count: 1,
+          ...stats
+        });
+      }
     }
   }
 
@@ -529,7 +575,7 @@ function extractStatlinesFromSelections(
   selections: any[],
   statlineMap: Map<string, {
     count: number;
-    M: number;
+    M: number | undefined;
     T: number;
     SV: number;
     INV?: number;
@@ -589,7 +635,7 @@ function extractStatlinesFromSelections(
           // For now, just record the model name with placeholder stats
           statlineMap.set(modelName, {
             count: modelCount,
-            M: 6,
+            M: undefined,
             T: 4,
             SV: 3,
             W: 1,
@@ -640,15 +686,22 @@ function extractModelNameFromSelection(selection: any): string | null {
  * Helper method to parse characteristics into stats
  */
 function parseCharacteristicsToStats(characteristics: any[]): {
-  M: number;
+  M: number | undefined;
   T: number;
   SV: number;
   W: number;
   LD: number;
   OC: number;
 } {
-  const stats = {
-    M: 6,
+  const stats: {
+    M: number | undefined;
+    T: number;
+    SV: number;
+    W: number;
+    LD: number;
+    OC: number;
+  } = {
+    M: undefined,
     T: 4,
     SV: 3,
     W: 1,
@@ -662,7 +715,7 @@ function parseCharacteristicsToStats(characteristics: any[]): {
     
     switch (char.name) {
       case 'M':
-        stats.M = numValue || 6;
+        stats.M = Number.isFinite(numValue) ? numValue : undefined;
         break;
       case 'T':
         stats.T = numValue || 4;

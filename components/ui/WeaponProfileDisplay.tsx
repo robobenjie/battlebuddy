@@ -59,6 +59,8 @@ interface WeaponProfileDisplayProps {
     AP?: string[];
     D?: string[];
   };
+  hitThresholdOverride?: number;
+  woundThresholdOverride?: number;
 }
 
 // Parse keyword to extract numeric value
@@ -136,7 +138,9 @@ export default function WeaponProfileDisplay({
   woundModifier = 0,
   weaponStatModifiers = {},
   activeRules = [],
-  modifierSources
+  modifierSources,
+  hitThresholdOverride,
+  woundThresholdOverride
 }: WeaponProfileDisplayProps) {
   const [isAtHalfRange, setIsAtHalfRange] = useState(false);
 
@@ -247,6 +251,7 @@ export default function WeaponProfileDisplay({
 
     // Calculate effective hit value with modifiers
     const effectiveHit = getEffectiveHitValue(weapon.WS, hitModifier);
+    const hitDisplay = hitThresholdOverride ? `${hitThresholdOverride}+` : effectiveHit.display;
     const modifierParts: string[] = [];
 
     // Add rule modifiers if present (both positive and negative)
@@ -265,7 +270,7 @@ export default function WeaponProfileDisplay({
 
     return {
       stat: 'Hits on',
-      value: effectiveHit.display,
+      value: hitDisplay,
       modifier: modifierParts.join(', ')
     };
   };
@@ -285,6 +290,7 @@ export default function WeaponProfileDisplay({
       hasLance,
       unitHasCharged
     );
+    const woundDisplay = woundThresholdOverride ? `${woundThresholdOverride}+` : effectiveWound.display;
 
     const modifierParts: string[] = [];
 
@@ -321,7 +327,7 @@ export default function WeaponProfileDisplay({
 
     return {
       stat: 'Wounds on',
-      value: effectiveWound.display,
+      value: woundDisplay,
       modifier: modifierParts.join(' ')
     };
   };
