@@ -50,6 +50,14 @@ function getErrorMessage(error: unknown): string {
   return 'Unknown error';
 }
 
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+}
+
 function hasExcludedOathChapterKeywords(units: UnitData[]): boolean {
   for (const unit of units) {
     for (const category of unit.categories || []) {
@@ -1198,15 +1206,6 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
   console.log(`  Phase 4 (Weapons): ${(t8-t7).toFixed(2)}ms - ${allWeapons.length} weapons`);
   
   try {
-    // Helper function to batch arrays into chunks
-    const chunkArray = <T>(array: T[], size: number): T[][] => {
-      const chunks: T[][] = [];
-      for (let i = 0; i < array.length; i += size) {
-        chunks.push(array.slice(i, i + size));
-      }
-      return chunks;
-    };
-
     console.log('  Database transactions:');
 
     // Step 1: Create army first
@@ -1741,6 +1740,13 @@ export async function extractAndLinkRules(params: {
     let linkingTime = 0;
     let ruleCreationTime = 0;
     let oathHandled = false;
+    const LINK_TX_BATCH_SIZE = 5;
+    const transactInBatches = async (transactions: any[]) => {
+      const batches = chunkArray(transactions, LINK_TX_BATCH_SIZE);
+      for (const batch of batches) {
+        await client.transact(batch);
+      }
+    };
 
     // Process army-level rules
     const armyRuleIdsSet = new Set<string>();
@@ -1797,7 +1803,7 @@ export async function extractAndLinkRules(params: {
     const armyRuleIds = Array.from(armyRuleIdsSet);
     if (armyRuleIds.length > 0) {
       const linkStart = performance.now();
-      await client.transact(
+      await transactInBatches(
         armyRuleIds.map(ruleId => client.tx.armies[armyId].link({ armyRules: ruleId }))
       );
       linkingTime += (performance.now() - linkStart);
@@ -1831,7 +1837,7 @@ export async function extractAndLinkRules(params: {
     // Batch all unit rule links together
     if (allUnitLinks.length > 0) {
       const linkStart = performance.now();
-      await client.transact(allUnitLinks);
+      await transactInBatches(allUnitLinks);
       linkingTime += (performance.now() - linkStart);
     }
 
@@ -1863,7 +1869,7 @@ export async function extractAndLinkRules(params: {
     // Batch all model rule links together
     if (allModelLinks.length > 0) {
       const linkStart = performance.now();
-      await client.transact(allModelLinks);
+      await transactInBatches(allModelLinks);
       linkingTime += (performance.now() - linkStart);
     }
 
@@ -1895,7 +1901,7 @@ export async function extractAndLinkRules(params: {
     // Batch all weapon rule links together
     if (allWeaponLinks.length > 0) {
       const linkStart = performance.now();
-      await client.transact(allWeaponLinks);
+      await transactInBatches(allWeaponLinks);
       linkingTime += (performance.now() - linkStart);
     }
 

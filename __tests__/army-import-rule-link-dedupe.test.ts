@@ -92,6 +92,68 @@ function createStrictMockDb() {
   };
 }
 
+function createTimeoutMockDb(maxOpsPerTransact: number) {
+  const existingRules: any[] = [];
+
+  const mkEntityProxy = (entity: string) => new Proxy({}, {
+    get: (_target, prop) => ({
+      update: (data: any) => ({
+        type: `${entity}-update`,
+        entity,
+        id: String(prop),
+        data,
+        link: (links: any) => ({
+          type: `${entity}-update`,
+          entity,
+          id: String(prop),
+          data,
+          links
+        })
+      }),
+      link: (links: any) => ({
+        type: `${entity}-link`,
+        entity,
+        id: String(prop),
+        links
+      })
+    })
+  });
+
+  return {
+    async queryOnce(_query: any) {
+      return { data: { rules: existingRules } };
+    },
+    async transact(transactions: any[]) {
+      if (transactions.length > maxOpsPerTransact) {
+        throw {
+          status: 'error',
+          eventId: 'test-timeout',
+          message: 'Operation timed out: handle-receive',
+          hint: { 'timeout-ms': 5000 }
+        };
+      }
+
+      for (const tx of transactions) {
+        if (tx.type === 'rules-update') {
+          existingRules.push({
+            id: tx.id,
+            ...tx.data
+          });
+        }
+      }
+
+      return Promise.resolve();
+    },
+    tx: {
+      armies: mkEntityProxy('armies'),
+      units: mkEntityProxy('units'),
+      models: mkEntityProxy('models'),
+      weapons: mkEntityProxy('weapons'),
+      rules: mkEntityProxy('rules')
+    }
+  };
+}
+
 function buildExtractedData(fileName: string): {
   sourceData: string;
   faction: string;
@@ -155,6 +217,21 @@ describe('Army import rule linking dedupe', () => {
       models: data.models,
       weapons: data.weapons,
       dbClient: strictDb as any
+    })).resolves.toBeDefined();
+  });
+
+  it('batches rule-link transactions to avoid timeout-sized payloads', async () => {
+    const timeoutDb = createTimeoutMockDb(5);
+    const data = buildExtractedData('speed_freeks_no_warboss.json');
+
+    await expect(extractAndLinkRules({
+      armyId: data.armyId,
+      faction: data.faction,
+      sourceData: data.sourceData,
+      units: data.units,
+      models: data.models,
+      weapons: data.weapons,
+      dbClient: timeoutDb as any
     })).resolves.toBeDefined();
   });
 });
