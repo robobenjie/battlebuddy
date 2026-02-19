@@ -117,6 +117,13 @@ export function evaluateWhen(when: WhenType, context: CombatContext): boolean {
       }
       return !!context.attacker.isLeader || !!context.attacker.leaderId;
 
+    // Is attached leader - true only when the current unit is a leader and currently attached to a bodyguard
+    case 'isAttachedLeader':
+      if (context.combatRole === 'defender') {
+        return !!(context.defender as any).isAttachedLeader;
+      }
+      return !!(context.attacker as any).isAttachedLeader;
+
     // Is targeted unit - checks if the defender is the targeted unit (for Oath of Moment, etc.)
     case 'isTargetedUnit': {
       const defenderUnitId = context.defender.unitId;

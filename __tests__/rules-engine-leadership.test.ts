@@ -3,9 +3,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { evaluateWhen } from '../lib/rules-engine/evaluator';
+import { evaluateRule, evaluateWhen } from '../lib/rules-engine/evaluator';
 import { buildCombatContext } from '../lib/rules-engine/context';
 import { WeaponStats, TargetStats } from '../lib/combat-calculator-engine';
+import { getTestRule } from '../lib/rules-engine/test-rules';
 
 const testWeapon: WeaponStats = {
   name: 'Test Weapon',
@@ -193,6 +194,164 @@ describe('Leadership Conditions', () => {
 
       const shouldApply = evaluateWhen(leaderCondition, context);
       expect(shouldApply).toBe(false);
+    });
+  });
+
+  describe('isAttachedLeader condition', () => {
+    it('should return true when attacker is a leader currently attached to a bodyguard', () => {
+      const when = { t: 'isAttachedLeader' as const };
+
+      const context = buildCombatContext({
+        attacker: {
+          id: 'leader-unit',
+          armyId: 'test-army',
+          categories: ['CHARACTER', 'INFANTRY'],
+          isLeader: true,
+          bodyguardUnits: [{ id: 'bodyguard-1' }]
+        },
+        defender: testTarget,
+        weapon: testWeapon,
+        game: testGame,
+        combatPhase: 'shooting',
+        combatRole: 'attacker',
+        options: {
+          modelsFiring: 1,
+          withinHalfRange: false,
+          blastBonusAttacks: 0,
+          unitHasCharged: false,
+          unitRemainedStationary: false
+        },
+        rules: [],
+        armyStates: []
+      });
+
+      expect(evaluateWhen(when, context)).toBe(true);
+    });
+
+    it('should return false for bodyguard units and standalone leaders', () => {
+      const when = { t: 'isAttachedLeader' as const };
+
+      const bodyguardContext = buildCombatContext({
+        attacker: {
+          id: 'bodyguard-unit',
+          armyId: 'test-army',
+          categories: ['INFANTRY'],
+          leaderId: 'leader-1'
+        },
+        defender: testTarget,
+        weapon: testWeapon,
+        game: testGame,
+        combatPhase: 'shooting',
+        combatRole: 'attacker',
+        options: {
+          modelsFiring: 1,
+          withinHalfRange: false,
+          blastBonusAttacks: 0,
+          unitHasCharged: false,
+          unitRemainedStationary: false
+        },
+        rules: [],
+        armyStates: []
+      });
+
+      const standaloneLeaderContext = buildCombatContext({
+        attacker: {
+          id: 'standalone-leader',
+          armyId: 'test-army',
+          categories: ['CHARACTER', 'INFANTRY'],
+          isLeader: true,
+          bodyguardUnits: []
+        },
+        defender: testTarget,
+        weapon: testWeapon,
+        game: testGame,
+        combatPhase: 'shooting',
+        combatRole: 'attacker',
+        options: {
+          modelsFiring: 1,
+          withinHalfRange: false,
+          blastBonusAttacks: 0,
+          unitHasCharged: false,
+          unitRemainedStationary: false
+        },
+        rules: [],
+        armyStates: []
+      });
+
+      expect(evaluateWhen(when, bodyguardContext)).toBe(false);
+      expect(evaluateWhen(when, standaloneLeaderContext)).toBe(false);
+    });
+
+    it('should apply attached-leader FNP rule only to attached leaders', () => {
+      const attachedLeaderFnpRule = getTestRule('attached-leader-fnp4');
+      if (!attachedLeaderFnpRule) {
+        throw new Error('attached-leader-fnp4 rule not found in test-rules.json');
+      }
+
+      const attachedLeaderContext = buildCombatContext({
+        attacker: {
+          id: 'enemy-unit',
+          armyId: 'enemy-army',
+          categories: ['INFANTRY']
+        },
+        defender: {
+          id: 'leader-unit',
+          armyId: 'test-army',
+          categories: ['CHARACTER', 'INFANTRY'],
+          isLeader: true,
+          bodyguardUnits: [{ id: 'bodyguard-1' }],
+          models: [{ T: 4, SV: 3 }]
+        },
+        weapon: testWeapon,
+        game: testGame,
+        combatPhase: 'shooting',
+        combatRole: 'defender',
+        options: {
+          modelsFiring: 1,
+          withinHalfRange: false,
+          blastBonusAttacks: 0,
+          unitHasCharged: false,
+          unitRemainedStationary: false
+        },
+        rules: [attachedLeaderFnpRule],
+        armyStates: []
+      });
+
+      const bodyguardContext = buildCombatContext({
+        attacker: {
+          id: 'enemy-unit',
+          armyId: 'enemy-army',
+          categories: ['INFANTRY']
+        },
+        defender: {
+          id: 'bodyguard-unit',
+          armyId: 'test-army',
+          categories: ['INFANTRY'],
+          leaderId: 'leader-1',
+          models: [{ T: 4, SV: 3 }]
+        },
+        weapon: testWeapon,
+        game: testGame,
+        combatPhase: 'shooting',
+        combatRole: 'defender',
+        options: {
+          modelsFiring: 1,
+          withinHalfRange: false,
+          blastBonusAttacks: 0,
+          unitHasCharged: false,
+          unitRemainedStationary: false
+        },
+        rules: [attachedLeaderFnpRule],
+        armyStates: []
+      });
+
+      const appliedToLeader = evaluateRule(attachedLeaderFnpRule, attachedLeaderContext);
+      const appliedToBodyguard = evaluateRule(attachedLeaderFnpRule, bodyguardContext);
+
+      expect(appliedToLeader).toBe(true);
+      expect(attachedLeaderContext.modifiers.apply('FNP', 7)).toBe(4);
+      expect(appliedToBodyguard).toBe(false);
+      expect(bodyguardContext.modifiers.getModifiers('FNP')).toHaveLength(0);
     });
   });
 });

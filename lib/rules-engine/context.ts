@@ -15,6 +15,7 @@ export interface CombatContext extends CombatOptions {
     categories: string[];
     leaderId?: string;      // If unit is being led
     isLeader?: boolean;     // If this unit is itself a leader (CHARACTER)
+    isAttachedLeader?: boolean; // True when this is a leader currently attached to a bodyguard
   };
 
   defender: {
@@ -28,6 +29,7 @@ export interface CombatContext extends CombatOptions {
     INV?: number;
     leaderId?: string;      // If unit is being led
     isLeader?: boolean;     // If this unit is itself a leader (CHARACTER)
+    isAttachedLeader?: boolean; // True when this is a leader currently attached to a bodyguard
   };
 
   weapon: WeaponStats;
@@ -107,6 +109,13 @@ export function buildCombatContext(params: {
     return undefined;
   };
 
+  // Helper to check if this unit is a leader currently attached to a bodyguard
+  const getIsAttachedLeader = (unit: any) => {
+    const unitIsLeader = unit.isLeader !== undefined ? unit.isLeader : isCharacter(unit);
+    const hasBodyguardUnits = Array.isArray(unit.bodyguardUnits) && unit.bodyguardUnits.length > 0;
+    return !!unitIsLeader && hasBodyguardUnits;
+  };
+
   return {
     // Spread options (modelsFiring, withinHalfRange, etc.)
     ...options,
@@ -124,6 +133,7 @@ export function buildCombatContext(params: {
         console.log('🔍 buildCombatContext: attacker.isLeader input:', attacker.isLeader, 'isCharacter:', isCharacter(attacker), 'final result:', result);
         return result;
       })(),
+      isAttachedLeader: getIsAttachedLeader(attacker),
     },
 
     defender: {
@@ -138,6 +148,7 @@ export function buildCombatContext(params: {
       leaderId: getLeaderId(defender),
       // Use passed-in isLeader if available, otherwise check if unit is a CHARACTER
       isLeader: defender.isLeader !== undefined ? defender.isLeader : isCharacter(defender),
+      isAttachedLeader: getIsAttachedLeader(defender),
     },
 
     weapon,

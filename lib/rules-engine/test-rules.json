@@ -1797,6 +1797,39 @@
       }
     },
     {
+      "name": "attached-leader-fnp4",
+      "isExample": false,
+      "exampleReason": "Unit rule that grants Feel No Pain 4+ to the attached leader only while it is leading.",
+      "rule": {
+        "id": "attached-leader-fnp4",
+        "name": "Attached Leader FNP 4+",
+        "description": "While a Character model is leading this unit, that Character model has Feel No Pain 4+.",
+        "faction": "Test Faction",
+        "scope": "unit",
+        "trigger": {
+          "t": "automatic",
+          "phase": "any",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "isAttachedLeader"
+        },
+        "kind": "passive",
+        "then": [
+          {
+            "t": "do",
+            "fx": [
+              {
+                "t": "setFNP",
+                "n": 4
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "defensive-hit-penalty",
       "isExample": false,
       "exampleReason": "Defender-side hit penalty using modHitAgainst. Used to test attacker/defender hit modifier merge.",
