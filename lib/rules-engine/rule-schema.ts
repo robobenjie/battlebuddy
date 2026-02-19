@@ -138,6 +138,7 @@ export const Fx = z.union([
   z.object({ t: z.literal("addUnitAbility"), ability: UnitAbility }).strict(),
 
   // Save characteristics (invuln and FNP)
+  z.object({ t: z.literal("setToughness"), n: z.number().int().min(1) }).strict(),
   z.object({ t: z.literal("setInvuln"), n: z.number().int().min(2).max(7) }).strict(),
   z.object({ t: z.literal("setFNP"), n: z.number().int().min(2).max(7) }).strict(),
 

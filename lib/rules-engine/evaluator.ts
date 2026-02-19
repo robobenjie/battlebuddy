@@ -283,6 +283,19 @@ export function applyFx(fx: FxType, context: CombatContext, ruleId: string): voi
     }
 
     // Invulnerable save
+    case 'setToughness': {
+      const modifier: Modifier = {
+        source: ruleId,
+        stat: 'T',
+        value: fx.n,
+        operation: 'set',
+        priority: 0,
+      };
+      context.modifiers.add(modifier);
+      break;
+    }
+
+    // Invulnerable save
     case 'setInvuln': {
       const modifier: Modifier = {
         source: ruleId,

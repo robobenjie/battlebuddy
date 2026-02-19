@@ -274,11 +274,12 @@ export function applyWeaponModifiers(
 
 export function applyTargetModifiers(
   target: TargetStats,
-  modifiers: { T?: number; SV?: number; INV?: number; FNP?: number }
+  modifiers: { T?: number; TSet?: number; SV?: number; INV?: number; FNP?: number }
 ): TargetStats {
+  const baseToughness = modifiers.TSet !== undefined ? modifiers.TSet : target.T;
   return {
     ...target,
-    T: target.T + (modifiers.T || 0),
+    T: baseToughness + (modifiers.T || 0),
     SV: target.SV + (modifiers.SV || 0),
     INV: modifiers.INV !== undefined ? modifiers.INV : target.INV,
     FNP: modifiers.FNP !== undefined ? modifiers.FNP : target.FNP
@@ -368,7 +369,7 @@ export function calculateCombatModifiers(params: {
   hitModifier: number;
   woundModifier: number;
   weaponModifiers: { A: number; S: number; AP: number; D: number };
-  targetModifiers: { T: number; SV: number; INV?: number; FNP?: number };
+  targetModifiers: { T: number; TSet?: number; SV: number; INV?: number; FNP?: number };
   addedKeywords: string[];
   appliedRules: Rule[];
   appliedAttackerRules: Rule[];
@@ -452,6 +453,13 @@ export function calculateCombatModifiers(params: {
   const attackerTMod = attackerContext.modifiers.get('T') || 0;
   const defenderTMod = defenderContext.modifiers.get('T') || 0;
   const tMod = attackerTMod + defenderTMod;
+  const tSetModifiers = [
+    ...attackerContext.modifiers.getModifiers('T'),
+    ...defenderContext.modifiers.getModifiers('T')
+  ].filter(m => m.operation === 'set');
+  const tSetMod = tSetModifiers.length > 0
+    ? tSetModifiers[tSetModifiers.length - 1].value
+    : undefined;
 
   const attackerSvMod = attackerContext.modifiers.get('SV') || 0;
   const defenderSvMod = defenderContext.modifiers.get('SV') || 0;
@@ -471,6 +479,7 @@ export function calculateCombatModifiers(params: {
 
   const targetModifiers = {
     T: tMod,
+    TSet: tSetMod,
     SV: svMod,
     INV: invMod,
     FNP: fnpMod

@@ -1763,6 +1763,40 @@
       }
     },
     {
+      "name": "set-toughness-seven",
+      "isExample": false,
+      "exampleReason": "Sets defender Toughness to a fixed value. Used to test setToughness effect handling.",
+      "rule": {
+        "id": "set-toughness-seven",
+        "name": "Set Toughness Seven",
+        "description": "Set the target unit's Toughness to 7.",
+        "faction": "Test Faction",
+        "scope": "army",
+        "trigger": {
+          "t": "automatic",
+          "phase": "any",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "combatRole",
+          "is": "attacker"
+        },
+        "kind": "passive",
+        "then": [
+          {
+            "t": "do",
+            "fx": [
+              {
+                "t": "setToughness",
+                "n": 7
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "defensive-hit-penalty",
       "isExample": false,
       "exampleReason": "Defender-side hit penalty using modHitAgainst. Used to test attacker/defender hit modifier merge.",
