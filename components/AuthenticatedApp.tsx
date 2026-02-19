@@ -196,7 +196,7 @@ export default function AuthenticatedApp({ user }: AuthenticatedAppProps) {
                 <div className="w-full text-center">
                   <h3 className="text-2xl font-semibold text-white mb-6">New Game</h3>
                 </div>
-                <div className="w-full flex flex-row items-center space-x-2">
+                <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <input
                     type="text"
                     placeholder="Enter 5-digit code"
@@ -208,7 +208,7 @@ export default function AuthenticatedApp({ user }: AuthenticatedAppProps) {
                   <button
                     onClick={joinGame}
                     disabled={isJoining || gameCode.length !== 5}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+                    className="w-full sm:w-auto bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
                   >
                     {isJoining ? 'Joining...' : 'Join Game'}
                   </button>

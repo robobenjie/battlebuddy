@@ -58,6 +58,8 @@ interface WeaponProfileDisplayProps {
     S?: string[];
     AP?: string[];
     D?: string[];
+    rerollHit?: string[];
+    rerollWound?: string[];
   };
   hitThresholdOverride?: number;
   woundThresholdOverride?: number;
@@ -205,6 +207,9 @@ export default function WeaponProfileDisplay({
     k.toLowerCase() === 'blast'
   );
 
+  const rerollHitSources = formatModifierSources(modifierSources?.rerollHit || [], activeRules);
+  const rerollWoundSources = formatModifierSources(modifierSources?.rerollWound || [], activeRules);
+
   // Calculate blast bonus
   const getBlastBonus = () => {
     if (!hasBlast || !target?.modelCount) return 0;
@@ -268,6 +273,10 @@ export default function WeaponProfileDisplay({
       modifierParts.push(`6+ gets ${sustainedHitsValue} extra hit${sustainedHitsValue > 1 ? 's' : ''} (sustained hits ${sustainedHitsValue})`);
     }
 
+    if (rerollHitSources) {
+      modifierParts.push(`Reroll hits (${rerollHitSources})`);
+    }
+
     return {
       stat: 'Hits on',
       value: hitDisplay,
@@ -323,6 +332,9 @@ export default function WeaponProfileDisplay({
     // Add twin-linked info
     if (hasTwinLinked) {
       modifierParts.push('Reroll wounds (twin-linked)');
+    }
+    if (rerollWoundSources) {
+      modifierParts.push(`Reroll wounds (${rerollWoundSources})`);
     }
 
     return {

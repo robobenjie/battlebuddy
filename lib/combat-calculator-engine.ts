@@ -411,12 +411,17 @@ export function calculateCombatModifiers(params: {
   const appliedRules = [...appliedAttackerRules, ...appliedDefenderRules];
 
   // Extract modifiers from attacker context (offensive modifiers)
-  const hitModifier = attackerContext.modifiers.get('hit');
+  const attackerHitModifier = attackerContext.modifiers.get('hit');
   const attackerWoundModifier = attackerContext.modifiers.get('wound');
 
   // Extract modifiers from defender context (defensive modifiers)
+  // Defensive hit modifiers affect the attacker's hit roll
+  const defenderHitModifier = defenderContext.modifiers.get('hit');
   // Defensive wound modifiers affect the attacker's wound roll
   const defenderWoundModifier = defenderContext.modifiers.get('wound');
+
+  // Combine hit modifiers (attacker bonuses + defender penalties)
+  const hitModifier = attackerHitModifier + defenderHitModifier;
 
   // Combine wound modifiers (attacker bonuses + defender penalties)
   const woundModifier = attackerWoundModifier + defenderWoundModifier;
@@ -442,9 +447,15 @@ export function calculateCombatModifiers(params: {
     D: attackerContext.modifiers.get('D') || 0
   };
 
-  // Extract target stat modifiers (from defender)
-  const tMod = defenderContext.modifiers.get('T') || 0;
-  const svMod = defenderContext.modifiers.get('SV') || 0;
+  // Extract target stat modifiers from both contexts.
+  // Some rules from the attacking side can modify defender stats (e.g. Toughness/Save penalties).
+  const attackerTMod = attackerContext.modifiers.get('T') || 0;
+  const defenderTMod = defenderContext.modifiers.get('T') || 0;
+  const tMod = attackerTMod + defenderTMod;
+
+  const attackerSvMod = attackerContext.modifiers.get('SV') || 0;
+  const defenderSvMod = defenderContext.modifiers.get('SV') || 0;
+  const svMod = attackerSvMod + defenderSvMod;
 
   // Extract save modifiers from defender context
   // INV and FNP use 'set' operation in the new schema

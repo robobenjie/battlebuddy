@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { db } from '../../lib/db';
 import { id } from '@instantdb/react';
 import UnitCard from '../ui/UnitCard';
@@ -11,6 +11,7 @@ import { useRulePopup } from '../ui/RulePopup';
 import RulePopup from '../ui/RulePopup';
 import { getUnitReminders, deduplicateRemindersByName } from '../../lib/rules-engine/reminder-utils';
 import { UNIT_FULL_QUERY } from '../../lib/query-fragments';
+import { CombatSessionRecord } from '../../lib/rooms-types';
 
 interface FightPhaseProps {
   gameId: string;
@@ -36,11 +37,13 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
   const [showCombatCalculator, setShowCombatCalculator] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState<any>(null);
   const [selectedUnitArmyId, setSelectedUnitArmyId] = useState<string>('');
+  const [dismissedSessionUpdatedAt, setDismissedSessionUpdatedAt] = useState<number | null>(null);
   const { isOpen, rule, showRule, hideRule } = useRulePopup();
 
   // Query ALL armies and units in this game, including destroyed units
   const { data: gameData } = db.useQuery({
     games: {
+      combatSessions: {},
       armies: {
         armyRules: {},
         states: {},
@@ -72,12 +75,39 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
   const allArmies = gameRecord?.armies || [];
   const destroyedUnitIds = new Set((gameRecord?.destroyedUnits || []).map((u: any) => u.id));
   const players = playersData?.players || [];
+  const activeSessionId = gameRecord?.activeCombatSessionId;
+  const activeCombatSession = (gameRecord?.combatSessions || []).find((session: any) => session.id === activeSessionId) as CombatSessionRecord | undefined;
 
   // Filter out destroyed units from all armies
   const armiesWithoutDestroyed = allArmies.map((army: any) => ({
     ...army,
     units: (army.units || []).filter((unit: any) => !destroyedUnitIds.has(unit.id))
   }));
+  const allUnitsInGame = armiesWithoutDestroyed.flatMap((army: any) => army.units || []);
+
+  useEffect(() => {
+    if (!activeCombatSession) return;
+    if (dismissedSessionUpdatedAt !== null && activeCombatSession.updatedAt <= dismissedSessionUpdatedAt) {
+      return;
+    }
+
+    if (activeCombatSession.weaponType && activeCombatSession.weaponType !== 'melee') {
+      if (showCombatCalculator) {
+        setShowCombatCalculator(false);
+        setSelectedUnit(null);
+        setSelectedUnitArmyId('');
+      }
+      return;
+    }
+
+    if (activeCombatSession.screen === 'combat-calculator' || activeCombatSession.screen === 'digital-dice') {
+      const unit = allUnitsInGame.find((u: any) => u.id === activeCombatSession.attackerUnitId);
+      if (!unit) return;
+      setSelectedUnit(unit);
+      setSelectedUnitArmyId(unit.armyId || '');
+      setShowCombatCalculator(true);
+    }
+  }, [activeCombatSession?.id, activeCombatSession?.updatedAt, activeCombatSession?.screen, activeCombatSession?.weaponType, dismissedSessionUpdatedAt, allUnitsInGame, showCombatCalculator]);
 
   // Helper to get army name (fallback to player name if needed)
   const getArmyDisplayName = (army: any) => {
@@ -141,10 +171,33 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
   };
 
   // Open combat calculator for melee weapons
-  const openCombatCalculator = (unit: any, armyId: string) => {
+  const openCombatCalculator = async (unit: any, armyId: string) => {
+    const now = Date.now();
+    const sessionId = id();
+    try {
+      await db.transact([
+        db.tx.combatSessions[sessionId].update({
+          screen: 'combat-calculator',
+          createdAt: now,
+          updatedAt: now,
+          initiatorPlayerId: currentPlayer?.id,
+          initiatorPlayerName: currentPlayer?.name,
+          attackerUnitId: unit.id,
+          attackerArmyId: armyId,
+          weaponType: 'melee',
+          phase: 'attacks',
+          version: 1,
+          payload: {}
+        }).link({ game: gameId }),
+        db.tx.games[gameId].update({ activeCombatSessionId: sessionId })
+      ]);
+    } catch (error) {
+      console.error('Failed to create combat session:', error);
+    }
     setSelectedUnit(unit);
     setSelectedUnitArmyId(armyId);
     setShowCombatCalculator(true);
+    setDismissedSessionUpdatedAt(null);
   };
 
   // Close combat calculator and mark unit as fought
@@ -160,6 +213,9 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
     setShowCombatCalculator(false);
     setSelectedUnit(null);
     setSelectedUnitArmyId('');
+    if (activeCombatSession?.updatedAt) {
+      setDismissedSessionUpdatedAt(activeCombatSession.updatedAt);
+    }
   };
 
   // Handle undo action
@@ -357,6 +413,7 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
                 weaponType="melee"
                 onClose={closeCombatCalculator}
                 currentPlayer={currentPlayer}
+                combatSession={activeCombatSession}
               />
             </div>
           </div>

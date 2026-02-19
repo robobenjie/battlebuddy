@@ -375,7 +375,7 @@ export default function GamePage() {
                 <button
                   onClick={startGame}
                   disabled={isStartingGame}
-                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                  className="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
                 >
                   {isStartingGame ? 'Starting Game...' : 'Start Game'}
                 </button>

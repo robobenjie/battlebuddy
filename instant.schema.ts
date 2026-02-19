@@ -33,6 +33,7 @@ const _schema = i.schema({
       activePlayerId: i.string().optional(),
       playerIds: i.json(), // array of player IDs
       phaseHistory: i.json(), // track phase progression for undo functionality
+      activeCombatSessionId: i.string().optional().indexed(),
     }),
 
     players: i.entity({
@@ -139,6 +140,23 @@ const _schema = i.schema({
       choiceValue: i.string().optional(),  // For storing selected choice option (e.g., 'swarming-instincts')
     }),
 
+    combatSessions: i.entity({
+      screen: i.string(), // 'combat-calculator', 'digital-dice'
+      createdAt: i.number(),
+      updatedAt: i.number().indexed(),
+      initiatorPlayerId: i.string().optional(),
+      initiatorPlayerName: i.string().optional(),
+      attackerUnitId: i.string().optional(),
+      attackerArmyId: i.string().optional(),
+      defenderUnitId: i.string().optional(),
+      weaponId: i.string().optional(),
+      weaponName: i.string().optional(),
+      weaponType: i.string().optional(), // 'melee', 'regular', 'pistol'
+      phase: i.string().optional(), // 'attacks', 'saves', 'fnp'
+      version: i.number(),
+      payload: i.json().optional(),
+    }),
+
   },
   
   links: {
@@ -211,6 +229,11 @@ const _schema = i.schema({
       reverse: { on: "armies", has: "many", label: "states" },
     },
 
+    gameCombatSessions: {
+      forward: { on: "combatSessions", has: "one", label: "game", required: true, onDelete: "cascade" },
+      reverse: { on: "games", has: "many", label: "combatSessions" },
+    },
+
     // Unit leader attachments (CHARACTER units attached to bodyguard units)
     // Uses self-referential many-to-many relationship
     // Automatically scoped per-game since units are copied per-game
@@ -235,6 +258,8 @@ const _schema = i.schema({
           playerId: i.string(),
           playerName: i.string(),
           timestamp: i.number(),
+          sessionId: i.string().optional(),
+          sessionVersion: i.number().optional(),
           // Combat context
           attackerUnitId: i.string(),
           attackerUnitName: i.string(),
@@ -244,6 +269,8 @@ const _schema = i.schema({
           weaponName: i.string(),
           // Target stats for displaying save information
           targetStats: i.json(), // { T, SV, INV?, FNP?, modelCount }
+          effectiveTargetStats: i.json().optional(),
+          rollDisplay: i.json().optional(),
           // Results (stored as JSON)
           combatResult: i.any(), // Full CombatResult object
           phase: i.string(), // 'attacks', 'saves', 'fnp'
@@ -253,6 +280,8 @@ const _schema = i.schema({
           playerName: i.string(),
           phase: i.string(), // 'show-saves', 'show-fnp', 'complete'
           timestamp: i.number(),
+          sessionId: i.string().optional(),
+          sessionVersion: i.number().optional(),
         }),
       },
     },

@@ -31,6 +31,8 @@ interface DiceRollResultsProps {
     wound?: string[];
     keywords?: Array<{ keyword: string; source: string }>;
     damageReroll?: string[];
+    rerollHit?: string[];
+    rerollWound?: string[];
   };
   hitThresholdOverride?: number;
   woundThresholdOverride?: number;
@@ -60,7 +62,7 @@ export default function DiceRollResults({
   const { attackPhase, woundPhase, savePhase, fnpPhase, keywords, summary, options, modifiedWeapon } = combatResult;
 
   // Use modified weapon for all calculations (has rule modifiers applied)
-  const effectiveWeapon = modifiedWeapon;
+  const effectiveWeapon = modifiedWeapon || weapon;
 
   // Calculate percentages
   const hitPercentage = summary.totalAttacks > 0
@@ -204,16 +206,17 @@ export default function DiceRollResults({
                 <span className="text-white">
                   {hitThresholdOverride ? `${hitThresholdOverride}+` : getEffectiveHitValue(effectiveWeapon.WS, hitModifier).display}
                 </span>
-                {(() => {
-                  const sources = formatModifierSources(modifierSources?.hit || [], activeRules);
-                  const display = formatModifierDisplay(hitModifier, sources);
-                  return display ? (
-                    <span className="text-purple-400 font-semibold ml-2">
-                      ({display})
-                    </span>
-                  ) : null;
-                })()}
               </p>
+
+              {(() => {
+                const sources = formatModifierSources(modifierSources?.hit || [], activeRules);
+                const display = formatModifierDisplay(hitModifier, sources);
+                return display ? (
+                  <p className="text-xs text-gray-400 italic">
+                    Hit modifier: {display}
+                  </p>
+                ) : null;
+              })()}
 
               {keywords.heavy && options.unitRemainedStationary && (
                 <p className="text-xs text-gray-400 italic">
@@ -236,6 +239,12 @@ export default function DiceRollResults({
               {keywords.torrent && (
                 <p className="text-xs text-gray-400 italic">
                   (Torrent: auto-hit)
+                </p>
+              )}
+
+              {modifierSources?.rerollHit && modifierSources.rerollHit.length > 0 && (
+                <p className="text-xs text-gray-400 italic">
+                  Reroll hits ({formatModifierSources(modifierSources.rerollHit, activeRules)})
                 </p>
               )}
             </div>
@@ -320,17 +329,18 @@ export default function DiceRollResults({
                       options.unitHasCharged || false
                     ).display}
                 </span>
-                {(() => {
-                  const sources = formatModifierSources(modifierSources?.wound || [], activeRules);
-                  const display = formatModifierDisplay(woundModifier, sources);
-                  return display ? (
-                    <span className="text-purple-400 font-semibold ml-2">
-                      ({display})
-                    </span>
-                  ) : null;
-                })()}
                 <span className="text-xs text-gray-400"> (S{effectiveWeapon.S} vs T{target.T})</span>
               </p>
+
+              {(() => {
+                const sources = formatModifierSources(modifierSources?.wound || [], activeRules);
+                const display = formatModifierDisplay(woundModifier, sources);
+                return display ? (
+                  <p className="text-xs text-gray-400 italic">
+                    Wound modifier: {display}
+                  </p>
+                ) : null;
+              })()}
 
               {keywords.lance && options.unitHasCharged && (
                 <p className="text-xs text-gray-400 italic">
@@ -347,6 +357,12 @@ export default function DiceRollResults({
               {keywords.antiXCategory && keywords.antiXThreshold && (
                 <p className="text-xs text-gray-400 italic">
                   (Anti-{keywords.antiXCategory} {keywords.antiXThreshold}+: critical wounds)
+                </p>
+              )}
+
+              {modifierSources?.rerollWound && modifierSources.rerollWound.length > 0 && (
+                <p className="text-xs text-gray-400 italic">
+                  Reroll wounds ({formatModifierSources(modifierSources.rerollWound, activeRules)})
                 </p>
               )}
             </div>
@@ -368,7 +384,9 @@ export default function DiceRollResults({
               {summary.rerolledWounds > 0 && (
                 <p>
                   • <span className="text-blue-400">{summary.rerolledWounds} rerolled</span>{' '}
-                  <span className="text-xs text-gray-400">(Twin-Linked)</span>
+                  <span className="text-xs text-gray-400">
+                    {keywords.twinLinked ? '(Twin-Linked)' : '(Reroll wounds)'}
+                  </span>
                 </p>
               )}
               {woundPhase.criticalWounds.length > 0 && (

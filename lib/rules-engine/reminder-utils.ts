@@ -16,6 +16,7 @@ function hasArmyStateRequirement(when: WhenType): boolean {
 
   switch (when.t) {
     case 'armyState':
+    case 'armyChoice':
       return true;
     case 'all':
     case 'any':
@@ -38,6 +39,12 @@ function checkArmyStateRequirement(when: WhenType, armyStates: any[]): boolean {
       // Check if any of the required states are active
       return when.is.some((requiredState: string) =>
         armyStates.some(armyState => armyState.state === requiredState)
+      );
+    case 'armyChoice':
+      return armyStates.some(armyState =>
+        armyState.state === when.choiceId &&
+        !!armyState.choiceValue &&
+        when.is.includes(armyState.choiceValue)
       );
     case 'all':
       // All conditions must be met

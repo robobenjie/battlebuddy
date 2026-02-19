@@ -96,6 +96,18 @@ export function evaluateWhen(when: WhenType, context: CombatContext): boolean {
         )
       );
 
+    // Army choice value
+    case 'armyChoice':
+      return context.armyStates.some(armyState =>
+        armyState.state === when.choiceId &&
+        !!armyState.choiceValue &&
+        when.is.includes(armyState.choiceValue)
+      );
+
+    // Combat role (attacker/defender)
+    case 'combatRole':
+      return context.combatRole === when.is;
+
     // Is leading - checks if the unit whose rules are being evaluated is a leader OR has a leader attached
     // (leader CHARACTERs have isLeader=true, bodyguard units have leaderId set)
     // Use combatRole to determine which unit's leadership status to check

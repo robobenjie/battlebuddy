@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { id } from '@instantdb/react';
 import { db } from '../../lib/db';
 import UnitCard from '../ui/UnitCard';
 import { formatUnitForCard, getWeaponsForUnit, sortUnitsByPriority, getUnitDisplayName } from '../../lib/unit-utils';
@@ -9,6 +10,7 @@ import CombatCalculatorPage from '../CombatCalculatorPage';
 import { getReactiveUnits } from '../../lib/rules-engine/reminder-utils';
 import ReactiveAbilitiesSection from '../ui/ReactiveAbilitiesSection';
 import { UNIT_BASIC_QUERY } from '../../lib/query-fragments';
+import { CombatSessionRecord } from '../../lib/rooms-types';
 
 interface ShootPhaseProps {
   gameId: string;
@@ -35,6 +37,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
   const [selectedUnit, setSelectedUnit] = useState<any>(null);
   const [selectedWeaponType, setSelectedWeaponType] = useState<string>('');
   const [selectedWeaponName, setSelectedWeaponName] = useState<string>('');
+  const [dismissedSessionUpdatedAt, setDismissedSessionUpdatedAt] = useState<number | null>(null);
 
   // Query units for this army in the game and destroyed units list
   const { data: unitsData } = db.useQuery({
@@ -50,6 +53,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
       }
     },
     games: {
+      combatSessions: {},
       destroyedUnits: {},
       armies: {
         units: {
@@ -65,7 +69,10 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
   });
 
   const allUnits = unitsData?.armies[0]?.units || [];
-  const destroyedUnitIds = new Set((unitsData?.games?.[0]?.destroyedUnits || []).map((u: any) => u.id));
+  const gameData = unitsData?.games?.[0];
+  const destroyedUnitIds = new Set((gameData?.destroyedUnits || []).map((u: any) => u.id));
+  const activeSessionId = gameData?.activeCombatSessionId;
+  const activeCombatSession = (gameData?.combatSessions || []).find((session: any) => session.id === activeSessionId) as CombatSessionRecord | undefined;
 
   // Filter out destroyed units and sort
   const units = sortUnitsByPriority(
@@ -86,14 +93,64 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
   const reactiveUnits = getReactiveUnits(nonActiveArmies, 'shooting')
     .filter((unit: any) => !destroyedUnitIds.has(unit.id));
 
+  useEffect(() => {
+    if (!activeCombatSession) return;
+    if (dismissedSessionUpdatedAt !== null && activeCombatSession.updatedAt <= dismissedSessionUpdatedAt) {
+      return;
+    }
+
+    if (activeCombatSession.weaponType === 'melee') {
+      if (showCombatCalculator) {
+        setShowCombatCalculator(false);
+        setSelectedUnit(null);
+        setSelectedWeaponType('');
+        setSelectedWeaponName('');
+      }
+      return;
+    }
+
+    if (activeCombatSession.screen === 'combat-calculator' || activeCombatSession.screen === 'digital-dice') {
+      const unit = units.find((u: any) => u.id === activeCombatSession.attackerUnitId);
+      if (!unit) return;
+      setSelectedUnit(unit);
+      setSelectedWeaponType(activeCombatSession.weaponType || '');
+      setSelectedWeaponName(activeCombatSession.weaponName || '');
+      setShowCombatCalculator(true);
+    }
+  }, [activeCombatSession?.id, activeCombatSession?.updatedAt, activeCombatSession?.screen, activeCombatSession?.weaponType, dismissedSessionUpdatedAt, units, showCombatCalculator]);
+
   // Open combat calculator
-  const openCombatCalculator = (unitId: string, weaponType?: string, weaponName?: string) => {
+  const openCombatCalculator = async (unitId: string, weaponType?: string, weaponName?: string) => {
     const unit = units.find((u: any) => u.id === unitId);
     if (unit) {
+      const now = Date.now();
+      const sessionId = id();
+      try {
+        await db.transact([
+          db.tx.combatSessions[sessionId].update({
+            screen: 'combat-calculator',
+            createdAt: now,
+            updatedAt: now,
+            initiatorPlayerId: currentPlayer?.id,
+            initiatorPlayerName: currentPlayer?.name,
+            attackerUnitId: unit.id,
+            attackerArmyId: army.id,
+            weaponType: weaponType || '',
+            weaponName: weaponName || '',
+            phase: 'attacks',
+            version: 1,
+            payload: {}
+          }).link({ game: gameId }),
+          db.tx.games[gameId].update({ activeCombatSessionId: sessionId })
+        ]);
+      } catch (error) {
+        console.error('Failed to create combat session:', error);
+      }
       setSelectedUnit(unit);
       setSelectedWeaponType(weaponType || '');
       setSelectedWeaponName(weaponName || '');
       setShowCombatCalculator(true);
+      setDismissedSessionUpdatedAt(null);
     }
   };
 
@@ -103,6 +160,9 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
     setSelectedUnit(null);
     setSelectedWeaponType('');
     setSelectedWeaponName('');
+    if (activeCombatSession?.updatedAt) {
+      setDismissedSessionUpdatedAt(activeCombatSession.updatedAt);
+    }
   };
 
   // Helper function to get weapon status for a unit, separated by type
@@ -317,6 +377,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
                 preSelectedWeaponName={selectedWeaponName}
                 onClose={closeCombatCalculator}
                 currentPlayer={currentPlayer}
+                combatSession={activeCombatSession}
               />
             </div>
           </div>

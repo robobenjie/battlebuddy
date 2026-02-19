@@ -1424,6 +1424,376 @@
           }
         ]
       }
+    },
+    {
+      "name": "death-guard-plague-choice",
+      "isExample": false,
+      "exampleReason": "Death Guard army-wide start-of-battle plague selection.",
+      "rule": {
+        "id": "death-guard-plague",
+        "name": "Afflicted Plague",
+        "description": "During Declare Battle Formations, select one plague. It applies to Afflicted enemy units for the rest of the battle.",
+        "faction": "Death Guard",
+        "scope": "army",
+        "trigger": {
+          "t": "manual",
+          "phase": "command",
+          "turn": "own",
+          "limit": "once-per-battle"
+        },
+        "when": {
+          "t": "true"
+        },
+        "kind": "choice",
+        "choice": {
+          "id": "death-guard-plague",
+          "prompt": "Select your plague for this battle",
+          "lifetime": {
+            "t": "game"
+          },
+          "options": [
+            {
+              "v": "skullsquirm-blight",
+              "label": "Skullsquirm Blight",
+              "then": [
+                {
+                  "t": "do",
+                  "fx": []
+                }
+              ]
+            },
+            {
+              "v": "rattlejoint-ague",
+              "label": "Rattlejoint Ague",
+              "then": [
+                {
+                  "t": "do",
+                  "fx": []
+                }
+              ]
+            },
+            {
+              "v": "scabrous-soulrot",
+              "label": "Scabrous Soulrot",
+              "then": [
+                {
+                  "t": "do",
+                  "fx": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "death-guard-afflicted-skullsquirm-attack",
+      "isExample": false,
+      "exampleReason": "Skullsquirm: afflicted target gets -1 Toughness when Death Guard attack it.",
+      "rule": {
+        "id": "death-guard-afflicted-skullsquirm-attack",
+        "name": "Nurgle's Gift (Skullsquirm)",
+        "description": "While an enemy unit is Afflicted, subtract 1 from Toughness. Skullsquirm also affects hit rolls when afflicted units attack.",
+        "faction": "Death Guard",
+        "scope": "army",
+        "trigger": {
+          "t": "automatic",
+          "phase": "any",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "all",
+          "xs": [
+            {
+              "t": "combatRole",
+              "is": "attacker"
+            },
+            {
+              "t": "armyChoice",
+              "choiceId": "death-guard-plague",
+              "is": ["skullsquirm-blight"]
+            }
+          ]
+        },
+        "kind": "choice",
+        "choice": {
+          "id": "target-afflicted",
+          "prompt": "Is the target unit Afflicted?",
+          "lifetime": {
+            "t": "roll"
+          },
+          "options": [
+            {
+              "v": "no",
+              "label": "No",
+              "then": [
+                {
+                  "t": "do",
+                  "fx": []
+                }
+              ]
+            },
+            {
+              "v": "yes",
+              "label": "Yes",
+              "then": [
+                {
+                  "t": "do",
+                  "fx": [
+                    {
+                      "t": "modDefensiveStat",
+                      "stat": "T",
+                      "add": -1
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "death-guard-afflicted-skullsquirm-defense",
+      "isExample": false,
+      "exampleReason": "Skullsquirm: afflicted attacking unit gets -1 to hit when targeting Death Guard.",
+      "rule": {
+        "id": "death-guard-afflicted-skullsquirm-defense",
+        "name": "Nurgle's Gift (Skullsquirm)",
+        "description": "Each time a model in an Afflicted unit makes an attack, subtract 1 from the Hit roll.",
+        "faction": "Death Guard",
+        "scope": "army",
+        "trigger": {
+          "t": "automatic",
+          "phase": "any",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "all",
+          "xs": [
+            {
+              "t": "combatRole",
+              "is": "defender"
+            },
+            {
+              "t": "armyChoice",
+              "choiceId": "death-guard-plague",
+              "is": ["skullsquirm-blight"]
+            }
+          ]
+        },
+        "kind": "choice",
+        "choice": {
+          "id": "attacker-afflicted",
+          "prompt": "Is the attacking unit Afflicted?",
+          "lifetime": {
+            "t": "roll"
+          },
+          "options": [
+            {
+              "v": "no",
+              "label": "No",
+              "then": [
+                {
+                  "t": "do",
+                  "fx": []
+                }
+              ]
+            },
+            {
+              "v": "yes",
+              "label": "Yes",
+              "then": [
+                {
+                  "t": "do",
+                  "fx": [
+                    {
+                      "t": "modHitAgainst",
+                      "add": -1
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "death-guard-afflicted-rattlejoint",
+      "isExample": false,
+      "exampleReason": "Rattlejoint: afflicted target gets -1 Toughness and worsened Save when Death Guard attack it.",
+      "rule": {
+        "id": "death-guard-afflicted-rattlejoint",
+        "name": "Nurgle's Gift (Rattlejoint)",
+        "description": "While an enemy unit is Afflicted, subtract 1 from Toughness and worsen Save by 1.",
+        "faction": "Death Guard",
+        "scope": "army",
+        "trigger": {
+          "t": "automatic",
+          "phase": "any",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "all",
+          "xs": [
+            {
+              "t": "combatRole",
+              "is": "attacker"
+            },
+            {
+              "t": "armyChoice",
+              "choiceId": "death-guard-plague",
+              "is": ["rattlejoint-ague"]
+            }
+          ]
+        },
+        "kind": "choice",
+        "choice": {
+          "id": "target-afflicted",
+          "prompt": "Is the target unit Afflicted?",
+          "lifetime": {
+            "t": "roll"
+          },
+          "options": [
+            {
+              "v": "no",
+              "label": "No",
+              "then": [
+                {
+                  "t": "do",
+                  "fx": []
+                }
+              ]
+            },
+            {
+              "v": "yes",
+              "label": "Yes",
+              "then": [
+                {
+                  "t": "do",
+                  "fx": [
+                    {
+                      "t": "modDefensiveStat",
+                      "stat": "T",
+                      "add": -1
+                    },
+                    {
+                      "t": "modDefensiveStat",
+                      "stat": "SV",
+                      "add": 1
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "death-guard-afflicted-scabrous",
+      "isExample": false,
+      "exampleReason": "Scabrous: afflicted target gets -1 Toughness in combat calculator; Move/Ld/OC are tracked outside this calculator.",
+      "rule": {
+        "id": "death-guard-afflicted-scabrous",
+        "name": "Nurgle's Gift (Scabrous)",
+        "description": "While an enemy unit is Afflicted, subtract 1 from Toughness. Also worsen Move, Leadership and Objective Control by 1 (track outside combat calculator).",
+        "faction": "Death Guard",
+        "scope": "army",
+        "trigger": {
+          "t": "automatic",
+          "phase": "any",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "all",
+          "xs": [
+            {
+              "t": "combatRole",
+              "is": "attacker"
+            },
+            {
+              "t": "armyChoice",
+              "choiceId": "death-guard-plague",
+              "is": ["scabrous-soulrot"]
+            }
+          ]
+        },
+        "kind": "choice",
+        "choice": {
+          "id": "target-afflicted",
+          "prompt": "Is the target unit Afflicted?",
+          "lifetime": {
+            "t": "roll"
+          },
+          "options": [
+            {
+              "v": "no",
+              "label": "No",
+              "then": [
+                {
+                  "t": "do",
+                  "fx": []
+                }
+              ]
+            },
+            {
+              "v": "yes",
+              "label": "Yes",
+              "then": [
+                {
+                  "t": "do",
+                  "fx": [
+                    {
+                      "t": "modDefensiveStat",
+                      "stat": "T",
+                      "add": -1
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "defensive-hit-penalty",
+      "isExample": false,
+      "exampleReason": "Defender-side hit penalty using modHitAgainst. Used to test attacker/defender hit modifier merge.",
+      "rule": {
+        "id": "defensive-hit-penalty",
+        "name": "Defensive Hit Penalty",
+        "description": "Each time an attack targets this unit, subtract 1 from the Hit roll.",
+        "faction": "Test Faction",
+        "scope": "unit",
+        "trigger": {
+          "t": "automatic",
+          "phase": "any",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "true"
+        },
+        "kind": "passive",
+        "then": [
+          {
+            "t": "do",
+            "fx": [
+              {
+                "t": "modHitAgainst",
+                "add": -1
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

@@ -23,7 +23,7 @@ import {
 } from '../lib/combat-calculator-engine';
 import { Rule, ArmyState, getAllUnitRules, evaluateWhen } from '../lib/rules-engine';
 import { UNIT_FULL_QUERY, UNIT_BASIC_QUERY } from '../lib/query-fragments';
-import { DiceRollEvent, CombatPhaseEvent } from '../lib/rooms-types';
+import { DiceRollEvent, CombatPhaseEvent, CombatSessionRecord } from '../lib/rooms-types';
 
 interface CombatCalculatorPageProps {
   gameId?: string;
@@ -38,6 +38,7 @@ interface CombatCalculatorPageProps {
     userId: string;
     name: string;
   };
+  combatSession?: CombatSessionRecord;
 }
 
 export default function CombatCalculatorPage({
@@ -48,7 +49,8 @@ export default function CombatCalculatorPage({
   weaponType,
   preSelectedWeaponName,
   onClose,
-  currentPlayer: propCurrentPlayer
+  currentPlayer: propCurrentPlayer,
+  combatSession
 }: CombatCalculatorPageProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -126,8 +128,26 @@ export default function CombatCalculatorPage({
   const [showDigitalDiceMenu, setShowDigitalDiceMenu] = useState(false);
   const [combatResult, setCombatResult] = useState<CombatResult | null>(null);
   const [showSavePhase, setShowSavePhase] = useState(false);
+  const [rollTargetStats, setRollTargetStats] = useState<TargetStats | null>(null);
   const [rollInitiatorId, setRollInitiatorId] = useState<string>('');
   const [rollInitiatorName, setRollInitiatorName] = useState<string>('');
+  const [lastDismissedDiceUpdatedAt, setLastDismissedDiceUpdatedAt] = useState<number | null>(null);
+  const [rollDisplayContext, setRollDisplayContext] = useState<{
+    hitModifier?: number;
+    woundModifier?: number;
+    addedKeywords?: string[];
+    modifierSources?: {
+      hit?: string[];
+      wound?: string[];
+      keywords?: Array<{ keyword: string; source: string }>;
+      damageReroll?: string[];
+      rerollHit?: string[];
+      rerollWound?: string[];
+    };
+    activeRules?: Array<{ id: string; name: string }>;
+    hitThresholdOverride?: number;
+    woundThresholdOverride?: number;
+  } | null>(null);
 
   // State for active rules display
   const [activeRules, setActiveRules] = useState<Rule[]>([]);
@@ -155,6 +175,8 @@ export default function CombatCalculatorPage({
     AP?: string[];
     D?: string[];
     damageReroll?: string[];
+    rerollHit?: string[];
+    rerollWound?: string[];
   }>({});
   const [currentArmyStates, setCurrentArmyStates] = useState<ArmyState[]>([]);
   const [combatState, setCombatState] = useState<CombatState | null>(null);
@@ -185,6 +207,8 @@ export default function CombatCalculatorPage({
   db.rooms.useTopicEffect(room, 'diceRollResult', (event, peer) => {
     // Only process if we have a valid gameId and event is from another player
     if (!gameId || event.playerId === currentPlayer?.id) return;
+    if (combatSession?.id && event.sessionId && event.sessionId !== combatSession.id) return;
+    if (combatSession?.version !== undefined && event.sessionVersion !== undefined && event.sessionVersion < combatSession.version) return;
 
     console.log(`🎲 [CombatCalc] Received dice roll from ${event.playerName}, phase: ${event.phase}`, event);
     // Set the combat result to show in the UI
@@ -195,12 +219,16 @@ export default function CombatCalculatorPage({
     setShowDigitalDiceMenu(false);
     setRollInitiatorId(event.playerId);
     setRollInitiatorName(event.playerName);
+    setRollTargetStats((event as any).effectiveTargetStats || event.targetStats || null);
+    setRollDisplayContext((event as any).rollDisplay || null);
   });
 
   // Subscribe to combat phase advancement from other players (hook must be called unconditionally)
   db.rooms.useTopicEffect(room, 'combatPhaseAdvance', (event, peer) => {
     // Only process if we have a valid gameId and event is from another player
     if (!gameId || event.playerId === currentPlayer?.id) return;
+    if (combatSession?.id && event.sessionId && event.sessionId !== combatSession.id) return;
+    if (combatSession?.version !== undefined && event.sessionVersion !== undefined && event.sessionVersion < combatSession.version) return;
 
     console.log(`⏭️ Received phase advance from ${event.playerName}:`, event.phase);
     // Handle phase advancement
@@ -232,6 +260,63 @@ export default function CombatCalculatorPage({
       targetSelectRef.current.focus();
     }
   }, []);
+
+  const updateCombatSession = async (updates: Partial<CombatSessionRecord>) => {
+    if (!combatSession?.id) return;
+    const now = Date.now();
+    const nextVersion = (combatSession.version ?? 0) + 1;
+    try {
+      await db.transact([
+        db.tx.combatSessions[combatSession.id].update({
+          ...updates,
+          updatedAt: now,
+          version: nextVersion
+        })
+      ]);
+    } catch (error) {
+      console.error('Failed to update combat session:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!combatSession) return;
+    if (lastDismissedDiceUpdatedAt !== null && combatSession.updatedAt <= lastDismissedDiceUpdatedAt) {
+      return;
+    }
+
+    if (combatSession.screen === 'combat-calculator') {
+      setCombatResult(null);
+      setShowSavePhase(false);
+      setShowDigitalDiceMenu(false);
+      return;
+    }
+
+    if (combatSession.screen === 'digital-dice') {
+      if (combatSession.defenderUnitId) {
+        setSelectedTargetId(combatSession.defenderUnitId);
+      }
+      if (combatSession.weaponId) {
+        setSelectedWeaponId(combatSession.weaponId);
+      }
+
+      const payload = combatSession.payload || {};
+      if (payload.stage === 'menu') {
+        setShowDigitalDiceMenu(true);
+        setCombatResult(null);
+        setShowSavePhase(false);
+        setRollTargetStats(null);
+      }
+
+      if (payload.combatResult) {
+        setCombatResult(payload.combatResult);
+        setShowSavePhase(combatSession.phase === 'saves' || combatSession.phase === 'fnp');
+        setShowDigitalDiceMenu(false);
+        setRollInitiatorId(combatSession.initiatorPlayerId || '');
+        setRollInitiatorName(combatSession.initiatorPlayerName || '');
+        setRollTargetStats(payload.effectiveTargetStats || payload.targetStats || null);
+      }
+    }
+  }, [combatSession?.id, combatSession?.updatedAt, combatSession?.screen, combatSession?.phase, lastDismissedDiceUpdatedAt]);
 
   // Query the unit's weapons dynamically so they update when fired
   const { data: weaponsData } = db.useQuery(
@@ -626,8 +711,8 @@ export default function CombatCalculatorPage({
     const appliedDefenderRules = combatStateResult.modifiers.appliedDefenderRules;
     const appliedRules = combatStateResult.modifiers.appliedRules;
 
-    // For display, only show ATTACKER rules (not opponent's rules)
-    // Include choice rules that are waiting for user input
+    // For display, include unresolved choice rules from both attacker and defender.
+    // This allows reactive defender prompts (e.g. "is attacker afflicted?") to appear.
     const conditionalAttackerRules = attackerRules.filter(rule => {
       // Skip if already applied
       if (appliedAttackerRules.some(r => r.id === rule.id)) return false;
@@ -640,14 +725,24 @@ export default function CombatCalculatorPage({
       return false;
     });
 
-    // Combine applied attacker rules with conditional attacker rules for display
-    // NOTE: We only show the attacker's rules in the UI, not the defender's rules
-    const displayRules = [...appliedAttackerRules, ...conditionalAttackerRules];
+    const conditionalDefenderRules = defenderRules.filter(rule => {
+      // Skip if already applied
+      if (appliedDefenderRules.some(r => r.id === rule.id)) return false;
+
+      if (rule.kind === 'choice') {
+        return evaluateWhen(rule.when, defenderContext);
+      }
+
+      return false;
+    });
+
+    const displayRules = [...appliedAttackerRules, ...conditionalAttackerRules, ...conditionalDefenderRules];
 
     // Debug: log applied rules
     console.log('✅ Applied Attacker Rules:', appliedAttackerRules.map(r => r.id));
     console.log('✅ Applied Defender Rules:', appliedDefenderRules.map(r => r.id));
     console.log('🔀 Conditional Attacker Rules (with user input):', conditionalAttackerRules.map(r => r.id));
+    console.log('🔀 Conditional Defender Rules (with user input):', conditionalDefenderRules.map(r => r.id));
     console.log('📺 Display Rules (shown in UI):', displayRules.map(r => r.id));
     console.log('📊 Attacker context modifiers:', attackerContext.modifiers.getAllModifiers());
     console.log('📊 Defender context modifiers:', defenderContext.modifiers.getAllModifiers());
@@ -722,6 +817,18 @@ export default function CombatCalculatorPage({
       }
     }
 
+    const rerollHitSources = [
+      ...attackerContext.modifiers.getModifiers('reroll:hit:all').map(m => m.source),
+      ...attackerContext.modifiers.getModifiers('reroll:hit:failed').map(m => m.source),
+      ...attackerContext.modifiers.getModifiers('reroll:hit:ones').map(m => m.source)
+    ];
+
+    const rerollWoundSources = [
+      ...attackerContext.modifiers.getModifiers('reroll:wound:all').map(m => m.source),
+      ...attackerContext.modifiers.getModifiers('reroll:wound:failed').map(m => m.source),
+      ...attackerContext.modifiers.getModifiers('reroll:wound:ones').map(m => m.source)
+    ];
+
     // Update keyword sources to include weapon abilities
     const updatedKeywordSources = keywords.map(kw => ({
       keyword: kw,
@@ -734,7 +841,7 @@ export default function CombatCalculatorPage({
     setWoundModifier(woundMod);
     setAddedKeywords(keywords);
     setWeaponStatModifiers({ A: aMod, S: sMod, AP: apMod, D: dMod });
-    setCurrentArmyStates(attackerArmyStates);
+    setCurrentArmyStates([...attackerArmyStates, ...defenderArmyStates]);
     setModifierSources({
       hit: hitSources,
       wound: woundSources,
@@ -743,7 +850,9 @@ export default function CombatCalculatorPage({
       S: sSources,
       AP: apSources,
       D: dSources,
-      damageReroll: damageRerollSources
+      damageReroll: damageRerollSources,
+      rerollHit: rerollHitSources,
+      rerollWound: rerollWoundSources
     });
     setCombatState(combatStateResult);
   }, [selectedWeaponId, selectedTarget?.id, unit?.id, game?.id, weaponType]); // Use IDs to avoid object reference changes
@@ -758,9 +867,29 @@ export default function CombatCalculatorPage({
 
   const handleDigitalDiceClick = () => {
     setShowDigitalDiceMenu(true);
+    if (selectedWeapon && selectedTarget && targetStats) {
+      const effectiveTargetStats = combatState?.effectiveTarget || applyTargetModifiers(targetStats, targetStatModifiers);
+      updateCombatSession({
+        screen: 'digital-dice',
+        attackerUnitId: unit?.id,
+        attackerArmyId: currentArmyId,
+        defenderUnitId: selectedTarget.id,
+        weaponId: (selectedWeapon as any).id,
+        weaponName: (selectedWeapon as any).name,
+        weaponType,
+        phase: 'attacks',
+        payload: {
+          stage: 'menu',
+          targetStats,
+          effectiveTargetStats,
+          selectedTargetId: selectedTarget.id,
+          selectedWeaponId: (selectedWeapon as any).id
+        }
+      });
+    }
   };
 
-  const handleRollAttacks = (options: CombatOptions) => {
+  const handleRollAttacks = async (options: CombatOptions) => {
     if (!selectedWeapon || !targetStats) return;
 
     // Convert weapon to WeaponStats format
@@ -960,6 +1089,16 @@ export default function CombatCalculatorPage({
       source: 'rule' // Simplified for now
     }));
 
+    const rollDisplay = {
+      hitModifier: hitMod,
+      woundModifier: woundMod,
+      addedKeywords: keywords,
+      modifierSources,
+      activeRules: appliedRules.map(rule => ({ id: rule.id, name: rule.name })),
+      hitThresholdOverride: combatStateResult.hitThreshold,
+      woundThresholdOverride: combatStateResult.woundThreshold
+    };
+
     // Don't apply modifiers here - executeCombatSequence will handle them
     // Just merge in the added keywords so they're available for keyword-based logic
     const modifiedWeaponStats: WeaponStats = combatStateResult.effectiveWeapon;
@@ -1005,10 +1144,30 @@ export default function CombatCalculatorPage({
 
     setCombatResult(result);
     setRollCombatState(combatStateResult);
+    setRollTargetStats(modifiedTargetStats);
     setShowSavePhase(false);
     setShowDigitalDiceMenu(false);
     setRollInitiatorId(currentPlayer?.id || '');
     setRollInitiatorName(currentPlayer?.name || '');
+    setRollDisplayContext(rollDisplay);
+    await updateCombatSession({
+      screen: 'digital-dice',
+      attackerUnitId: unit?.id,
+      attackerArmyId: currentArmyId,
+      defenderUnitId: selectedTarget?.id,
+      weaponId: (selectedWeapon as any).id,
+      weaponName: weaponStats.name,
+      weaponType,
+      phase: 'attacks',
+      payload: {
+        stage: 'results',
+        combatResult: result,
+        targetStats,
+        effectiveTargetStats: modifiedTargetStats,
+        selectedTargetId: selectedTarget?.id,
+        selectedWeaponId: (selectedWeapon as any).id
+      }
+    });
 
     // Publish dice roll result to other players in the room
     if (gameId && publishDiceRoll && currentPlayer && selectedTarget && unit && targetStats) {
@@ -1016,6 +1175,8 @@ export default function CombatCalculatorPage({
         playerId: currentPlayer.id,
         playerName: currentPlayer.name,
         timestamp: Date.now(),
+        sessionId: combatSession?.id,
+        sessionVersion: (combatSession?.version ?? 0) + 1,
         attackerUnitId: unit.id,
         attackerUnitName: unit.name,
         defenderUnitId: selectedTarget.id,
@@ -1029,8 +1190,10 @@ export default function CombatCalculatorPage({
           FNP: targetStats.FNP,
           modelCount: targetStats.modelCount,
         },
+        effectiveTargetStats: modifiedTargetStats,
         combatResult: result,
         phase: 'attacks',
+        rollDisplay,
       };
       console.log('📡 Publishing dice roll event:', diceRollEvent);
       publishDiceRoll(diceRollEvent);
@@ -1060,8 +1223,38 @@ export default function CombatCalculatorPage({
     // Execute FNP phase after saves (also use modified target stats for FNP)
     updatedResult = executeFNPPhase(updatedResult, modifiedTargetStats);
 
+    const rollDisplay = rollDisplayContext || {
+      hitModifier,
+      woundModifier,
+      addedKeywords,
+      modifierSources,
+      activeRules: activeRules.map(rule => ({ id: rule.id, name: rule.name })),
+      hitThresholdOverride: rollCombatState?.hitThreshold ?? combatState?.hitThreshold,
+      woundThresholdOverride: rollCombatState?.woundThreshold ?? combatState?.woundThreshold
+    };
+
     setCombatResult(updatedResult);
     setShowSavePhase(true);
+    setRollTargetStats(modifiedTargetStats);
+    setRollDisplayContext(rollDisplay);
+    updateCombatSession({
+      screen: 'digital-dice',
+      attackerUnitId: unit?.id,
+      attackerArmyId: currentArmyId,
+      defenderUnitId: selectedTarget?.id,
+      weaponId: (selectedWeapon as any).id,
+      weaponName: weaponStats.name,
+      weaponType,
+      phase: 'saves',
+      payload: {
+        stage: 'results',
+        combatResult: updatedResult,
+        targetStats,
+        effectiveTargetStats: modifiedTargetStats,
+        selectedTargetId: selectedTarget?.id,
+        selectedWeaponId: (selectedWeapon as any).id
+      }
+    });
 
     // Publish updated combat result with saves to other players
     if (gameId && publishDiceRoll && currentPlayer && selectedTarget && unit && targetStats) {
@@ -1069,6 +1262,8 @@ export default function CombatCalculatorPage({
         playerId: currentPlayer.id,
         playerName: currentPlayer.name,
         timestamp: Date.now(),
+        sessionId: combatSession?.id,
+        sessionVersion: (combatSession?.version ?? 0) + 1,
         attackerUnitId: unit.id,
         attackerUnitName: unit.name,
         defenderUnitId: selectedTarget.id,
@@ -1082,8 +1277,10 @@ export default function CombatCalculatorPage({
           FNP: targetStats.FNP,
           modelCount: targetStats.modelCount,
         },
+        effectiveTargetStats: modifiedTargetStats,
         combatResult: updatedResult,
         phase: 'saves',
+        rollDisplay,
       };
       console.log('📡 [CombatCalc] Publishing save results:', diceRollEvent);
       publishDiceRoll(diceRollEvent);
@@ -1093,6 +1290,11 @@ export default function CombatCalculatorPage({
   const handleCloseDiceResults = () => {
     setCombatResult(null);
     setShowSavePhase(false);
+    setShowDigitalDiceMenu(false);
+    setRollDisplayContext(null);
+    if (combatSession?.updatedAt) {
+      setLastDismissedDiceUpdatedAt(combatSession.updatedAt);
+    }
 
     // Don't publish completion event - each player can close their own view independently
   };
@@ -1102,6 +1304,11 @@ export default function CombatCalculatorPage({
     await handleShoot();
     // Close the modal
     handleCloseDiceResults();
+    updateCombatSession({
+      screen: 'combat-calculator',
+      phase: 'attacks',
+      payload: {}
+    });
   };
 
   const handleShoot = async () => {
@@ -1197,6 +1404,16 @@ export default function CombatCalculatorPage({
   const activePeers = Object.values(peers).filter(
     (peer: any) => Date.now() - (peer.lastAction || 0) < 60000
   );
+
+  const displayActiveRules = rollDisplayContext?.activeRules || activeRules;
+  const displayHitModifier = rollDisplayContext?.hitModifier ?? hitModifier;
+  const displayWoundModifier = rollDisplayContext?.woundModifier ?? woundModifier;
+  const displayAddedKeywords = rollDisplayContext?.addedKeywords || addedKeywords;
+  const displayModifierSources = rollDisplayContext?.modifierSources || modifierSources;
+  const displayHitThresholdOverride =
+    rollDisplayContext?.hitThresholdOverride ?? rollCombatState?.hitThreshold ?? combatState?.hitThreshold;
+  const displayWoundThresholdOverride =
+    rollDisplayContext?.woundThresholdOverride ?? rollCombatState?.woundThreshold ?? combatState?.woundThreshold;
 
   return (
     <div className="text-white">
@@ -1363,7 +1580,12 @@ export default function CombatCalculatorPage({
           activeRules={activeRules as any}
           armyStates={currentArmyStates}
           onRollAttacks={handleRollAttacks}
-          onClose={() => setShowDigitalDiceMenu(false)}
+          onClose={() => {
+            setShowDigitalDiceMenu(false);
+            if (combatSession?.updatedAt) {
+              setLastDismissedDiceUpdatedAt(combatSession.updatedAt);
+            }
+          }}
         />
       )}
 
@@ -1384,23 +1606,23 @@ export default function CombatCalculatorPage({
           {/* Content */}
           <div className="flex-1 overflow-hidden flex flex-col">
             <div className="flex-1 overflow-hidden">
-              <DiceRollResults
-                combatResult={combatResult}
-                weapon={rollCombatState?.effectiveWeapon || (selectedWeapon as any)}
-                target={rollCombatState?.effectiveTarget || applyTargetModifiers(targetStats, targetStatModifiers)!}
-                onRollSaves={handleRollSaves}
-                showSavePhase={showSavePhase}
-                activeRules={activeRules as any}
-                hitModifier={hitModifier}
-                woundModifier={woundModifier}
-                addedKeywords={addedKeywords}
-                modifierSources={modifierSources}
-                hitThresholdOverride={rollCombatState?.hitThreshold}
-                woundThresholdOverride={rollCombatState?.woundThreshold}
-                initiatorPlayerId={rollInitiatorId}
-                initiatorPlayerName={rollInitiatorName}
-                currentPlayerId={currentPlayer?.id}
-              />
+                <DiceRollResults
+                  combatResult={combatResult}
+                  weapon={combatResult.modifiedWeapon || rollCombatState?.effectiveWeapon || (selectedWeapon as any)}
+                  target={rollTargetStats || rollCombatState?.effectiveTarget || applyTargetModifiers(targetStats, targetStatModifiers)!}
+                  onRollSaves={handleRollSaves}
+                  showSavePhase={showSavePhase}
+                  activeRules={displayActiveRules as any}
+                  hitModifier={displayHitModifier}
+                  woundModifier={displayWoundModifier}
+                  addedKeywords={displayAddedKeywords}
+                  modifierSources={displayModifierSources}
+                  hitThresholdOverride={displayHitThresholdOverride}
+                  woundThresholdOverride={displayWoundThresholdOverride}
+                  initiatorPlayerId={rollInitiatorId}
+                  initiatorPlayerName={rollInitiatorName}
+                  currentPlayerId={currentPlayer?.id}
+                />
             </div>
 
             {/* Done Button */}

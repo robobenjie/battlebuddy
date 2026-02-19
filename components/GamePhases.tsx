@@ -26,6 +26,7 @@ interface GamePhasesProps {
     currentTurn: number;
     currentPhase: string;
     activePlayerId?: string;
+    activeCombatSessionId?: string;
     status: string;
     phaseHistory?: any[];
   };
@@ -64,6 +65,20 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
   const [rollInitiatorId, setRollInitiatorId] = useState<string>('');
   const [rollInitiatorName, setRollInitiatorName] = useState<string>('');
   const [showSavePhase, setShowSavePhase] = useState(false);
+  const [sharedHitModifier, setSharedHitModifier] = useState(0);
+  const [sharedWoundModifier, setSharedWoundModifier] = useState(0);
+  const [sharedAddedKeywords, setSharedAddedKeywords] = useState<string[]>([]);
+  const [sharedModifierSources, setSharedModifierSources] = useState<{
+    hit?: string[];
+    wound?: string[];
+    keywords?: Array<{ keyword: string; source: string }>;
+    damageReroll?: string[];
+    rerollHit?: string[];
+    rerollWound?: string[];
+  }>({});
+  const [sharedActiveRules, setSharedActiveRules] = useState<Array<{ id: string; name: string }>>([]);
+  const [sharedHitThresholdOverride, setSharedHitThresholdOverride] = useState<number | undefined>(undefined);
+  const [sharedWoundThresholdOverride, setSharedWoundThresholdOverride] = useState<number | undefined>(undefined);
 
   // Room subscription for real-time dice roll sharing
   const room = db.room('game', gameId);
@@ -112,6 +127,13 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
     // When receiving 'saves' or 'fnp' phase, saves have been rolled (showSavePhase = true)
     setShowSavePhase(event.phase === 'saves' || event.phase === 'fnp');
     setShowSharedResults(true);
+    setSharedHitModifier(event.rollDisplay?.hitModifier ?? 0);
+    setSharedWoundModifier(event.rollDisplay?.woundModifier ?? 0);
+    setSharedAddedKeywords(event.rollDisplay?.addedKeywords || []);
+    setSharedModifierSources(event.rollDisplay?.modifierSources || {});
+    setSharedActiveRules(event.rollDisplay?.activeRules || []);
+    setSharedHitThresholdOverride(event.rollDisplay?.hitThresholdOverride);
+    setSharedWoundThresholdOverride(event.rollDisplay?.woundThresholdOverride);
   });
 
   // Subscribe to combat phase advancement
@@ -525,8 +547,8 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
         currentUserId={currentUserPlayer?.id}
       />
 
-      {/* Shared Dice Roll Results Modal */}
-      {showSharedResults && sharedCombatResult && sharedWeapon && sharedTarget && (() => {
+      {/* Shared Dice Roll Results Modal (disabled when combat sessions are active) */}
+      {!game.activeCombatSessionId && showSharedResults && sharedCombatResult && sharedWeapon && sharedTarget && (() => {
         console.log('🎬 [GamePhases] Rendering shared results modal', {
           showSavePhase,
           hasCombatResult: !!sharedCombatResult,
@@ -557,6 +579,13 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
                 console.log('🔘 [GamePhases] Roll Saves button clicked in modal');
                 handleRollSaves();
               }}
+              activeRules={sharedActiveRules as any}
+              hitModifier={sharedHitModifier}
+              woundModifier={sharedWoundModifier}
+              addedKeywords={sharedAddedKeywords}
+              modifierSources={sharedModifierSources}
+              hitThresholdOverride={sharedHitThresholdOverride}
+              woundThresholdOverride={sharedWoundThresholdOverride}
               initiatorPlayerId={rollInitiatorId}
               initiatorPlayerName={rollInitiatorName}
               currentPlayerId={currentUser?.id}

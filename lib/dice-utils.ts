@@ -303,15 +303,15 @@ export function rollWounds(
   });
 
   const rerollKind = modifiers.rerollWounds || (modifiers.twinLinked ? 'failed' : undefined);
+  const effectiveRerollKind = rerollKind === 'all' ? 'failed' : rerollKind;
 
   // Reroll wounds (twin-linked or explicit reroll effects)
-  if (rerollKind) {
+  if (effectiveRerollKind) {
     const failedIndices: number[] = [];
     woundRolls.forEach((roll, index) => {
       if (
-        rerollKind === 'all' ||
-        (rerollKind === 'ones' && roll.value === 1) ||
-        (rerollKind === 'failed' && roll.value < woundThreshold)
+        (effectiveRerollKind === 'ones' && roll.value === 1) ||
+        (effectiveRerollKind === 'failed' && roll.value < woundThreshold)
       ) {
         failedIndices.push(index);
       }

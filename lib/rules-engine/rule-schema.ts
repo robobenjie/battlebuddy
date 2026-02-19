@@ -84,6 +84,8 @@ export const Atom = z.union([
   z.object({ t: z.literal("unitName"), is: z.string().min(1) }).strict(),
   z.object({ t: z.literal("unitStatus"), has: z.array(z.string()).min(1) }).strict(),
   z.object({ t: z.literal("armyState"), is: z.array(z.string()).min(1) }).strict(),
+  z.object({ t: z.literal("armyChoice"), choiceId: z.string().min(1), is: z.array(z.string()).min(1) }).strict(),
+  z.object({ t: z.literal("combatRole"), is: z.enum(["attacker", "defender"]) }).strict(),
   z.object({ t: z.literal("isLeading") }).strict(),
   z.object({ t: z.literal("isTargetedUnit") }).strict(),  // Check if defender is the targeted unit (for Oath of Moment)
 
