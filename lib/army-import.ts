@@ -30,6 +30,26 @@ function normalizeArmyKeyword(keyword: string): string {
     .trim();
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  if (error && typeof error === 'object') {
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return 'Unknown error';
+    }
+  }
+
+  return 'Unknown error';
+}
+
 function hasExcludedOathChapterKeywords(units: UnitData[]): boolean {
   for (const unit of units) {
     for (const category of unit.categories || []) {
@@ -1299,7 +1319,7 @@ export async function importCompleteArmy(jsonData: NewRecruitRoster, userId: str
     };
   } catch (error) {
     console.error('Failed to import complete army:', error);
-    throw new Error(`Complete army import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(`Complete army import failed: ${getErrorMessage(error)}`);
   }
 }
 
@@ -1723,7 +1743,7 @@ export async function extractAndLinkRules(params: {
     let oathHandled = false;
 
     // Process army-level rules
-    const armyRuleIds: string[] = [];
+    const armyRuleIdsSet = new Set<string>();
     for (const importedRule of extractedRules.armyRules) {
       if (normalizeRuleName(importedRule.name) === OATH_OF_MOMENT_RULE_NAME) {
         if (oathHandled) {
@@ -1741,7 +1761,7 @@ export async function extractAndLinkRules(params: {
         );
         createdRuleIds.push(baseRuleId);
         ruleIdMap.set(importedRule.battlescribeId, baseRuleId);
-        armyRuleIds.push(baseRuleId);
+        armyRuleIdsSet.add(baseRuleId);
 
         if (oathBonusEligible) {
           const bonusRule: ImportedRule = {
@@ -1760,7 +1780,7 @@ export async function extractAndLinkRules(params: {
           );
           createdRuleIds.push(bonusRuleId);
           ruleIdMap.set(bonusRule.battlescribeId, bonusRuleId);
-          armyRuleIds.push(bonusRuleId);
+          armyRuleIdsSet.add(bonusRuleId);
         }
         continue;
       }
@@ -1770,10 +1790,11 @@ export async function extractAndLinkRules(params: {
       ruleCreationTime += (performance.now() - createStart);
       createdRuleIds.push(ruleId);
       ruleIdMap.set(importedRule.battlescribeId, ruleId);
-      armyRuleIds.push(ruleId);
+      armyRuleIdsSet.add(ruleId);
     }
 
     // Link all army rules at once
+    const armyRuleIds = Array.from(armyRuleIdsSet);
     if (armyRuleIds.length > 0) {
       const linkStart = performance.now();
       await client.transact(
@@ -1784,6 +1805,7 @@ export async function extractAndLinkRules(params: {
 
     // Process unit rules - collect all links first
     const allUnitLinks: any[] = [];
+    const unitLinkKeys = new Set<string>();
     for (const unit of units) {
       const unitRules = extractedRules.unitRules.get(unit.name) || [];
 
@@ -1798,7 +1820,11 @@ export async function extractAndLinkRules(params: {
           ruleIdMap.set(importedRule.battlescribeId, ruleId);
         }
 
-        allUnitLinks.push(client.tx.units[unit.id].link({ unitRules: ruleId }));
+        const linkKey = `${unit.id}:${ruleId}`;
+        if (!unitLinkKeys.has(linkKey)) {
+          unitLinkKeys.add(linkKey);
+          allUnitLinks.push(client.tx.units[unit.id].link({ unitRules: ruleId }));
+        }
       }
     }
 
@@ -1811,6 +1837,7 @@ export async function extractAndLinkRules(params: {
 
     // Process model rules - collect all links first
     const allModelLinks: any[] = [];
+    const modelLinkKeys = new Set<string>();
     for (const model of models) {
       const modelRules = extractedRules.modelRules.get(model.name) || [];
 
@@ -1825,7 +1852,11 @@ export async function extractAndLinkRules(params: {
           ruleIdMap.set(importedRule.battlescribeId, ruleId);
         }
 
-        allModelLinks.push(client.tx.models[model.id].link({ modelRules: ruleId }));
+        const linkKey = `${model.id}:${ruleId}`;
+        if (!modelLinkKeys.has(linkKey)) {
+          modelLinkKeys.add(linkKey);
+          allModelLinks.push(client.tx.models[model.id].link({ modelRules: ruleId }));
+        }
       }
     }
 
@@ -1838,6 +1869,7 @@ export async function extractAndLinkRules(params: {
 
     // Process weapon rules (keywords) - collect all links first
     const allWeaponLinks: any[] = [];
+    const weaponLinkKeys = new Set<string>();
     for (const weapon of weapons) {
       const weaponRules = extractedRules.weaponRules.get(weapon.name || '') || [];
 
@@ -1852,7 +1884,11 @@ export async function extractAndLinkRules(params: {
           ruleIdMap.set(importedRule.battlescribeId, ruleId);
         }
 
-        allWeaponLinks.push(client.tx.weapons[weapon.id].link({ weaponRules: ruleId }));
+        const linkKey = `${weapon.id}:${ruleId}`;
+        if (!weaponLinkKeys.has(linkKey)) {
+          weaponLinkKeys.add(linkKey);
+          allWeaponLinks.push(client.tx.weapons[weapon.id].link({ weaponRules: ruleId }));
+        }
       }
     }
 
@@ -1876,7 +1912,7 @@ export async function extractAndLinkRules(params: {
     return { ruleIds: createdRuleIds, unimplementedRules };
   } catch (error) {
     console.error('Failed to extract and link rules:', error);
-    throw new Error(`Rule extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(`Rule extraction failed: ${getErrorMessage(error)}`);
   }
 }
 
