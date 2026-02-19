@@ -503,7 +503,7 @@ function getUnitStatlines(unit: UnitData): Array<{
   LD: number;
   OC: number;
 }> {
-  const statlineMap = new Map<string, {
+  type StatlineEntry = {
     count: number;
     M: number | undefined;
     T: number;
@@ -512,7 +512,10 @@ function getUnitStatlines(unit: UnitData): Array<{
     W: number;
     LD: number;
     OC: number;
-  }>();
+    isPlaceholder?: boolean;
+  };
+
+  const statlineMap = new Map<string, StatlineEntry>();
 
   // Check unit's own selections for model statlines from source data
   if (unit.sourceData?.selections) {
@@ -531,38 +534,47 @@ function getUnitStatlines(unit: UnitData): Array<{
         const profileName = unitProfile.name;
         const singularName = normalizeName(profileName);
 
-        let targetKey: string | undefined;
-        if (statlineMap.has(profileName)) {
-          targetKey = profileName;
-        } else if (statlineMap.has(singularName)) {
-          targetKey = singularName;
-        } else {
-          // Try prefix match for model names that include loadouts
-          targetKey = Array.from(statlineMap.keys()).find(key =>
-            key === profileName ||
-            key === singularName ||
-            key.startsWith(profileName) ||
-            key.startsWith(singularName)
-          );
-        }
-        if (!targetKey) {
+        const targetKeys = Array.from(new Set(Array.from(statlineMap.keys()).filter(key =>
+          key === profileName ||
+          key === singularName ||
+          key.startsWith(profileName) ||
+          key.startsWith(singularName)
+        )));
+
+        if (targetKeys.length === 0) {
           const baseName = profileName.split(' ')[0];
           if (baseName) {
-            targetKey = Array.from(statlineMap.keys()).find(key =>
-              key.startsWith(baseName)
-            );
+            targetKeys.push(...Array.from(statlineMap.keys()).filter(key => key.startsWith(baseName)));
           }
         }
 
-        if (targetKey) {
-          const entry = statlineMap.get(targetKey)!;
-          if (entry.M === undefined) {
-            entry.M = stats.M;
+        if (targetKeys.length > 0) {
+          for (const targetKey of targetKeys) {
+            const entry = statlineMap.get(targetKey)!;
+            if (entry.isPlaceholder) {
+              entry.M = stats.M;
+              entry.T = stats.T;
+              entry.SV = stats.SV;
+              entry.W = stats.W;
+              entry.LD = stats.LD;
+              entry.OC = stats.OC;
+              entry.isPlaceholder = false;
+            } else if (entry.M === undefined) {
+              entry.M = stats.M;
+            }
           }
         } else if ((profileName === unit.name || unit.name.includes(profileName) || profileName.includes(unit.name)) && stats.M !== undefined) {
           // Use the unit profile as a fallback for all model entries
           for (const entry of statlineMap.values()) {
-            if (entry.M === undefined) {
+            if (entry.isPlaceholder) {
+              entry.M = stats.M;
+              entry.T = stats.T;
+              entry.SV = stats.SV;
+              entry.W = stats.W;
+              entry.LD = stats.LD;
+              entry.OC = stats.OC;
+              entry.isPlaceholder = false;
+            } else if (entry.M === undefined) {
               entry.M = stats.M;
             }
           }
@@ -574,8 +586,25 @@ function getUnitStatlines(unit: UnitData): Array<{
         const stats = parseCharacteristicsToStats(characteristics);
         statlineMap.set(unit.name, {
           count: 1,
-          ...stats
+          ...stats,
+          isPlaceholder: false
         });
+      } else {
+        // Final fallback: apply primary unit profile stats to any remaining entries missing M.
+        const primaryStats = parseCharacteristicsToStats(unitProfiles[0].characteristics || []);
+        for (const entry of statlineMap.values()) {
+          if (entry.M === undefined) {
+            entry.M = primaryStats.M;
+            if (entry.isPlaceholder) {
+              entry.T = primaryStats.T;
+              entry.SV = primaryStats.SV;
+              entry.W = primaryStats.W;
+              entry.LD = primaryStats.LD;
+              entry.OC = primaryStats.OC;
+              entry.isPlaceholder = false;
+            }
+          }
+        }
       }
     }
   }
@@ -610,6 +639,7 @@ function extractStatlinesFromSelections(
     W: number;
     LD: number;
     OC: number;
+    isPlaceholder?: boolean;
   }>
 ): void {
   for (const selection of selections) {
@@ -641,7 +671,8 @@ function extractStatlinesFromSelections(
             statlineMap.set(modelName, {
               count: modelCount,
               ...stats,
-              INV: inv
+              INV: inv,
+              isPlaceholder: false
             });
           }
         }
@@ -668,7 +699,8 @@ function extractStatlinesFromSelections(
             SV: 3,
             W: 1,
             LD: 6,
-            OC: 1
+            OC: 1,
+            isPlaceholder: true
           });
         }
       }

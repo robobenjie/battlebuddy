@@ -18,6 +18,7 @@ import {
 } from '../lib/army-import';
 import testData from '../test_data/assault_weapon_test.json';
 import spaceWolvesData from '../test_data/space_wolves.json';
+import deathGuardData from '../test_data/death_guard_mortarions_hammer.json';
 
 // Mock transactions storage
 const mockTransactions: any[] = [];
@@ -1279,3 +1280,16 @@ describe('Weapon-to-Model Linking Integrity', () => {
     }
   });
 }); 
+
+describe('Death Guard Import Statline Completeness', () => {
+  it('should populate movement for all extracted models in Mortarion\'s Hammer', () => {
+    const jsonData = deathGuardData as NewRecruitRoster;
+    const armyMetadata = extractArmyMetadata(jsonData, 'test-user-dg');
+    const units = extractUnits(jsonData, armyMetadata.id, 'test-user-dg');
+
+    const allModels = units.flatMap(unit => extractModels(unit));
+    const missingMove = allModels.filter(model => model.M === undefined);
+
+    expect(missingMove).toHaveLength(0);
+  });
+});
