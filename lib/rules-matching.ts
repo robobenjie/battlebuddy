@@ -330,23 +330,58 @@ function normalizeRuleName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-/**
- * Match an imported rule against rules-engine implementations
- * Returns the Rule object if implemented, null otherwise
- */
-export function matchRuleToImplementation(importedRule: ImportedRule, faction: string): Rule | null {
-  // Get all available rules for this faction
-  // DEPRECATED: Rules are now stored in InstantDB database
-  // This function returns undefined to indicate no static rule match
-  // Rules should be queried from the database instead
-  let availableRules: Rule[] = [];
+function canonicalRuleKey(name: string): string {
+  const normalized = normalizeRuleName(name);
+  // Handle common singular/plural variants (e.g. Tank Hunter vs Tank Hunters).
+  return normalized.endsWith('s') ? normalized.slice(0, -1) : normalized;
+}
+
+function normalizeFactionName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+export function matchRuleToImplementation(
+  importedRule: ImportedRule,
+  faction: string,
+  existingRules: Array<{ faction?: string; scope?: string; ruleObject?: string }> = []
+): Rule | null {
+  const availableRules: Rule[] = existingRules
+    .flatMap((r) => {
+      if (!r.ruleObject) return [];
+      try {
+        const parsed = JSON.parse(r.ruleObject);
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        return [];
+      }
+    })
+    .filter((r: any) => !!r?.id && !!r?.name);
 
   const normalizedImportName = normalizeRuleName(importedRule.name);
+  const canonicalImportName = canonicalRuleKey(importedRule.name);
+  const normalizedFaction = normalizeFactionName(faction);
+  const importScope = importedRule.scope || '';
 
   // Try to find a matching rule
   for (const rule of availableRules) {
     const normalizedRuleName = normalizeRuleName(rule.name);
+    const canonicalRuleName = canonicalRuleKey(rule.name);
+    const ruleFaction = normalizeFactionName(rule.faction || '');
+    const sameScope = !importScope || !rule.scope || rule.scope === importScope;
+    const sameFaction =
+      !normalizedFaction ||
+      !ruleFaction ||
+      normalizedFaction.includes(ruleFaction) ||
+      ruleFaction.includes(normalizedFaction);
+
+    if (!sameFaction || !sameScope) {
+      continue;
+    }
+
     if (normalizedImportName === normalizedRuleName) {
+      return rule;
+    }
+    if (canonicalImportName === canonicalRuleName) {
       return rule;
     }
   }

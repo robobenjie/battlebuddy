@@ -1977,13 +1977,15 @@ async function findOrCreateRule(
     r => r.battlescribeId === importedRule.battlescribeId
   );
   if (byBattlescribeId) {
-    if (options?.ruleObjectOverride && byBattlescribeId.ruleObject !== options.ruleObjectOverride) {
+    const matchedRule = matchRuleToImplementation(importedRule, faction, existingRules);
+    const resolvedRuleObject = options?.ruleObjectOverride ?? (matchedRule ? JSON.stringify(matchedRule) : undefined);
+    if (resolvedRuleObject && byBattlescribeId.ruleObject !== resolvedRuleObject) {
       await dbClient.transact([
         dbClient.tx.rules[byBattlescribeId.id].update({
-          ruleObject: options.ruleObjectOverride
+          ruleObject: resolvedRuleObject
         })
       ]);
-      byBattlescribeId.ruleObject = options.ruleObjectOverride;
+      byBattlescribeId.ruleObject = resolvedRuleObject;
     }
     console.log(`🔗 Reusing rule by battlescribeId: ${importedRule.name}`);
     return byBattlescribeId.id;
@@ -1994,13 +1996,15 @@ async function findOrCreateRule(
     r => r.name === importedRule.name && r.rawText === importedRule.rawText
   );
   if (byContent) {
-    if (options?.ruleObjectOverride && byContent.ruleObject !== options.ruleObjectOverride) {
+    const matchedRule = matchRuleToImplementation(importedRule, faction, existingRules);
+    const resolvedRuleObject = options?.ruleObjectOverride ?? (matchedRule ? JSON.stringify(matchedRule) : undefined);
+    if (resolvedRuleObject && byContent.ruleObject !== resolvedRuleObject) {
       await dbClient.transact([
         dbClient.tx.rules[byContent.id].update({
-          ruleObject: options.ruleObjectOverride
+          ruleObject: resolvedRuleObject
         })
       ]);
-      byContent.ruleObject = options.ruleObjectOverride;
+      byContent.ruleObject = resolvedRuleObject;
     }
     console.log(`🔗 Reusing rule by content match: ${importedRule.name}`);
     return byContent.id;
@@ -2010,7 +2014,7 @@ async function findOrCreateRule(
   const ruleId = id();
 
   // Try to match against rules-engine implementation
-  const matchedRule = matchRuleToImplementation(importedRule, faction);
+  const matchedRule = matchRuleToImplementation(importedRule, faction, existingRules);
   const ruleObject = options?.ruleObjectOverride ?? (matchedRule ? JSON.stringify(matchedRule) : undefined);
 
   if (!ruleObject) {
