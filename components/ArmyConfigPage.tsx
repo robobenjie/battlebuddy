@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { db } from '../lib/db';
 import { id } from '@instantdb/react';
 import { getUnitDisplayName } from '../lib/unit-utils';
+import ArmyChoiceSelector from './ui/ArmyChoiceSelector';
+import { Rule, ChoiceRuleType } from '../lib/rules-engine/types';
+import { getPendingStartOfBattleChoiceRules } from '../lib/command-choice-utils';
 
 interface ArmyConfigPageProps {
   gameId: string;
@@ -13,11 +16,16 @@ interface ArmyConfigPageProps {
 
 export default function ArmyConfigPage({ gameId, armyId, currentUserId }: ArmyConfigPageProps) {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pendingStartChoices, setPendingStartChoices] = useState<Record<string, string>>({});
 
   // Query units with leaders relationship loaded
   const { data: unitsData } = db.useQuery({
     units: {
       leaders: {}, // Load attached leaders
+      unitRules: {},
+      models: {
+        modelRules: {},
+      },
       $: {
         where: {
           armyId: armyId
@@ -48,8 +56,22 @@ export default function ArmyConfigPage({ gameId, armyId, currentUserId }: ArmyCo
     }
   });
 
+  const { data: armyRulesData } = db.useQuery({
+    armies: {
+      states: {},
+      armyRules: {},
+      $: {
+        where: {
+          id: armyId
+        }
+      }
+    }
+  });
+
   const players = playersData?.players || [];
   const game = gameData?.games?.[0];
+  const armyRecord = armyRulesData?.armies?.[0];
+  const armyStates = armyRecord?.states || [];
   const currentPlayer = players.find(p => p.userId === currentUserId);
   const isCurrentPlayerReady = currentPlayer?.configReady || false;
 
@@ -70,6 +92,70 @@ export default function ArmyConfigPage({ gameId, armyId, currentUserId }: ArmyCo
   }, [allPlayersReady, game, gameId]);
 
   const allUnits = unitsData?.units || [];
+
+  const parseRuleObject = (ruleObject?: string): Rule[] => {
+    if (!ruleObject) return [];
+    try {
+      const parsed = JSON.parse(ruleObject);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e) {
+      console.error('Failed to parse rule object:', e);
+      return [];
+    }
+  };
+
+  const linkedArmyRules: Rule[] = (armyRecord?.armyRules || [])
+    .flatMap((ruleData: any) => parseRuleObject(ruleData.ruleObject))
+    .filter((r: Rule | null): r is Rule => r !== null);
+
+  const unitLinkedArmyScopeRules: Rule[] = allUnits
+    .flatMap((unit: any) => unit.unitRules || [])
+    .flatMap((ruleData: any) => parseRuleObject(ruleData.ruleObject))
+    .filter((r: Rule | null): r is Rule => r !== null)
+    .filter((rule: Rule) => rule.scope === 'army');
+
+  const modelLinkedArmyScopeRules: Rule[] = allUnits
+    .flatMap((unit: any) => unit.models || [])
+    .flatMap((model: any) => model.modelRules || [])
+    .flatMap((ruleData: any) => parseRuleObject(ruleData.ruleObject))
+    .filter((r: Rule | null): r is Rule => r !== null)
+    .filter((rule: Rule) => rule.scope === 'army');
+
+  const armyRulesById = new Map<string, Rule>();
+  for (const rule of [...linkedArmyRules, ...unitLinkedArmyScopeRules, ...modelLinkedArmyScopeRules]) {
+    armyRulesById.set(rule.id, rule);
+  }
+  const armyRules = Array.from(armyRulesById.values());
+  const startOfBattleChoiceRules: ChoiceRuleType[] = getPendingStartOfBattleChoiceRules(
+    armyRules,
+    armyStates as any
+  );
+
+  useEffect(() => {
+    if (startOfBattleChoiceRules.length === 0) return;
+
+    setPendingStartChoices((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      for (const rule of startOfBattleChoiceRules) {
+        const choiceId = rule.choice.id;
+        if (next[choiceId]) continue;
+
+        const existingState = armyStates.find((s: any) => s.state === choiceId);
+        if (existingState?.choiceValue) {
+          next[choiceId] = existingState.choiceValue;
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [startOfBattleChoiceRules, armyStates]);
+
+  const hasAllStartChoicesSelected = startOfBattleChoiceRules.every(
+    (rule) => !!pendingStartChoices[rule.choice.id]
+  );
 
   // Identify CHARACTER units and non-CHARACTER units
   const characterUnits = allUnits.filter((unit: any) =>
@@ -131,13 +217,42 @@ export default function ArmyConfigPage({ gameId, armyId, currentUserId }: ArmyCo
   // Mark current player as ready
   const markReady = async () => {
     if (!currentPlayer) return;
+    if (!hasAllStartChoicesSelected) return;
+
     setIsProcessing(true);
     try {
-      await db.transact([
+      const txs: any[] = [];
+
+      for (const rule of startOfBattleChoiceRules) {
+        const selectedValue = pendingStartChoices[rule.choice.id];
+        if (!selectedValue) continue;
+
+        const existingState = armyStates.find((s: any) => s.state === rule.choice.id);
+        if (existingState) {
+          txs.push(
+            db.tx.armyStates[existingState.id].update({
+              choiceValue: selectedValue,
+              activatedTurn: game?.currentTurn || 1,
+            })
+          );
+        } else {
+          txs.push(
+            db.tx.armyStates[id()].update({
+              state: rule.choice.id,
+              choiceValue: selectedValue,
+              activatedTurn: game?.currentTurn || 1,
+            }).link({ army: armyId })
+          );
+        }
+      }
+
+      txs.push(
         db.tx.players[currentPlayer.id].update({
           configReady: true
         })
-      ]);
+      );
+
+      await db.transact(txs);
     } catch (error) {
       console.error('Error marking player as ready:', error);
     } finally {
@@ -159,7 +274,7 @@ export default function ArmyConfigPage({ gameId, armyId, currentUserId }: ArmyCo
           {!isCurrentPlayerReady ? (
             <button
               onClick={markReady}
-              disabled={isProcessing}
+              disabled={isProcessing || !hasAllStartChoicesSelected}
               className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
             >
               I'm Ready
@@ -173,6 +288,40 @@ export default function ArmyConfigPage({ gameId, armyId, currentUserId }: ArmyCo
             </div>
           )}
         </div>
+
+        {/* Start of Battle Choices */}
+        {startOfBattleChoiceRules.length > 0 && (
+          <div className="space-y-4 mb-8">
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+              <h2 className="text-xl font-semibold text-white mb-2">Declare Battle Formations</h2>
+              <p className="text-gray-400 text-sm">
+                Make any start-of-battle army choices before you mark ready.
+              </p>
+              {!hasAllStartChoicesSelected && !isCurrentPlayerReady && (
+                <p className="text-amber-400 text-sm mt-2">
+                  Select an option for each choice to enable &quot;I&apos;m Ready&quot;.
+                </p>
+              )}
+            </div>
+            {startOfBattleChoiceRules.map((rule) => {
+              const existingState = armyStates.find((s: any) => s.state === rule.choice.id);
+              return (
+                <ArmyChoiceSelector
+                  key={rule.id}
+                  rule={rule}
+                  currentSelection={pendingStartChoices[rule.choice.id] || existingState?.choiceValue}
+                  onSelect={(optionValue) => {
+                    setPendingStartChoices((prev) => ({
+                      ...prev,
+                      [rule.choice.id]: optionValue,
+                    }));
+                  }}
+                  disabled={isCurrentPlayerReady}
+                />
+              );
+            })}
+          </div>
+        )}
 
         {/* Player Status */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-8">

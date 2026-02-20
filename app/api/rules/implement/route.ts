@@ -5,14 +5,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { OpenAIResponseSchema } from '@/lib/rules-engine/rule-schema';
 import { buildSystemPrompt, buildUserPrompt } from '@/lib/openai-prompt';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { getOpenAIClient } from '@/lib/openai-client';
 
 interface ImplementRequest {
   ruleName: string;
@@ -45,6 +41,7 @@ export async function POST(request: NextRequest) {
     // Build prompts using shared functions
     const systemPrompt = buildSystemPrompt();
     const userPrompt = buildUserPrompt({ ruleName, ruleText, faction, scope, asReminder, aiExplanation, userResponse });
+    const openai = getOpenAIClient();
 
     // Call OpenAI with structured output using Zod schema
     const completion = await openai.chat.completions.parse({

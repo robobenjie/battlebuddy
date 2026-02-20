@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getPendingCommandChoiceRules } from '../lib/command-choice-utils';
+import { getPendingCommandChoiceRules, getPendingStartOfBattleChoiceRules } from '../lib/command-choice-utils';
 import { ChoiceRuleType, Rule } from '../lib/rules-engine/types';
 
 const makeChoiceRule = (overrides: Partial<ChoiceRuleType> = {}): ChoiceRuleType => ({
@@ -29,10 +29,10 @@ const makeChoiceRule = (overrides: Partial<ChoiceRuleType> = {}): ChoiceRuleType
 });
 
 describe('Command choice visibility', () => {
-  it('shows once-per-battle command choice on turn 1 when not selected', () => {
+  it('does not show start-of-battle army choices in command phase', () => {
     const rules: Rule[] = [makeChoiceRule()];
     const pending = getPendingCommandChoiceRules(rules, [], 1);
-    expect(pending.map(r => r.id)).toContain('death-guard-plague');
+    expect(pending).toHaveLength(0);
   });
 
   it('keeps choice visible if stale state exists without choiceValue', () => {
@@ -42,7 +42,7 @@ describe('Command choice visibility', () => {
       [{ state: 'death-guard-plague', activatedTurn: 1 }],
       1
     );
-    expect(pending.map(r => r.id)).toContain('death-guard-plague');
+    expect(pending).toHaveLength(0);
   });
 
   it('hides choice once choiceValue has been selected', () => {
@@ -51,6 +51,21 @@ describe('Command choice visibility', () => {
       rules,
       [{ state: 'death-guard-plague', choiceValue: 'rattlejoint-ague', activatedTurn: 1 }],
       1
+    );
+    expect(pending).toHaveLength(0);
+  });
+
+  it('shows start-of-battle choices before selection', () => {
+    const rules: Rule[] = [makeChoiceRule()];
+    const pending = getPendingStartOfBattleChoiceRules(rules, []);
+    expect(pending.map(r => r.id)).toContain('death-guard-plague');
+  });
+
+  it('hides start-of-battle choices once selected', () => {
+    const rules: Rule[] = [makeChoiceRule()];
+    const pending = getPendingStartOfBattleChoiceRules(
+      rules,
+      [{ state: 'death-guard-plague', choiceValue: 'rattlejoint-ague', activatedTurn: 1 }]
     );
     expect(pending).toHaveLength(0);
   });

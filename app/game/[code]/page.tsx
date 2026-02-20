@@ -13,6 +13,7 @@ export default function GamePage() {
   const gameCode = params.code as string;
   const { user } = db.useAuth();
   const [isStartingGame, setIsStartingGame] = useState(false);
+  const [isCopyingArmyForConfig, setIsCopyingArmyForConfig] = useState(false);
 
   // First query just to get the game by code
   const { data: gamesData, isLoading: isLoadingGame } = db.useQuery({
@@ -63,7 +64,7 @@ export default function GamePage() {
 
   // Separate query for user army templates (not game-specific) - only when needed
   const { data: userArmiesData } = db.useQuery(
-    !game || game.status === 'active' ? {} : {
+    !game || game.status === 'active' || !user?.id ? {} : {
       armies: {
         armyRules: {},
         units: {
@@ -73,6 +74,11 @@ export default function GamePage() {
             weapons: {
               weaponRules: {}
             }
+          }
+        },
+        $: {
+          where: {
+            ownerId: user.id
           }
         }
       }
@@ -129,6 +135,48 @@ export default function GamePage() {
     }
   }, [user, router]);
 
+  const currentPlayer = players.find(p => p.userId === user?.id);
+
+  // In army-config, ensure the current user has a game-specific army copy.
+  // This allows each player to self-heal into config even if host started first.
+  useEffect(() => {
+    if (!game || game.status !== 'army-config') return;
+    if (!currentPlayer || !currentPlayer.armyId) return;
+    if (isCopyingArmyForConfig) return;
+
+    const existingGameArmy = allArmies.find(
+      (a) => a.gameId === game.id && a.ownerId === currentPlayer.userId
+    );
+    if (existingGameArmy) return;
+
+    const selectedTemplateArmyId = currentPlayer.armyId;
+    if (!selectedTemplateArmyId) return;
+
+    let cancelled = false;
+    const ensureArmyCopy = async () => {
+      setIsCopyingArmyForConfig(true);
+      try {
+        const newArmyId = await copyArmyToGame(selectedTemplateArmyId, currentPlayer.id);
+        if (!newArmyId && !cancelled) {
+          console.error('Failed to copy army while entering army-config');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error ensuring army copy for army-config:', error);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsCopyingArmyForConfig(false);
+        }
+      }
+    };
+
+    ensureArmyCopy();
+    return () => {
+      cancelled = true;
+    };
+  }, [game?.id, game?.status, currentPlayer?.id, currentPlayer?.armyId, currentPlayer?.userId, allArmies, isCopyingArmyForConfig]);
+
   // Show loading state while initial game data loads
   if (isLoadingGame || isLoading) {
     return (
@@ -160,7 +208,6 @@ export default function GamePage() {
   }
 
   const isHost = user?.id === game.hostId;
-  const currentPlayer = players.find(p => p.userId === user?.id);
 
   // Function to start the game with army copying
   const startGame = async () => {
@@ -171,17 +218,14 @@ export default function GamePage() {
       const currentPlayer = players.find(p => p.userId === user?.id);
       
       if (currentPlayer && currentPlayer.armyId) {
-        // Check if this player already has a game army
-        const existingGameArmy = allArmies.find(a => a.gameId === game?.id && a.ownerId === currentPlayer.userId);
-        
-        if (!existingGameArmy) {
-          // This player has selected an army template but it's not copied to the game yet
-          console.log(`Copying army for current player ${currentPlayer.name} (${currentPlayer.userId})`);
-          const newArmyId = await copyArmyToGame(currentPlayer.armyId, currentPlayer.id);
-          console.log(`Created game army ${newArmyId} for player ${currentPlayer.name}`);
-        } else {
-          console.log(`Current player ${currentPlayer.name} already has game army ${existingGameArmy.id}`);
+        // Always perform a fresh copy at game start.
+        // This avoids reusing stale/partial game armies from previous failed copy attempts.
+        console.log(`Copying army for current player ${currentPlayer.name} (${currentPlayer.userId})`);
+        const newArmyId = await copyArmyToGame(currentPlayer.armyId, currentPlayer.id);
+        if (!newArmyId) {
+          throw new Error('Failed to copy army to game');
         }
+        console.log(`Created game army ${newArmyId} for player ${currentPlayer.name}`);
       } else if (currentPlayer) {
         console.log(`Current player ${currentPlayer.name} has no army selected`);
       }
@@ -214,10 +258,6 @@ export default function GamePage() {
           armyId: armyId
         })
       ]);
-      
-      // Also copy the army to the game immediately
-      console.log(`Player ${currentPlayer.name} selected army ${armyId}, copying to game...`);
-      await copyArmyToGame(armyId, currentPlayer.id);
     } catch (error) {
       console.error('Error selecting army:', error);
     }
@@ -232,6 +272,9 @@ export default function GamePage() {
         <div className="min-h-screen bg-gray-900 flex items-center justify-center">
           <div className="text-center">
             <p className="text-gray-400 mb-4">Waiting for your army to be set up...</p>
+            {isCopyingArmyForConfig && (
+              <p className="text-gray-500 text-sm mb-2">Copying your selected army into this game...</p>
+            )}
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
           </div>
         </div>

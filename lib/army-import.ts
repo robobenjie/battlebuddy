@@ -1559,7 +1559,24 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
     const newModelIds: string[] = [];
     const newWeaponIds: string[] = [];
 
-    const transactions = [];
+    const transactWithRetry = async (txs: any[], label: string, maxAttempts = 3) => {
+      let attempt = 0;
+      while (attempt < maxAttempts) {
+        try {
+          await db.transact(txs);
+          return;
+        } catch (err) {
+          attempt += 1;
+          const message = err instanceof Error ? err.message : String(err);
+          const isTimeout = message.toLowerCase().includes('timed out') || message.toLowerCase().includes('timeout');
+          if (!isTimeout || attempt >= maxAttempts) {
+            throw err;
+          }
+          console.warn(`Retrying ${label} after timeout (attempt ${attempt + 1}/${maxAttempts})`);
+          await new Promise((resolve) => setTimeout(resolve, 150 * attempt));
+        }
+      }
+    };
 
     // Helper function to create a copy of an object with specific overrides
     const createCopy = (original: any, overrides: any = {}) => {
@@ -1592,12 +1609,12 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
     };
 
     // Step 1: Create army first
-    await db.transact([
+    await transactWithRetry([
       db.tx.armies[gameArmyId].update(armyCopy).link({
         owner: armyData.ownerId,
         game: gameId
       })
-    ]);
+    ], 'create army');
 
     // Prepare all units, models, and weapons
     const unitTransactions = [];
@@ -1679,29 +1696,29 @@ export async function duplicateArmyForGame(armyData: any, gameId: string): Promi
     }
 
     // Step 2: Batch units into chunks of 10
-    const unitChunks = chunkArray(unitTransactions, 10);
+    const unitChunks = chunkArray(unitTransactions, 5);
     for (const unitChunk of unitChunks) {
-      await db.transact(unitChunk);
+      await transactWithRetry(unitChunk, 'create units');
     }
 
     // Step 3: Batch models into chunks of 20
-    const modelChunks = chunkArray(modelTransactions, 20);
+    const modelChunks = chunkArray(modelTransactions, 10);
     for (const modelChunk of modelChunks) {
-      await db.transact(modelChunk);
+      await transactWithRetry(modelChunk, 'create models');
     }
 
     // Step 4: Batch weapons into chunks of 30
-    const weaponChunks = chunkArray(weaponTransactions, 30);
+    const weaponChunks = chunkArray(weaponTransactions, 15);
     for (const weaponChunk of weaponChunks) {
-      await db.transact(weaponChunk);
+      await transactWithRetry(weaponChunk, 'create weapons');
     }
 
     // Step 5: Link all rules in batches
     console.log(`📊 Total rule links to create: ${ruleLinks.length}`);
     if (ruleLinks.length > 0) {
-      const ruleLinkChunks = chunkArray(ruleLinks, 50);
+      const ruleLinkChunks = chunkArray(ruleLinks, 20);
       for (const ruleLinkChunk of ruleLinkChunks) {
-        await db.transact(ruleLinkChunk);
+        await transactWithRetry(ruleLinkChunk, 'link rules');
       }
       console.log(`✅ Linked ${ruleLinks.length} rules to game army`);
     } else {

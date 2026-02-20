@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig = (phase: string): NextConfig => {
+  const isVercel = process.env.VERCEL === '1';
   const isProd = (
     process.env.NODE_ENV === 'production'
     || phase === 'phase-production-build'
@@ -9,7 +10,8 @@ const nextConfig = (phase: string): NextConfig => {
 
   return {
     reactStrictMode: false,
-    distDir: isProd ? '.next.prod' : '.next.dev',
+    // Vercel expects production output in `.next`.
+    distDir: isVercel ? '.next' : (isProd ? '.next.prod' : '.next.dev'),
     images: {
       remotePatterns: [
         {
