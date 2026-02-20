@@ -17,6 +17,11 @@ export interface Stratagem {
   turn?: 'your-turn' | 'opponent-turn' | 'either'; // who can use this stratagem
 }
 
+export interface StratagemDrawerEntry {
+  stratagem: Stratagem;
+  isAvailableNow: boolean;
+}
+
 // Core Stratagems (available to all factions)
 export const CORE_STRATAGEMS: Stratagem[] = [
   {
@@ -499,4 +504,40 @@ export function getStratagemsForTurn(stratagems: Stratagem[], isYourTurn: boolea
     if (isYourTurn) return s.turn === 'your-turn';
     return s.turn === 'opponent-turn';
   });
+}
+
+function isStratagemAvailableNow(stratagem: Stratagem, isYourTurn: boolean): boolean {
+  if (!stratagem.turn || stratagem.turn === 'either') return true;
+  if (isYourTurn) return stratagem.turn === 'your-turn';
+  return stratagem.turn === 'opponent-turn';
+}
+
+function compareDrawerPriority(a: Stratagem, b: Stratagem): number {
+  const aIsDetachment = !!a.detachment;
+  const bIsDetachment = !!b.detachment;
+  if (aIsDetachment !== bIsDetachment) {
+    return aIsDetachment ? -1 : 1;
+  }
+  return a.name.localeCompare(b.name);
+}
+
+export function getStratagemsForDrawer(stratagems: Stratagem[], isYourTurn: boolean): StratagemDrawerEntry[] {
+  const availableNow: Stratagem[] = [];
+  const unavailableNow: Stratagem[] = [];
+
+  for (const stratagem of stratagems) {
+    if (isStratagemAvailableNow(stratagem, isYourTurn)) {
+      availableNow.push(stratagem);
+    } else {
+      unavailableNow.push(stratagem);
+    }
+  }
+
+  availableNow.sort(compareDrawerPriority);
+  unavailableNow.sort(compareDrawerPriority);
+
+  return [
+    ...availableNow.map((stratagem) => ({ stratagem, isAvailableNow: true })),
+    ...unavailableNow.map((stratagem) => ({ stratagem, isAvailableNow: false })),
+  ];
 }

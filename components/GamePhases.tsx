@@ -9,7 +9,7 @@ import ShootPhase from './phases/ShootPhase';
 import ChargePhase from './phases/ChargePhase';
 import FightPhase from './phases/FightPhase';
 import ChooseFirstPlayerPhase from './phases/ChooseFirstPlayerPhase';
-import StratagemsModal from './StratagemsModal';
+import StratagemsPanel from './StratagemsPanel';
 import HamburgerMenu from './HamburgerMenu';
 import Sidebar from './Sidebar';
 import ArmyViewPanel from './ArmyViewPanel';
@@ -52,7 +52,7 @@ const PHASE_NAMES: Record<Phase, string> = {
 
 export default function GamePhases({ gameId, game, players, currentUser }: GamePhasesProps) {
   const [isAdvancing, setIsAdvancing] = useState(false);
-  const [showStratagemsModal, setShowStratagemsModal] = useState(false);
+  const [isStratagemPanelOpen, setIsStratagemPanelOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isArmyPanelOpen, setIsArmyPanelOpen] = useState(false);
   const router = useRouter();
@@ -291,13 +291,23 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
       // Prevent default to stop click events from firing
       e.preventDefault();
 
-      // Swipe left (to open panel from right)
-      if (swipeDistance > 0 && !isArmyPanelOpen) {
-        setIsArmyPanelOpen(true);
+      // Swipe left: open army panel, or close stratagem panel
+      if (swipeDistance > 0) {
+        if (isStratagemPanelOpen) {
+          setIsStratagemPanelOpen(false);
+        } else if (!isArmyPanelOpen) {
+          setIsStratagemPanelOpen(false);
+          setIsArmyPanelOpen(true);
+        }
       }
-      // Swipe right (to close panel)
-      else if (swipeDistance < 0 && isArmyPanelOpen) {
-        setIsArmyPanelOpen(false);
+      // Swipe right: open stratagem panel, or close army panel
+      else if (swipeDistance < 0) {
+        if (isArmyPanelOpen) {
+          setIsArmyPanelOpen(false);
+        } else if (!isStratagemPanelOpen) {
+          setIsArmyPanelOpen(false);
+          setIsStratagemPanelOpen(true);
+        }
       }
     }
 
@@ -494,6 +504,17 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
     ]);
   };
 
+  const handleAdjustCommandPoints = async (delta: number) => {
+    if (!currentUserPlayer) return;
+    const currentCP = currentUserPlayer.commandPoints || 0;
+    const newCP = Math.max(0, currentCP + delta);
+    await db.transact([
+      db.tx.players[currentUserPlayer.id].update({
+        commandPoints: newCP
+      })
+    ]);
+  };
+
   const handleNavigation = (page: string) => {
     if (page === 'home') {
       router.push('/');
@@ -534,17 +555,16 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
         players={players}
       />
 
-      {/* Stratagems Modal */}
-      <StratagemsModal
-        isOpen={showStratagemsModal}
-        onClose={() => setShowStratagemsModal(false)}
-        currentPhase={game.currentPhase}
+      {/* Stratagems Panel */}
+      <StratagemsPanel
+        isOpen={isStratagemPanelOpen}
+        onClose={() => setIsStratagemPanelOpen(false)}
         faction={currentUserArmy?.faction}
         detachment={currentUserArmy?.detachment}
         commandPoints={currentUserPlayer?.commandPoints || 0}
+        isYourTurn={game.activePlayerId === currentUserPlayer?.id}
         onUseStratagem={handleUseStratagem}
-        activePlayerId={game.activePlayerId}
-        currentUserId={currentUserPlayer?.id}
+        onAdjustCommandPoints={handleAdjustCommandPoints}
       />
 
       {/* Shared Dice Roll Results Modal (disabled when combat sessions are active) */}
@@ -607,14 +627,9 @@ export default function GamePhases({ gameId, game, players, currentUser }: GameP
               </p>
             </div>
             <div className="flex items-center gap-4">
-              {/* CP Button */}
-              <button
-                onClick={() => setShowStratagemsModal(true)}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
-              >
-                <span className="text-lg">{currentUserPlayer?.commandPoints || 0}</span>
-                <span className="text-sm">CP</span>
-              </button>
+              <div className="bg-gray-700 text-yellow-400 font-bold py-2 px-4 rounded-lg">
+                {currentUserPlayer?.commandPoints || 0} CP
+              </div>
               <div className="text-right text-sm text-gray-400">
                 <p>Game {game.code}</p>
                 <p>Phase {getCurrentPhaseIndex() + 1} of {PHASES.length}</p>
