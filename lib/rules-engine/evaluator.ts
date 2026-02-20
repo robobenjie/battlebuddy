@@ -328,6 +328,19 @@ export function applyFx(fx: FxType, context: CombatContext, ruleId: string): voi
       break;
     }
 
+    // Critical hit threshold
+    case 'setCriticalHit': {
+      const modifier: Modifier = {
+        source: ruleId,
+        stat: 'criticalHit',
+        value: fx.n,
+        operation: 'set',
+        priority: 0,
+      };
+      context.modifiers.add(modifier);
+      break;
+    }
+
     // Rerolls
     case 'reroll': {
       const modifier: Modifier = {

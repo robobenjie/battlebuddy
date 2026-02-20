@@ -24,6 +24,21 @@ export default function ArmyChoiceSelector({
 }: ArmyChoiceSelectorProps) {
   const { choice } = rule;
 
+  const getOptionSubtext = (optionValue: string): string | null => {
+    if (rule.id === 'death-guard-plague' || choice.id === 'death-guard-plague') {
+      if (optionValue === 'skullsquirm-blight') {
+        return 'Afflicted units: -1 Toughness, and -1 to Hit when they attack.';
+      }
+      if (optionValue === 'rattlejoint-ague') {
+        return 'Afflicted units: -1 Toughness and Save worsened by 1.';
+      }
+      if (optionValue === 'scabrous-soulrot') {
+        return 'Afflicted units: -1 Toughness (and -1 Move/Ld/OC tracked outside combat).';
+      }
+    }
+    return null;
+  };
+
   return (
     <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
       {/* Rule Name and Description */}
@@ -41,6 +56,7 @@ export default function ArmyChoiceSelector({
       <div className="space-y-2">
         {choice.options.map((option) => {
           const isSelected = currentSelection === option.v;
+          const optionSubtext = getOptionSubtext(option.v);
 
           return (
             <button
@@ -59,6 +75,11 @@ export default function ArmyChoiceSelector({
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="font-medium">{option.label}</div>
+                  {optionSubtext && (
+                    <div className="mt-1 text-xs text-gray-400">
+                      {optionSubtext}
+                    </div>
+                  )}
                 </div>
                 {isSelected && (
                   <div className="ml-2 text-blue-400">

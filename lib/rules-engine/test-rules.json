@@ -1861,6 +1861,78 @@
           }
         ]
       }
+    },
+    {
+      "name": "add-lance-ability",
+      "isExample": false,
+      "exampleReason": "Adds the Lance weapon ability via typed schema. Used to validate lance support in WeaponAbilityFlag.",
+      "rule": {
+        "id": "add-lance-ability",
+        "name": "Add Lance Ability",
+        "description": "Melee attacks made by this unit gain Lance.",
+        "faction": "Test Faction",
+        "scope": "unit",
+        "trigger": {
+          "t": "automatic",
+          "phase": "fight",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "weaponType",
+          "any": [
+            "melee"
+          ]
+        },
+        "kind": "passive",
+        "then": [
+          {
+            "t": "do",
+            "fx": [
+              {
+                "t": "addWeaponAbility",
+                "ability": {
+                  "t": "flag",
+                  "id": "lance"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "critical-hit-on-five",
+      "isExample": false,
+      "exampleReason": "Sets critical hit threshold to 5+ for attacks. Used to test setCriticalHit effect.",
+      "rule": {
+        "id": "critical-hit-on-five",
+        "name": "Critical Hit on 5+",
+        "description": "Each unmodified hit roll of 5+ scores a critical hit.",
+        "faction": "Test Faction",
+        "scope": "unit",
+        "trigger": {
+          "t": "automatic",
+          "phase": "any",
+          "turn": "both",
+          "limit": "none"
+        },
+        "when": {
+          "t": "true"
+        },
+        "kind": "passive",
+        "then": [
+          {
+            "t": "do",
+            "fx": [
+              {
+                "t": "setCriticalHit",
+                "n": 5
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

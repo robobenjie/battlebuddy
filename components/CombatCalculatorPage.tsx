@@ -22,10 +22,24 @@ import {
   CombatState
 } from '../lib/combat-calculator-engine';
 import { buildRollDisplayPayload } from '../lib/combat-roll-display';
+import { getCombatModifierSources } from '../lib/combat-modifier-sources';
+import {
+  shouldMarkWeaponsOnDone,
+  shouldExitCalculatorOnDigitalDiceClose,
+  shouldExitCalculatorOnDone,
+  calculateRemainingRangedWeaponGroupsAfterFiring
+} from '../lib/combat-session-utils';
 import { resolveCurrentTurnKey } from '../lib/combat-turn-key';
 import { buildCombatSessionResultsPayload } from '../lib/combat-session-payload';
 import { prepareCombatRuleSetup } from '../lib/combat-rule-setup';
-import { Rule, ArmyState, evaluateWhen } from '../lib/rules-engine';
+import { buildCombatActiveRules } from '../lib/combat-active-rules';
+import { getCombatCalculatorStratagems, CombatCalculatorStratagem } from '../lib/combat-calculator-stratagems';
+import {
+  isExtraAttacksWeapon,
+  isMeleeWeaponGroupDisabled,
+  isMeleeWeaponInstanceEligible
+} from '../lib/melee-weapon-sequencing';
+import { Rule, ArmyState } from '../lib/rules-engine';
 import { UNIT_FULL_QUERY, UNIT_BASIC_QUERY } from '../lib/query-fragments';
 import { DiceRollEvent, CombatPhaseEvent, CombatSessionRecord } from '../lib/rooms-types';
 
@@ -42,6 +56,7 @@ interface CombatCalculatorPageProps {
     userId: string;
     name: string;
   };
+  viewerPlayerId?: string;
   combatSession?: CombatSessionRecord;
 }
 
@@ -54,6 +69,7 @@ export default function CombatCalculatorPage({
   preSelectedWeaponName,
   onClose,
   currentPlayer: propCurrentPlayer,
+  viewerPlayerId,
   combatSession
 }: CombatCalculatorPageProps = {}) {
   const router = useRouter();
@@ -112,6 +128,7 @@ export default function CombatCalculatorPage({
   // Filter out the current unit's army - use prop if available, fallback to unit.armyId
   const currentArmyId = propCurrentArmyId || unit?.armyId;
 
+  const currentArmy = game?.armies?.find((army: any) => army.id === currentArmyId);
   const enemyArmies = game?.armies?.filter((army: any) => army.id !== currentArmyId) || [];
   const enemyUnits = sortUnitsByPriority(
     (enemyArmies?.flatMap((army: any) => army.units) || [])
@@ -185,6 +202,20 @@ export default function CombatCalculatorPage({
   const [currentArmyStates, setCurrentArmyStates] = useState<ArmyState[]>([]);
   const [combatState, setCombatState] = useState<CombatState | null>(null);
   const [rollCombatState, setRollCombatState] = useState<CombatState | null>(null);
+  const [activeStratagemIds, setActiveStratagemIds] = useState<string[]>([]);
+  const [selectedStratagemInfo, setSelectedStratagemInfo] = useState<CombatCalculatorStratagem | null>(null);
+
+  const availableCombatStratagems = getCombatCalculatorStratagems({
+    faction: currentArmy?.faction,
+    detachment: currentArmy?.detachment,
+    weaponType: weaponType === 'melee' ? 'melee' : 'ranged',
+    unitKeywords: unit?.keywords || [],
+    unitCategories: unit?.categories || []
+  });
+
+  const activeCombatStratagemRules = availableCombatStratagems
+    .filter((s) => activeStratagemIds.includes(s.id))
+    .map((s) => s.rule);
 
   // Room setup for real-time collaboration
   // Always initialize room (use dummy ID if no gameId to satisfy React hooks rules)
@@ -262,6 +293,10 @@ export default function CombatCalculatorPage({
       targetSelectRef.current.focus();
     }
   }, []);
+
+  useEffect(() => {
+    setActiveStratagemIds([]);
+  }, [unit?.id]);
 
   const updateCombatSession = async (updates: Partial<CombatSessionRecord>) => {
     if (!combatSession?.id) return;
@@ -407,10 +442,11 @@ export default function CombatCalculatorPage({
   // 1. It's already fired, OR
   // 2. For ranged weapons only: Any instance of it is on a model that has fired the opposite type (pistol/non-pistol rule)
   const isWeaponDisabled = (weapon: any) => {
-    if (isWeaponFired(weapon)) return true;
+    if (weaponType === 'melee') {
+      return isMeleeWeaponGroupDisabled(weapon.name, allWeapons as any, turnPlayerId);
+    }
 
-    // Melee weapons don't have pistol/non-pistol restriction
-    if (weaponType === 'melee') return false;
+    if (isWeaponFired(weapon)) return true;
 
     // Get all weapons with this name
     const weaponsWithSameName = allWeapons.filter((w: any) => w.name === weapon.name);
@@ -557,6 +593,7 @@ export default function CombatCalculatorPage({
       selectedTarget,
       weaponType
     });
+    const attackerRulesWithStratagems = [...attackerRules, ...activeCombatStratagemRules];
 
     const combatStateResult = buildCombatState({
       attacker: { ...unit, armyId: currentArmyId, isLeader: !!(unit?.bodyguardUnits && unit.bodyguardUnits.length > 0) },
@@ -571,7 +608,7 @@ export default function CombatCalculatorPage({
         unitHasCharged,
         blastBonusAttacks: 0
       },
-      attackerRules,
+      attackerRules: attackerRulesWithStratagems,
       defenderRules,
       attackerArmyStates,
       defenderArmyStates,
@@ -582,34 +619,14 @@ export default function CombatCalculatorPage({
     const defenderContext = combatStateResult.modifiers.defenderContext;
     const appliedAttackerRules = combatStateResult.modifiers.appliedAttackerRules;
     const appliedDefenderRules = combatStateResult.modifiers.appliedDefenderRules;
-    const appliedRules = combatStateResult.modifiers.appliedRules;
-
-    // For display, include unresolved choice rules from both attacker and defender.
-    // This allows reactive defender prompts (e.g. "is attacker afflicted?") to appear.
-    const conditionalAttackerRules = attackerRules.filter(rule => {
-      // Skip if already applied
-      if (appliedAttackerRules.some(r => r.id === rule.id)) return false;
-
-      // Include choice rules if their when condition is met
-      if (rule.kind === 'choice') {
-        return evaluateWhen(rule.when, attackerContext);
-      }
-
-      return false;
+    const displayRules = buildCombatActiveRules({
+      attackerRules: attackerRulesWithStratagems,
+      defenderRules,
+      appliedAttackerRules,
+      appliedDefenderRules,
+      attackerContext,
+      defenderContext
     });
-
-    const conditionalDefenderRules = defenderRules.filter(rule => {
-      // Skip if already applied
-      if (appliedDefenderRules.some(r => r.id === rule.id)) return false;
-
-      if (rule.kind === 'choice') {
-        return evaluateWhen(rule.when, defenderContext);
-      }
-
-      return false;
-    });
-
-    const displayRules = [...appliedAttackerRules, ...conditionalAttackerRules, ...conditionalDefenderRules];
 
 
     // Extract keywords (weapon abilities) from attacker context
@@ -719,7 +736,7 @@ export default function CombatCalculatorPage({
       rerollWound: rerollWoundSources
     });
     setCombatState(combatStateResult);
-  }, [selectedWeaponId, selectedTarget?.id, unit?.id, game?.id, weaponType]); // Use IDs to avoid object reference changes
+  }, [selectedWeaponId, selectedTarget?.id, unit?.id, game?.id, weaponType, activeStratagemIds.join('|')]); // Use IDs to avoid object reference changes
 
   const handleBack = () => {
     if (onClose) {
@@ -781,6 +798,7 @@ export default function CombatCalculatorPage({
       selectedTarget,
       weaponType
     });
+    const attackerRulesWithStratagems = [...attackerRules, ...activeCombatStratagemRules];
 
     const combatStateResult = buildCombatState({
       attacker: { ...unit, armyId: currentArmyId },
@@ -789,7 +807,7 @@ export default function CombatCalculatorPage({
       game: game,
       combatPhase: weaponType === 'melee' ? 'melee' : 'shooting',
       options,
-      attackerRules,
+      attackerRules: attackerRulesWithStratagems,
       defenderRules,
       attackerArmyStates,
       defenderArmyStates,
@@ -802,6 +820,7 @@ export default function CombatCalculatorPage({
     const appliedRules = combatStateResult.modifiers.appliedRules;
     const rerollHitKind = combatStateResult.modifiers.rerollHitKind;
     const rerollWoundKind = combatStateResult.modifiers.rerollWoundKind;
+    const criticalHitThreshold = combatStateResult.modifiers.criticalHitThreshold;
 
     const aMod = combatStateResult.modifiers.weaponModifiers.A;
     const sMod = combatStateResult.modifiers.weaponModifiers.S;
@@ -813,20 +832,11 @@ export default function CombatCalculatorPage({
     const invMod = combatStateResult.modifiers.targetModifiers.INV;
     const fnpMod = combatStateResult.modifiers.targetModifiers.FNP;
 
-    // TODO: Extract modifier sources from appliedRules if needed for UI display
-    // For now, just use rule IDs as sources (detailed source tracking would require walking the new schema's then/fx blocks)
-    const hitSources = appliedRules.map(r => r.id);
-    const woundSources = appliedRules.map(r => r.id);
-    const keywordSources: Array<{ keyword: string; source: string }> = keywords.map(kw => ({
-      keyword: kw,
-      source: 'rule' // Simplified for now
-    }));
-
-    const computedModifierSources = {
-      hit: hitSources,
-      wound: woundSources,
-      keywords: keywordSources
-    };
+    const computedModifierSources = getCombatModifierSources({
+      attackerContext: combatStateResult.modifiers.attackerContext,
+      defenderContext: combatStateResult.modifiers.defenderContext,
+      keywords
+    });
 
     const rollDisplay = buildRollDisplayPayload({
       hitModifier: hitMod,
@@ -864,6 +874,7 @@ export default function CombatCalculatorPage({
       preCalculatedModifiers: {
         hitModifier: hitMod,
         woundModifier: woundMod,
+        criticalHitThreshold,
         weaponModifiers: { A: aMod, S: sMod, AP: apMod, D: dMod },
         addedKeywords: keywords,
         appliedRules: appliedRules,
@@ -1028,15 +1039,49 @@ export default function CombatCalculatorPage({
   };
 
   const handleDone = async () => {
-    // Mark weapons as fired, same as handleShoot
-    await handleShoot();
+    const shouldMarkWeapons = shouldMarkWeaponsOnDone({
+      currentPlayerId: viewerPlayerId || currentPlayer?.id,
+      initiatorPlayerId: combatSession?.initiatorPlayerId
+    });
+    const remainingAvailableWeaponCountAfterDone = shouldMarkWeapons && selectedWeapon && turnPlayerId && weaponType !== 'melee'
+      ? calculateRemainingRangedWeaponGroupsAfterFiring({
+          allWeapons: allWeapons.map((weapon: any) => ({
+            id: weapon.id,
+            name: weapon.name,
+            modelId: weapon.modelId,
+            turnsFired: weapon.turnsFired || [],
+            isPistol: isPistol(weapon)
+          })),
+          currentlyAvailableWeaponNames: availableUnfiredWeapons.map((weapon: any) => weapon.name),
+          selectedWeaponName: (selectedWeapon as any).name,
+          turnPlayerId
+        })
+      : shouldMarkWeapons
+      ? Math.max(availableUnfiredWeapons.length - 1, 0)
+      : availableUnfiredWeapons.length;
+    const shouldExitOnDone = shouldExitCalculatorOnDone({
+      shouldMarkWeapons,
+      remainingAvailableWeaponCountAfterDone
+    });
+
+    // Only the initiator should mark weapons as fired for this attack session.
+    if (shouldMarkWeapons) {
+      await handleShoot();
+    }
+
     // Close the modal
     handleCloseDiceResults();
-    updateCombatSession({
-      screen: 'combat-calculator',
-      phase: 'attacks',
-      payload: {}
-    });
+    if (shouldExitOnDone) {
+      handleBack();
+    }
+  };
+
+  const toggleCombatStratagem = (stratagemId: string) => {
+    setActiveStratagemIds((prev) =>
+      prev.includes(stratagemId)
+        ? prev.filter((id) => id !== stratagemId)
+        : [...prev, stratagemId]
+    );
   };
 
   const handleShoot = async () => {
@@ -1059,6 +1104,14 @@ export default function CombatCalculatorPage({
         const currentTurnsFired = weapon.turnsFired || [];
         if (currentTurnsFired.includes(turnPlayerId)) {
           return false;
+        }
+
+        if (weaponType === 'melee') {
+          if (isExtraAttacksWeapon(weapon)) {
+            return isMeleeWeaponInstanceEligible(weapon, allWeapons as any, turnPlayerId);
+          }
+
+          return isMeleeWeaponInstanceEligible(weapon, allWeapons as any, turnPlayerId);
         }
 
         // Check if this weapon's model has fired the opposite type
@@ -1274,6 +1327,38 @@ export default function CombatCalculatorPage({
             </div>
           </div>
 
+          {availableCombatStratagems.length > 0 && (
+            <div className="mt-4 p-3 rounded-lg bg-yellow-900/20 border border-yellow-700/50">
+              <p className="text-sm font-semibold text-yellow-300 mb-2">Combat Stratagems</p>
+              <div className="flex flex-wrap gap-2">
+                {availableCombatStratagems.map((stratagem) => {
+                  const active = activeStratagemIds.includes(stratagem.id);
+                  return (
+                    <div key={stratagem.id} className="flex items-center gap-1">
+                      <button
+                        onClick={() => toggleCombatStratagem(stratagem.id)}
+                        className={`px-3 py-1 rounded-md text-sm font-semibold transition-colors ${
+                          active
+                            ? 'bg-yellow-500 text-black'
+                            : 'bg-yellow-700/70 hover:bg-yellow-600 text-yellow-100'
+                        }`}
+                      >
+                        {stratagem.name} ({stratagem.cost}CP)
+                      </button>
+                      <button
+                        onClick={() => setSelectedStratagemInfo(stratagem)}
+                        className="px-2 py-1 rounded-md text-xs bg-gray-700 hover:bg-gray-600 text-gray-200"
+                        title="View full stratagem text"
+                      >
+                        i
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Active Rules Display */}
           {activeRules.length > 0 && (
             <div className="mt-6">
@@ -1309,8 +1394,35 @@ export default function CombatCalculatorPage({
             if (combatSession?.updatedAt) {
               setLastDismissedDiceUpdatedAt(combatSession.updatedAt);
             }
+            if (
+              shouldExitCalculatorOnDigitalDiceClose({
+                remainingAvailableWeaponCount: availableUnfiredWeapons.length
+              })
+            ) {
+              handleBack();
+            }
           }}
         />
+      )}
+
+      {selectedStratagemInfo && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg max-w-xl w-full p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-yellow-300">
+                {selectedStratagemInfo.name} ({selectedStratagemInfo.cost}CP)
+              </h3>
+              <button
+                onClick={() => setSelectedStratagemInfo(null)}
+                className="text-gray-400 hover:text-white text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-sm text-gray-300 mb-2">{selectedStratagemInfo.when}</p>
+            <p className="text-sm text-gray-200">{selectedStratagemInfo.effect}</p>
+          </div>
+        </div>
       )}
 
       {/* Dice Roll Results Modal */}

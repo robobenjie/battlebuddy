@@ -12,6 +12,7 @@ import RulePopup from '../ui/RulePopup';
 import { getUnitReminders, deduplicateRemindersByName } from '../../lib/rules-engine/reminder-utils';
 import { UNIT_FULL_QUERY } from '../../lib/query-fragments';
 import { CombatSessionRecord } from '../../lib/rooms-types';
+import { getUnitMeleeWeaponsWithModelIds, hasRemainingEligibleMeleeWeapons } from '../../lib/melee-weapon-sequencing';
 
 interface FightPhaseProps {
   gameId: string;
@@ -75,6 +76,7 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
   const allArmies = gameRecord?.armies || [];
   const destroyedUnitIds = new Set((gameRecord?.destroyedUnits || []).map((u: any) => u.id));
   const players = playersData?.players || [];
+  const viewerPlayer = players.find((player: any) => player.userId === currentUser?.id);
   const activeSessionId = gameRecord?.activeCombatSessionId;
   const activeCombatSession = (gameRecord?.combatSessions || []).find((session: any) => session.id === activeSessionId) as CombatSessionRecord | undefined;
 
@@ -203,11 +205,18 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
   // Close combat calculator and mark unit as fought
   const closeCombatCalculator = async () => {
     if (selectedUnit) {
-      // Mark unit as fought
-      try {
-        await createUnitStatus(selectedUnit.id, 'fought');
-      } catch (error) {
-        console.error('Error marking unit as fought:', error);
+      const latestUnit = allUnitsInGame.find((unit: any) => unit.id === selectedUnit.id) || selectedUnit;
+      const turnPlayerId = `${game.currentTurn}-${currentPlayer.id}`;
+      const meleeWeapons = getUnitMeleeWeaponsWithModelIds(latestUnit);
+      const hasRemainingMeleeAttacks = hasRemainingEligibleMeleeWeapons(meleeWeapons, turnPlayerId);
+
+      // Mark unit as fought only when all eligible melee attacks are resolved.
+      if (!hasRemainingMeleeAttacks) {
+        try {
+          await createUnitStatus(selectedUnit.id, 'fought');
+        } catch (error) {
+          console.error('Error marking unit as fought:', error);
+        }
       }
     }
     setShowCombatCalculator(false);
@@ -413,6 +422,7 @@ export default function FightPhase({ gameId, army, currentPlayer, currentUser, g
                 weaponType="melee"
                 onClose={closeCombatCalculator}
                 currentPlayer={currentPlayer}
+                viewerPlayerId={viewerPlayer?.id}
                 combatSession={activeCombatSession}
               />
             </div>

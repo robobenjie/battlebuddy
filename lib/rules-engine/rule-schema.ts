@@ -51,6 +51,7 @@ export const WeaponAbilityFlag = z.enum([
   "heavy",
   "ignoresCover",
   "indirectFire",
+  "lance",
   "lethalHits",
   "pistol",
   "psychic",
@@ -142,6 +143,7 @@ export const Fx = z.union([
   z.object({ t: z.literal("setToughness"), n: z.number().int().min(1) }).strict(),
   z.object({ t: z.literal("setInvuln"), n: z.number().int().min(2).max(7) }).strict(),
   z.object({ t: z.literal("setFNP"), n: z.number().int().min(2).max(7) }).strict(),
+  z.object({ t: z.literal("setCriticalHit"), n: z.number().int().min(2).max(6) }).strict(),
 
   // Rerolls
   z.object({ t: z.literal("reroll"), phase: z.enum(["hit", "wound", "damage"]), kind: z.enum(["ones", "failed", "all"]) }).strict(),

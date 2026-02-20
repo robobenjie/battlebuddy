@@ -13,6 +13,7 @@ import { formatUnitForCard } from '../../lib/unit-utils';
 import ArmyChoiceSelector from '../ui/ArmyChoiceSelector';
 import EnemyUnitSelector from '../ui/EnemyUnitSelector';
 import { Rule, ChoiceRuleType } from '../../lib/rules-engine/types';
+import { getPendingCommandChoiceRules } from '../../lib/command-choice-utils';
 
 interface CommandPhaseProps {
   gameId: string;
@@ -44,17 +45,16 @@ interface CommandPhaseProps {
 export default function CommandPhase({ gameId, army, currentUserArmy, currentPlayer, currentUser, game, players }: CommandPhaseProps) {
   const { isOpen, rule, showRule, hideRule } = useRulePopup();
 
-  // Query for army states to check if WAAAGH has been declared
-  // Use currentUserArmy so each player sees their own army's Waaagh status
-  // Note: Query from armies with states link, not armyStates directly
+  // Query army states/rules for the currently active phase army.
+  // Note: Query from armies with states link, not armyStates directly.
   const { data: armyStatesData } = db.useQuery(
-    currentUserArmy?.id ? {
+    army?.id ? {
       armies: {
         states: {},
         armyRules: {}, // Query army-level rules
         $: {
           where: {
-            id: currentUserArmy.id
+            id: army.id
           }
         }
       }
@@ -102,7 +102,7 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
 
   const armyWithStates = armyStatesData?.armies?.[0];
   const waaaghState = armyWithStates?.states?.find((s: any) => s.state === 'waaagh-active');
-  const hasWaaagh = currentUserArmy?.faction?.toLowerCase() === 'orks';
+  const hasWaaagh = army?.faction?.toLowerCase() === 'orks';
   const waaaghAlreadyDeclared = !!waaaghState;
   const isCurrentPlayer = currentPlayer?.userId === currentUser?.id;
 
@@ -172,7 +172,7 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
   };
 
   const declareWaaagh = async () => {
-    if (!currentUserArmy?.id) return;
+    if (!army?.id) return;
 
     // Waaagh lasts until the player's next command phase (a full game round)
     await db.transact([
@@ -180,46 +180,49 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
         state: 'waaagh-active',
         activatedTurn: game.currentTurn,
         expiresPhase: 'command', // Expires at the start of next command phase
-      }).link({ army: currentUserArmy.id })
+      }).link({ army: army.id })
     ]);
   };
 
   // Get army-level rules for choices and targeting
   const armyRulesData = armyWithStates?.armyRules || [];
 
-  const armyRules: Rule[] = armyRulesData
-    .flatMap((ruleData: any) => {
-      try {
-        const parsed = JSON.parse(ruleData.ruleObject);
-        // Handle both single rule objects and arrays of rules
-        const rules = Array.isArray(parsed) ? parsed : [parsed];
-        return rules;
-      } catch (e) {
-        console.error('Failed to parse army rule:', e);
-        return [];
-      }
-    })
+  const parseRuleObject = (ruleObject?: string): Rule[] => {
+    if (!ruleObject) return [];
+    try {
+      const parsed = JSON.parse(ruleObject);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e) {
+      console.error('Failed to parse rule object:', e);
+      return [];
+    }
+  };
+
+  const linkedArmyRules: Rule[] = armyRulesData
+    .flatMap((ruleData: any) => parseRuleObject(ruleData.ruleObject))
+    .filter((r: Rule | null): r is Rule => r !== null);
+
+  // Some imported army-scope rules can be linked to units based on source placement.
+  // Pull those in so command-phase army choices (e.g. Death Guard plague) still appear.
+  const unitLinkedArmyScopeRules: Rule[] = units
+    .flatMap((unit: any) => unit.unitRules || [])
+    .flatMap((ruleData: any) => parseRuleObject(ruleData.ruleObject))
+    .filter((r: Rule | null): r is Rule => r !== null)
+    .filter((rule: Rule) => rule.scope === 'army');
+
+  const armyRulesById = new Map<string, Rule>();
+  for (const rule of [...linkedArmyRules, ...unitLinkedArmyScopeRules]) {
+    armyRulesById.set(rule.id, rule);
+  }
+  const armyRules: Rule[] = Array.from(armyRulesById.values())
     .filter((r: Rule | null): r is Rule => r !== null);
 
   // Filter for command phase choice rules that need action
-  const commandChoiceRules = armyRules.filter((rule): rule is ChoiceRuleType => {
-    if (rule.kind !== 'choice') return false;
-    if (rule.scope !== 'army') return false;
-    if (!rule.trigger) return false;
-    if (rule.trigger.phase !== 'command' && !Array.isArray(rule.trigger.phase)) return false;
-    if (Array.isArray(rule.trigger.phase) && !rule.trigger.phase.includes('command')) return false;
-
-    // Check if already selected
-    const existingState = armyStates.find((s: any) => s.state === rule.choice.id);
-
-    // Once-per-battle: only show on turn 1 if not already selected
-    if (rule.trigger.limit === 'once-per-battle') {
-      return game.currentTurn === 1 && !existingState;
-    }
-
-    // Otherwise (none limit): always show if not selected this turn
-    return !existingState || existingState.activatedTurn < game.currentTurn;
-  });
+  const commandChoiceRules: ChoiceRuleType[] = getPendingCommandChoiceRules(
+    armyRules,
+    armyStates as any,
+    game.currentTurn
+  );
 
   // Filter for targeting rules that need action (like Oath of Moment)
   const targetingRules = armyRules.filter(rule => {
@@ -241,7 +244,7 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
 
   // Handle choice selection
   const handleChoiceSelection = async (ruleId: string, choiceId: string, optionValue: string) => {
-    if (!currentUserArmy?.id) return;
+    if (!army?.id) return;
 
     await db.transact([
       db.tx.armyStates[id()].update({
@@ -251,13 +254,13 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
         // Choices with game lifetime don't expire
         // Choices with phase lifetime expire at next command phase
         expiresPhase: undefined, // Will add phase-based expiration in future iteration
-      }).link({ army: currentUserArmy.id })
+      }).link({ army: army.id })
     ]);
   };
 
   // Handle enemy unit targeting
   const handleTargetSelection = async (ruleId: string, targetUnitId: string) => {
-    if (!currentUserArmy?.id) return;
+    if (!army?.id) return;
 
     await db.transact([
       db.tx.armyStates[id()].update({
@@ -265,7 +268,7 @@ export default function CommandPhase({ gameId, army, currentUserArmy, currentPla
         targetUnitId: targetUnitId,
         activatedTurn: game.currentTurn,
         expiresPhase: 'command', // Most targeting abilities expire at next command phase
-      }).link({ army: currentUserArmy.id })
+      }).link({ army: army.id })
     ]);
   };
 

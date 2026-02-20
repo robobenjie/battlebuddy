@@ -39,6 +39,7 @@ export default function DigitalDiceMenu({
   const [blastBonusAttacks, setBlastBonusAttacks] = useState(
     keywords.blast ? Math.floor(target.modelCount / 5) : 0
   );
+  const [chargedThisTurn, setChargedThisTurn] = useState(unitHasCharged);
   const [unitRemainedStationary, setUnitRemainedStationary] = useState(!unitHasMovedOrAdvanced);
 
   // State for user inputs from choice rules
@@ -66,12 +67,16 @@ export default function DigitalDiceMenu({
     }
   }, [target.modelCount, keywords.blast]);
 
+  useEffect(() => {
+    setChargedThisTurn(unitHasCharged);
+  }, [unitHasCharged]);
+
   const handleRollAttacks = () => {
     const options: CombatOptions = {
       modelsFiring: typeof modelsFiring === 'number' ? modelsFiring : 1,
       withinHalfRange,
       blastBonusAttacks,
-      unitHasCharged,
+      unitHasCharged: chargedThisTurn,
       unitRemainedStationary,
       userInputs
     };
@@ -85,7 +90,7 @@ export default function DigitalDiceMenu({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg max-w-md w-full mx-4 p-6">
+      <div className="bg-gray-900 rounded-lg max-w-md w-full mx-4 p-6 max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-white">Digital Dice</h2>
@@ -97,7 +102,7 @@ export default function DigitalDiceMenu({
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto pr-1 flex-1 min-h-0">
           {/* Weapon Name */}
           <div className="bg-gray-800 rounded p-3">
             <p className="text-sm text-gray-400">Weapon</p>
@@ -221,6 +226,26 @@ export default function DigitalDiceMenu({
             </div>
           )}
 
+          {/* Lance Charged Toggle */}
+          {keywords.lance && (
+            <div className="bg-gray-800 rounded p-3">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <p className="text-white font-semibold">Unit charged this turn</p>
+                  <p className="text-xs text-gray-400">
+                    (+1 to wound for Lance weapons)
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={chargedThisTurn}
+                  onChange={(e) => setChargedThisTurn(e.target.checked)}
+                  className="w-6 h-6 text-red-600 bg-gray-700 border-gray-600 rounded focus:ring-red-500"
+                />
+              </label>
+            </div>
+          )}
+
           {/* Conditional Rule Inputs (Choice Rules) */}
           {rulesWithInput.map(rule => {
             if (rule.kind !== 'choice' || !rule.choice) return null;
@@ -270,7 +295,10 @@ export default function DigitalDiceMenu({
             </div>
           )}
 
-          {/* Roll Attacks Button */}
+        </div>
+
+        {/* Roll Attacks Button */}
+        <div className="pt-4 mt-4 border-t border-gray-700">
           <button
             onClick={handleRollAttacks}
             className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg"

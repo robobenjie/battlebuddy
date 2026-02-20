@@ -12,7 +12,7 @@ export interface AttackResult {
   totalAttacks: number;
   attackRolls: DiceRoll[];
   hits: number[];
-  criticalHits: number[]; // Indices of critical hits (6s)
+  criticalHits: number[]; // Indices of critical hits
   lethalHits: number[]; // Indices of lethal hits that auto-wound
   attackCountRolls?: { value: number; sides: number }[]; // The dice rolls for attack count (one per model if variable)
 }
@@ -135,11 +135,14 @@ export function rollAttacks(
   modifiers: {
     sustainedHitsValue?: number;
     lethalHits?: boolean;
+    criticalHitThreshold?: number;
     torrent?: boolean;
     rerollHits?: 'ones' | 'failed' | 'all';
     attackCountRolls?: { value: number; sides: number }[];
   } = {}
 ): AttackResult {
+  const criticalHitThreshold = modifiers.criticalHitThreshold ?? 6;
+
   // Torrent: all attacks auto-hit
   if (modifiers.torrent) {
     const attackRolls: DiceRoll[] = Array.from({ length: attackCount }, () => ({ value: 6 }));
@@ -172,15 +175,15 @@ export function rollAttacks(
   const criticalHits: number[] = [];
   const lethalHits: number[] = [];
 
+  const effectiveHitRerollKind = modifiers.rerollHits === 'all' ? 'failed' : modifiers.rerollHits;
+
   // Apply rerolls before evaluating hits
-  if (modifiers.rerollHits) {
+  if (effectiveHitRerollKind) {
     const indicesToReroll: number[] = [];
     attackRolls.forEach((roll, index) => {
-      if (modifiers.rerollHits === 'all') {
+      if (effectiveHitRerollKind === 'ones' && roll.value === 1) {
         indicesToReroll.push(index);
-      } else if (modifiers.rerollHits === 'ones' && roll.value === 1) {
-        indicesToReroll.push(index);
-      } else if (modifiers.rerollHits === 'failed' && roll.value < hitThreshold) {
+      } else if (effectiveHitRerollKind === 'failed' && roll.value < hitThreshold) {
         indicesToReroll.push(index);
       }
     });
@@ -201,8 +204,8 @@ export function rollAttacks(
     if (roll.value >= hitThreshold) {
       hits.push(index);
 
-      // Check for critical hit (unmodified 6)
-      if (roll.value === 6) {
+      // Check for critical hit (unmodified threshold)
+      if (roll.value >= criticalHitThreshold) {
         criticalHits.push(index);
 
         // Lethal hits auto-wound

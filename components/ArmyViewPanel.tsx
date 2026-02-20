@@ -163,14 +163,14 @@ export default function ArmyViewPanel({ isOpen, onClose, gameId, currentUserId, 
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black bg-opacity-50 transition-opacity"
+          className="fixed inset-0 z-[70] bg-black bg-opacity-50 transition-opacity"
           onClick={onClose}
         />
       )}
 
       {/* Panel */}
       <div
-        className={`fixed top-0 right-0 z-50 h-full w-full sm:w-96 bg-gray-800 border-l border-gray-700 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 z-[80] h-full w-full sm:w-96 bg-gray-800 border-l border-gray-700 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >

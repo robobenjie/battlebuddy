@@ -2,7 +2,7 @@
  * Stratagems for Warhammer 40k 10th Edition
  */
 
-export type StratagemPhase = 'any' | 'command' | 'move' | 'shoot' | 'charge' | 'fight';
+export type StratagemPhase = 'any' | 'command' | 'move' | 'shoot' | 'charge' | 'fight' | 'move-or-charge';
 
 export interface Stratagem {
   id: string;
@@ -379,6 +379,76 @@ export const SPACE_MARINES_GLADIUS_STRATAGEMS: Stratagem[] = [
   },
 ];
 
+// Death Guard - Mortarion's Hammer Stratagems
+export const DEATH_GUARD_MORTARIONS_HAMMER_STRATAGEMS: Stratagem[] = [
+  {
+    id: 'blighted-land',
+    name: 'Blighted Land',
+    cost: 2,
+    phase: 'move',
+    when: 'End of your Movement phase',
+    effect: 'Select one terrain feature within 24" of and visible to one DEATH GUARD VEHICLE unit from your army. Until the start of your next turn, enemy units are Afflicted while they are within 3" of that terrain feature.',
+    faction: 'Death Guard',
+    detachment: "Mortarion's Hammer",
+    turn: 'your-turn',
+  },
+  {
+    id: 'relentless-grind',
+    name: 'Relentless Grind',
+    cost: 1,
+    phase: 'move-or-charge',
+    when: 'Your Movement phase or your Charge phase',
+    effect: 'Select one DEATH GUARD VEHICLE unit from your army that has not been selected to move or charge this phase. Until the end of the phase, each time your unit makes a Normal, Advance or Charge move, it can move horizontally through terrain features.',
+    faction: 'Death Guard',
+    detachment: "Mortarion's Hammer",
+    turn: 'your-turn',
+  },
+  {
+    id: 'drawn-to-despair',
+    name: 'Drawn to Despair',
+    cost: 1,
+    phase: 'shoot',
+    when: 'Your Shooting phase',
+    effect: 'Select one DEATH GUARD unit from your army that has not been selected to shoot this phase. Until the end of the phase, each time a model in your unit makes an attack that targets a visible enemy unit (excluding AIRCRAFT) within your opponent\'s deployment zone, you can re-roll the Hit roll.',
+    faction: 'Death Guard',
+    detachment: "Mortarion's Hammer",
+    turn: 'your-turn',
+  },
+  {
+    id: 'font-of-filth',
+    name: 'Font of Filth',
+    cost: 1,
+    phase: 'shoot',
+    when: 'Your Shooting phase',
+    effect: 'Select one DEATH GUARD VEHICLE unit from your army that has not been selected to shoot this phase. Until the end of the phase, ranged weapons equipped by models in your unit have the [ASSAULT] ability.',
+    faction: 'Death Guard',
+    detachment: "Mortarion's Hammer",
+    turn: 'your-turn',
+  },
+  {
+    id: 'eyestinger-storm',
+    name: 'Eyestinger Storm',
+    cost: 1,
+    phase: 'command',
+    when: "Your opponent's Command phase",
+    effect: 'Select one DEATH GUARD VEHICLE unit from your army, then select one objective marker visible to one or more models in your unit. Each Afflicted enemy unit within range of that objective marker must take a Battle-shock test; enemy units affected by this Stratagem do not need to take any other Battle-shock tests in the same phase.',
+    faction: 'Death Guard',
+    detachment: "Mortarion's Hammer",
+    turn: 'opponent-turn',
+  },
+  {
+    id: 'stinking-mire',
+    name: 'Stinking Mire',
+    cost: 1,
+    phase: 'charge',
+    when: "Start of your opponent's Charge phase",
+    effect: 'Select one DEATH GUARD VEHICLE unit from your army. Until the end of the phase, each time an enemy unit selects your unit as the target of a charge, subtract 2 from the Charge roll (this is not cumulative with any other negative modifiers to that Charge roll).',
+    faction: 'Death Guard',
+    detachment: "Mortarion's Hammer",
+    turn: 'opponent-turn',
+  },
+];
+
 // Helper function to get all stratagems for a faction/detachment
 export function getAvailableStratagems(faction?: string, detachment?: string): Stratagem[] {
   const stratagems = [...CORE_STRATAGEMS];
@@ -403,12 +473,23 @@ export function getAvailableStratagems(faction?: string, detachment?: string): S
     }
   }
 
+  if (faction?.toLowerCase().includes('death guard')) {
+    const normalizedDetachment = detachment?.toLowerCase() || '';
+    if (normalizedDetachment.includes('mortarion') && normalizedDetachment.includes('hammer')) {
+      stratagems.push(...DEATH_GUARD_MORTARIONS_HAMMER_STRATAGEMS);
+    }
+  }
+
   return stratagems;
 }
 
 // Helper function to filter stratagems by phase
 export function getStratagemsForPhase(stratagems: Stratagem[], phase: string): Stratagem[] {
-  return stratagems.filter(s => s.phase === 'any' || s.phase === phase);
+  return stratagems.filter((s) => {
+    if (s.phase === 'any' || s.phase === phase) return true;
+    if (s.phase === 'move-or-charge') return phase === 'move' || phase === 'charge';
+    return false;
+  });
 }
 
 // Helper function to filter stratagems by turn

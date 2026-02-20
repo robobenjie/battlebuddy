@@ -368,6 +368,7 @@ export function calculateCombatModifiers(params: {
 }): {
   hitModifier: number;
   woundModifier: number;
+  criticalHitThreshold?: number;
   weaponModifiers: { A: number; S: number; AP: number; D: number };
   targetModifiers: { T: number; TSet?: number; SV: number; INV?: number; FNP?: number };
   addedKeywords: string[];
@@ -440,6 +441,14 @@ export function calculateCombatModifiers(params: {
   const rerollHitKind = resolveRerollKind('hit');
   const rerollWoundKind = resolveRerollKind('wound');
 
+  const criticalHitSetModifiers = [
+    ...attackerContext.modifiers.getModifiers('criticalHit'),
+    ...defenderContext.modifiers.getModifiers('criticalHit')
+  ].filter(m => m.operation === 'set');
+  const criticalHitThreshold = criticalHitSetModifiers.length > 0
+    ? criticalHitSetModifiers[criticalHitSetModifiers.length - 1].value
+    : undefined;
+
   // Extract weapon characteristic modifiers (from attacker)
   const weaponModifiers = {
     A: attackerContext.modifiers.get('A') || 0,
@@ -491,6 +500,7 @@ export function calculateCombatModifiers(params: {
   return {
     hitModifier,
     woundModifier,
+    criticalHitThreshold,
     weaponModifiers,
     targetModifiers,
     addedKeywords,
@@ -593,6 +603,7 @@ export function executeCombatSequence(
     preCalculatedModifiers?: {
       hitModifier: number;
       woundModifier: number;
+      criticalHitThreshold?: number;
       weaponModifiers: { A: number; S: number; AP: number; D: number };
       addedKeywords: string[];
       appliedRules: Rule[];
@@ -612,6 +623,7 @@ export function executeCombatSequence(
   let appliedRules: Rule[] = [];
   let rerollHitKind: 'ones' | 'failed' | 'all' | undefined;
   let rerollWoundKind: 'ones' | 'failed' | 'all' | undefined;
+  let criticalHitThreshold: number | undefined;
 
   if (params?.preCalculatedModifiers) {
     // Use pre-calculated modifiers (already merged from attacker and defender)
@@ -625,6 +637,7 @@ export function executeCombatSequence(
     appliedRules = params.preCalculatedModifiers.appliedRules;
     rerollHitKind = params.preCalculatedModifiers.rerollHitKind;
     rerollWoundKind = params.preCalculatedModifiers.rerollWoundKind;
+    criticalHitThreshold = params.preCalculatedModifiers.criticalHitThreshold;
   } else if (params?.rules && params?.attacker && params?.game) {
     // Legacy path: calculate modifiers from rules (only supports attacker rules)
     const context = buildCombatContext({
@@ -660,6 +673,11 @@ export function executeCombatSequence(
     };
     rerollHitKind = resolveRerollKind('hit');
     rerollWoundKind = resolveRerollKind('wound');
+    const criticalHitSetMods = context.modifiers.getModifiers('criticalHit')
+      .filter(m => m.operation === 'set');
+    if (criticalHitSetMods.length > 0) {
+      criticalHitThreshold = criticalHitSetMods[criticalHitSetMods.length - 1].value;
+    }
   }
 
   const effectiveWeapon = applyWeaponModifiers(
@@ -699,6 +717,7 @@ export function executeCombatSequence(
   const attackPhase = rollAttacks(totalAttacks, hitThreshold, {
     sustainedHitsValue: keywords.sustainedHitsValue || undefined,
     lethalHits: keywords.lethalHits,
+    criticalHitThreshold,
     torrent: keywords.torrent,
     rerollHits: rerollHitKind,
     attackCountRolls: attacksResult.rolls

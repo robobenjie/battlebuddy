@@ -39,6 +39,16 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
   const [selectedWeaponName, setSelectedWeaponName] = useState<string>('');
   const [dismissedSessionUpdatedAt, setDismissedSessionUpdatedAt] = useState<number | null>(null);
 
+  const { data: playersData } = db.useQuery({
+    players: {
+      $: {
+        where: {
+          gameId
+        }
+      }
+    }
+  });
+
   // Query units for this army in the game and destroyed units list
   const { data: unitsData } = db.useQuery({
     armies: {
@@ -69,6 +79,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
   });
 
   const allUnits = unitsData?.armies[0]?.units || [];
+  const viewerPlayer = (playersData?.players || []).find((player: any) => player.userId === currentUser?.id);
   const gameData = unitsData?.games?.[0];
   const destroyedUnitIds = new Set((gameData?.destroyedUnits || []).map((u: any) => u.id));
   const activeSessionId = gameData?.activeCombatSessionId;
@@ -377,6 +388,7 @@ export default function ShootPhase({ gameId, army, currentPlayer, currentUser, g
                 preSelectedWeaponName={selectedWeaponName}
                 onClose={closeCombatCalculator}
                 currentPlayer={currentPlayer}
+                viewerPlayerId={viewerPlayer?.id}
                 combatSession={activeCombatSession}
               />
             </div>
